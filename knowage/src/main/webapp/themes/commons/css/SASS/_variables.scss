@@ -20,7 +20,7 @@ $listBackground:	 		$pageBackground;
 $detailBackground: 			#f6f6f6;
 $tabBackground: 			white;
 $tableLineSeparator: 		#c3d4df;
-$tableSelectedElementColor: $secondaryColor;
+$tableSelectedElementColor: lighten($secondaryColor,5%);
 $federatedDatasetBackground: $pageBackground;
 $raisedButtonTextColor: 	white;
 $inputInvalidLineColor: 	#c70751;
@@ -32,11 +32,15 @@ $cardActionIconsColor: 		$toolbarButtonColor;
 $tooltipBackgroundColor: 	#fcefbd;
 $shadowsColor:				#ccc;
 $warningColor:				lighten($secondaryColor,20%);
+$tableHeaderColor: white;
 
 $listRightBorder: 2px solid $ternaryColor;
 
 
 /* FONTS AND ICONS */
+$defaultFontFamily : 'Roboto', 'Helvetica Neue, Helvetica, Arial', sans-serif;
+$rootFontSize: 		16px;
+
 $headerFontWeight: 	600;
 $tabFontWeight: 	300;
 $baseFontSize: 		.8rem;
@@ -66,6 +70,10 @@ $smallLineHeight: 			1.5rem;
 $standardMarginTop: 		.5rem;
 $fabTop: 					.6em;
 $fontIconHeight:			24px;
+$listHeight: 				24px;
+$biggerListHeight:			32px;
+$cockpitWidth:				1920px;
+$menuBarWidth:				40px;
 
 /* WORKSPACE */
 $progCirculWorkspaceDiam: 75;

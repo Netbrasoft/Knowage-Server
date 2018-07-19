@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 /**
  * @authors Giovanni Luca Ulivo (GiovanniLuca.Ulivo@eng.it)
  * v0.0.1
- * 
+ *
  */
 (function() {
 angular.module('cockpitModule')
@@ -31,38 +31,50 @@ angular.module('cockpitModule')
         link: function (scope, ele, attrs) {
             scope.$watch(attrs.textWidgetTextRender, function (html) {
             	html=cockpitModule_utilstServices.getParameterValue(html);
-                 
+
                 var model = scope.ngModel;
                 scope.ngModel.isReady=(cockpitModule_generalServices.isFromNewCockpit())?true:false;
                 if (html && html.indexOf("$F{")  >= 0){
-                	var elems = []; 
+                	var elems = [];
 	                for (var dsLabel in model.datasets){
 	                	elems.push(dsLabel);
 	                }
 
-                	function checkPlaceholders (counter){
-                		if (counter < elems.length){
-		                	cockpitModule_datasetServices.substitutePlaceholderValues(html, elems[counter], model).then(function(htmlReturned){
-		         				html = htmlReturned;
-		         				ele.html(html);
-		         				$compile(ele.contents())(scope);
-		         				counter++;
-		         				checkPlaceholders(counter);		         				
-		         			},function(error){
-		         			});
-                		}else{
-                			 scope.ngModel.isReady=true; //view the content replaced
-                		}
-                	}       
-                	
-                	checkPlaceholders(0);
+	                scope.checkPlaceholders= function(counter, refreshBool){
+
+	                	if(counter == 0 && refreshBool != undefined && refreshBool == true){
+	                		html = scope.ngModel.content.text;
+	                	}
+
+	                	if (counter < elems.length){
+	                		// call this only if reference is really contained
+	                		if(html.indexOf(elems[counter])>=0){
+	                			cockpitModule_datasetServices.substitutePlaceholderValues(html, elems[counter], model).then(function(htmlReturned){
+	                				html = htmlReturned;
+	                				ele.html(html);
+	                				$compile(ele.contents())(scope);
+	                				counter++;
+	                				scope.checkPlaceholders(counter);
+	                			},function(error){
+	                			});
+	                		}
+	                		else{
+	                			counter++;
+	                			scope.checkPlaceholders(counter);
+	                		}
+	                	}else{
+	                		scope.ngModel.isReady=true; //view the content replaced
+	                	}
+	                }
+
+	                scope.checkPlaceholders(0);
                 }else{
                 	 ele.html(html);
                      $compile(ele.contents())(scope);
                      scope.ngModel.isReady=true;
                 }
-               
-                
+
+
             });
         }
     };
@@ -82,7 +94,7 @@ angular.module('cockpitModule')
                     	//init the widget
                     	element.ready(function () {
                     		scope.initWidget();
-                        });                   	
+                        });
                     }
                 };
 		   	}
@@ -90,14 +102,14 @@ angular.module('cockpitModule')
 });
 
 function cockpitTextWidgetControllerFunction($scope,cockpitModule_widgetConfigurator,cockpitModule_datasetServices,sbiModule_translate,$q,$mdPanel){
-	
+
 	$scope.property={style:{}};
 	$scope.init=function(element,width,height){
-		$scope.refreshWidget();
+	//	$scope.refreshWidget();
 	};
-	
+
 	$scope.refresh=function(element,width,height){
-		/*
+
 		var fontSize = 0;
 		var textLength = 0;
 		var c = document.createElement('canvas');
@@ -109,50 +121,70 @@ function cockpitTextWidgetControllerFunction($scope,cockpitModule_widgetConfigur
 			textLength = mesTxt.width;
 			$scope.safeApply();
 		}
-		
+
 		$scope.property.style["font-size"]= fontSize+"px";
 		$scope.property.style["line-height"]= fontSize+"px";
-		*/
+
+		$scope.checkPlaceholders(0, true);
+
 	};
-	
+
 	$scope.editWidget=function(index){
-		
+
 		var finishEdit=$q.defer();
 		var config = {
 				attachTo:  angular.element(document.body),
 				controller: function($scope,finishEdit,sbiModule_translate,model,mdPanelRef,$mdToast){
 			    	  $scope.localModel = {};
+
+
+
 			    	  angular.copy(model,$scope.localModel);
 			    	  $scope.translate=sbiModule_translate;
-			    	  
+
+			    	  // trick to have drawn the text again when going into edit (could be altyered dataset, filters)
+			    	  //otherwiser watch on renderer does not start
+			    	  if($scope.localModel.content.text != undefined){
+			    		  $scope.localModel.content.text+=' ';
+			    	  }
+
 			    	  $scope.editorConfig = {
 			    	            sanitize: false,
 			    	            toolbar: [
 			    	            { name: 'basicStyling', items: ['bold', 'italic', 'underline', 'strikethrough', 'subscript', 'superscript', '-', 'leftAlign', 'centerAlign', 'rightAlign', 'blockJustify', '-'] },
 			    	            { name: 'paragraph', items: ['orderedList', 'unorderedList', 'outdent', 'indent', '-'] },
-			    	            { name: 'colors', items: ['fontColor', 'backgroundColor', '-'] }, 
+			    	            { name: 'colors', items: ['fontColor', 'backgroundColor', '-'] },
 			    	            { name: 'styling', items: ['font', 'size', 'format'] }
 			    	            ]
 			    	  };
-			    	  
-			    	  
+
 			    	  $scope.handleEvent=function(event, arg1){
 			    		  if(event=='datasetChanged'){
 							  changeDatasetFunction(arg1);
 						  }
 					  }
-			    	  
-			    	  var changeDatasetFunction=function(dsId){
-			    		  var ds = cockpitModule_datasetServices.getDatasetById(dsId);
-			    		  if(ds){
-		    				$scope.localModel.datasets[ds.label] = ds.metadata.fieldsMeta;
-		    				$scope.localModel.viewDatasetsDett = {};
-		    				$scope.localModel.viewDatasetsDett[ds.label] = false;
-		    				$scope.localModel.functions=['SUM', 'AVG', 'MIN', 'MAX','COUNT'];
-		    				$scope.localModel.viewDatasets = true;
+
+			    	  $scope.formatPattern = ['#.###','#,###','#.###,##','#,###.##'];
+
+			    	  var changeDatasetFunction=function(dsIdArray){
+			    		  if(dsIdArray != undefined){
+			    			  // clean datasets
+			    			  $scope.localModel.datasets = {};
+
+			    			  for(var i = 0; i< dsIdArray.length; i++){
+			    				  var dsId = dsIdArray[i];
+			    				  var ds = cockpitModule_datasetServices.getDatasetById(dsId);
+			    				  if(ds){
+			    					  $scope.localModel.datasets[ds.label] = ds.metadata.fieldsMeta;
+			    					  $scope.localModel.viewDatasetsDett = {};
+			    					  $scope.localModel.viewDatasetsDett[ds.label] = false;
+			    					  $scope.localModel.functions=['SUM', 'AVG', 'MIN', 'MAX','COUNT', 'COUNT_DISTINCT'];
+			    					  $scope.localModel.viewDatasets = true;
+			    				  }
+			    			  }
 			    		  }
 			    	  }
-			    	  
+
 			    	  $scope.saveConfiguration=function(){
 			    		  if($scope.localModel.content.text == undefined || $scope.localModel.content.text ==""){
 			  				$scope.showAction($scope.translate.load('sbi.cockpit.widget.text.missingtext'));
@@ -193,19 +225,41 @@ function cockpitTextWidgetControllerFunction($scope,cockpitModule_widgetConfigur
 				focusOnOpen: true,
 				preserveScope: true,
 				locals: {finishEdit:finishEdit,model:$scope.ngModel},
-			
+
 		};
 
 		$mdPanel.open(config);
 		return finishEdit.promise;
-		
-	
+
+
 	}
+
+
+	$scope.getOptions =function(){
+		var obj = {};
+
+//		if(!$scope.ngModel.settings.pagination.enabled || $scope.ngModel.settings.pagination.frontEnd){
+//			obj["page"] = -1;
+//			obj["itemPerPage"] = -1;
+//		}else{
+//			obj["page"] = $scope.ngModel.settings.page ? $scope.ngModel.settings.page - 1 : 0;
+//			obj["itemPerPage"] = $scope.ngModel.settings.pagination ? $scope.ngModel.settings.pagination.itemsNumber : -1;
+//		}
+//
+//		obj["columnOrdering"] = { name: $scope.ngModel.settings.sortingColumn };
+//		obj["reverseOrdering"] = ($scope.ngModel.settings.sortingOrder == 'ASC');
+
+		obj["type"] = $scope.ngModel.type;
+
+		return obj;
+
+	}
+
 
 };
 
 
 //this function register the widget in the cockpitModule_widgetConfigurator factory
-addWidgetFunctionality("text",{'updateble':false,'cliccable':false});
+addWidgetFunctionality("text",{'initialDimension':{'width':5, 'height':5},'updateble':false,'cliccable':false});
 
 })();

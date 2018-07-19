@@ -8,12 +8,14 @@
   'components/alerts',
   'components/animations',
   'components/associatorDirective',
+  'components/exportersMenu',
   'components/cacheManager',
   'components/layerCatalogue',
   'components/navbar',
   'components/federatedDataset',
   'components/importExportDocuments',
   'components/jsonTree',
+  'components/list',
   'components/listDetail',
   'components/login',
   'components/lov',
@@ -50,4 +52,9 @@
   'components/chartEngine',
   'components/dataSetManagement',
   'components/qbeEngine',
+  'components/table',
   'components/wheelNavigator';
+
+  @import 
+  'vendors/aggrid',
+  'vendors/codeMirror';

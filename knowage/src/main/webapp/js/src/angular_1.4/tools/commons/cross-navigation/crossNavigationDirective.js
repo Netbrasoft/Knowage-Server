@@ -14,7 +14,7 @@ angular.module('cross_navigation', ['ngMaterial','bread_crumb','angular_table'])
 		};
 
 		//chartType,documentName, documentParameters, categoryName, categoryValue, serieName, serieValue, groupingCategoryName, groupingCategoryValue, stringParameters
-		this.navigateTo=function(outputParameter,inputParameter,targetDocument,docLabel,staticParameters){
+		this.navigateTo=function(outputParameter,inputParameter,targetDocument,docLabel,otherOutputParameters){
 
 			sbiModule_restServices.promiseGet("1.0/crossNavigation",this.crossNavigationSteps.currentDocument.label+"/loadCrossNavigationByDocument")
 			.then(function(response){
@@ -72,13 +72,13 @@ angular.module('cross_navigation', ['ngMaterial','bread_crumb','angular_table'])
 
 
 				if(navObj.length==1){
-					execCross(navObj[0],outputParameter,inputParameter,true, staticParameters);
+					execCross(navObj[0],outputParameter,inputParameter,true, otherOutputParameters);
 				}
 				else if(navObj.length>1){
 					if(targetDocument!=undefined){
 						for(var i=0;i<navObj.length;i++){
 							if(angular.equals(navObj[i].crossName,targetDocument)){
-								execCross(navObj[i],outputParameter,inputParameter,true,staticParameters);
+								execCross(navObj[i],outputParameter,inputParameter,true,otherOutputParameters);
 								return;
 							}
 						}
@@ -115,7 +115,7 @@ angular.module('cross_navigation', ['ngMaterial','bread_crumb','angular_table'])
 					    	  translate:sbiModule_translate}
 					    })
 					    .then(function(doc) {
-					    	execCross(doc,outputParameter,inputParameter,true,staticParameters);
+					    	execCross(doc,outputParameter,inputParameter,true,otherOutputParameters);
 					    }, function() {
 					     return;
 					    });
@@ -141,10 +141,10 @@ angular.module('cross_navigation', ['ngMaterial','bread_crumb','angular_table'])
 			return false;
 		}
 
-		function execCross(doc,outputParameter,inputParameter,externalCross, staticParameters){
+		function execCross(doc,outputParameter,inputParameter,externalCross, otherOutputParameters){
 			var parameterStr="";
 			if(externalCross){
-				parameterStr=cns.responseToStringParameter(doc,outputParameter,inputParameter,staticParameters);
+				parameterStr=cns.responseToStringParameter(doc,outputParameter,inputParameter,otherOutputParameters);
 			}else{
 				parameterStr=jsonToURI(outputParameter);
 			}
@@ -192,7 +192,7 @@ angular.module('cross_navigation', ['ngMaterial','bread_crumb','angular_table'])
 			}
 		};
 
-		this.responseToStringParameter=function(navObj,outputParameter,inputParameter, staticParameters){
+		this.responseToStringParameter=function(navObj,outputParameter,inputParameter, otherOutputParameters){
 			var respStr={};
 
 			//check for output parameters
@@ -236,12 +236,12 @@ angular.module('cross_navigation', ['ngMaterial','bread_crumb','angular_table'])
 				}
 			}
 
-			//check for staticParameters
-			if(staticParameters!=undefined && staticParameters!='' && navObj.navigationParams!=undefined){
-				for(var parin=0;parin<staticParameters.length;parin++){
+			//check for otherOutputParameters
+			if(otherOutputParameters!=undefined && otherOutputParameters!='' && navObj.navigationParams!=undefined){
+				for(var parin=0;parin<otherOutputParameters.length;parin++){
 					var staticParName = null;
 					var staticParValue = null;
-					var staticPar = staticParameters[parin];
+					var staticPar = otherOutputParameters[parin];
 					for(var name in staticPar){
 						staticParName = name;
 						staticParValue = staticPar[name];
@@ -305,13 +305,35 @@ angular.module('cross_navigation', ['ngMaterial','bread_crumb','angular_table'])
 
 			if(param.inputParameterType=="DATE" || (param.type!=undefined && param.type.valueCd=="DATE")){
 				//back date server format
-				return sbiModule_dateServices.formatDate(sbiModule_dateServices.getDateFromFormat(value, param.dateFormat),sbiModule_config.serverDateFormat );
-				//return sbiModule_dateServices.getDateFromFormat(value, param.dateFormat)
+//				return sbiModule_dateServices.formatDate(sbiModule_dateServices.getDateFromFormat(value, param.dateFormat),sbiModule_config.serverDateFormat );
+				var parsedValue;
+				if (Array.isArray(value)){
+					parsedValue = [];
+					for (v in value){
+						var res = sbiModule_dateServices.formatDate(sbiModule_dateServices.getDateFromFormat(value[v], param.dateFormat),sbiModule_config.serverDateFormat );
+						if (res) parsedValue.push(res);
+					}
+				}else{
+					parsedValue = sbiModule_dateServices.formatDate(sbiModule_dateServices.getDateFromFormat(value, param.dateFormat),sbiModule_config.serverDateFormat );
+				}
+				return parsedValue;
 
 			}
 			if(param.inputParameterType=="NUM" || (param.type!=undefined && param.type.valueCd=="NUM")){
-				var res=parseFloat(value);
-				return isNaN(res) ? undefined : res;
+				var parsedValue;
+				if (Array.isArray(value)){
+					parsedValue = [];
+					for (v in value){
+						var res = parseFloat(value[v]);
+						if (!isNaN(res)) parsedValue.push(res);
+					}
+				}else{
+					var res=parseFloat(value);
+					parsedValue =  isNaN(res) ? undefined : res;
+				}
+//				var res=parseFloat(value);
+//				return isNaN(res) ? undefined : res;
+				return parsedValue;
 			}
 		};
 

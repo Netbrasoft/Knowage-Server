@@ -6,7 +6,9 @@
 
 #foreach ($dataField in $dataFields) ## conversion column name to internal column name
 	#if($dataField.class.name == 'java.util.LinkedHashMap')
-		#set($workAroundNoPrint = $dataColumnsMapper.put($dataField.header , $dataField.name))
+		#set($dataFieldHeader = $datasettransformer.setGroupingFunctionToLowerCase($dataField.header))
+    	#set($workAroundNoPrint = $dataColumnsMapper.put($dataFieldHeader , $dataField.name))
+
 	#end
 #end
 
@@ -34,8 +36,10 @@
 *#
 #if ($chart.VALUES.SERIE.class.name == 'java.util.LinkedHashMap')
 	#set($serie = $chart.VALUES.SERIE.name)
+	#set($serieObj = $chart.VALUES.SERIE)
 	#set($groupingFunction = $chart.VALUES.SERIE.groupingFunction)	
 #elseif ($chart.VALUES.SERIE.class.name == 'java.util.ArrayList')
+	#set($serieObj = $chart.VALUES.SERIE[0])
 	#set($serie = $chart.VALUES.SERIE[0].name)
 	#set($groupingFunction = $chart.VALUES.SERIE[0].groupingFunction)
 #end
@@ -44,11 +48,17 @@
 
 #set($columnNames = $datasettransformer.getColumnNames($columnsNeeded))
 
-#set($firstresult = $datasettransformer.getData($dataRows,$serie,$columnsNeeded,$dataColumnsMapper, $groupingFunction))
+#set($firstresult = $datasettransformer.getData($dataRows,$serie,$columnsNeeded,$dataColumnsMapper, $groupingFunction.toLowerCase()))
 
 #set($firstCategory='')
 
+#set($isDateTime=$chart.dateTime)
+
+#if($isDateTime==true)
 #set($isFirstDate=$datasettransformer.isFirstCategoryDate($firstresult,$columnsNeeded[0]))
+#else
+#set($isFirstDate=false)
+#end
 
 #if($isFirstDate==true)
 #set($firstCategory = $datasettransformer.getDateResult($firstresult,$columnsNeeded[0]))
@@ -98,6 +108,9 @@
  	chart: 
  	{
  		type: '$chartType',
+ 		dateF: '$chart.dateFormat',
+ 		dateT: '$chart.dateTime',
+ 		
  		
  		#*
     		The zoom in option for HEATMAP chart. User will be able to zoom in on either of those two chart types
@@ -299,6 +312,9 @@
 	*#
 	legend:
 	{
+		#if ($chart.LEGEND.show != '' && ($chart.LEGEND.show == 'true' || $chart.LEGEND.show == true))
+		enabled: $chart.LEGEND.show , 
+		#end
 		symbolHeight: '$chart.LEGEND.symbolHeight',
 		
 		style:
@@ -538,6 +554,21 @@
 		firstCategory: $firstCategory,
   		storeresult: $storeresult,
   		serie: $serieName,
+  		#if($serieObj.precision)
+  		precision: "$serieObj.precision",
+  		#else
+  		precision: "",
+  		#end
+  		#if($serieObj.prefixChar)
+  		prefixChar: "$serieObj.prefixChar",
+  		#else
+  		prefixChar: "",
+  		#end
+  		#if($serieObj.postfixChar)
+  		postfixChar: "$serieObj.postfixChar",
+  		#else
+  		postfixChar: "",
+  		#end
   		columns: $columnNames
 	},
 	

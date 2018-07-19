@@ -82,6 +82,8 @@
 			}
 		}
 		$scope.colorPickerProperty={format:'rgb'}
+		
+		
 
 
 		$scope.actionsOfCockpitColumns = [{
@@ -113,8 +115,13 @@
 	    	  action : function(item,event) {
 	    		  var index=$scope.model.content.columnSelectedOfDataset.indexOf(item);
 	    		  $scope.model.content.columnSelectedOfDataset.splice(index,1);
+	    		  if($scope.model.settings.sortingColumn == item.aliasToShow){
+	    			  $scope.model.settings.sortingColumn = null;
+	    		  }
 	    	  }
 	      }];
+
+
 		$scope.metadataTableColumns=[
 		                             {
 		                            	 label:"  ",
@@ -134,9 +141,18 @@
 		                            	 hideTooltip:true
 		                             },
 		                             {
-		                            	 "label":"Column Name",
+		                            	 "label":"Column",
 		                            	 "name":"alias",
+		                            	 transformer:function(item){
+		                            		 var template='<md-input-container class="md-block" ng-if="!row.isCalculated"> '
+		                            			 +'<md-select ng-model="row.alias" ng-change="scopeFunctions.changeColumn(row)">'
+		                            			 +'<md-option ng-repeat="col in scopeFunctions.columnList" ng-value="col.alias" >'
+		                            			 +'{{col.alias}}'
+		                            			 +'</md-option>'
+		                            			 +'</md-select></md-input-container>';
 
+		                            		 return template;
+		                            	 },
 		                            	 hideTooltip:true
 
 		                             },
@@ -144,7 +160,7 @@
 		                            	 "label":"Title",
 		                            	 "name":"aliasToShow",
 		                            	 transformer:function(item){
-		                            		 var template = "<md-input-container flex class=\"md-block\"> "
+		                            		 var template = "<md-input-container flex class=\"md-block noMdError\"> "
 		                            			 +"<label>Text</label>"
 		                            			 +"<input class=\"input_class\" ng-model=row.aliasToShow />"
 		                            			 +"</md-input-container>";
@@ -188,8 +204,8 @@
 		                            	 "name":" ",
 		                            	 transformer:function(row,column,index){
 
-		                            		 var temp = '<md-button class="md-icon-button" style="background:{{row.style[\'background-color\']}}" ng-click="scopeFunctions.draw(row,column,index)">'
-		                            			 +'<md-icon style="color:{{row.style.color}}" md-font-icon="fa fa-paint-brush" aria-label="Paintbruh"></md-icon>'
+		                            		 var temp = '<md-button class="md-icon-button noMargin" ng-style="{\'background\':row.style[\'background-color\']}" ng-click="scopeFunctions.draw(row,column,index)">'
+		                            			 +'<md-icon style="color:{{row.style.color}}" md-font-icon="fa fa-paint-brush" aria-label="Paint brush"></md-icon>'
 		                            			 +'</md-button>'
 
 		                            			 return temp;
@@ -200,6 +216,11 @@
 		                             ];
 
 
+		$scope.$watch('local',function(newValue,oldValue){
+			if($scope.functionsCockpitColumn.columnList && newValue && newValue.metadata.fieldsMeta != $scope.functionsCockpitColumn.columnList){
+				angular.copy(newValue.metadata.fieldsMeta,$scope.functionsCockpitColumn.columnList);
+			}
+		})
 		$scope.functionsCockpitColumn = {
 			translate:sbiModule_translate,
 			moveUp: function(evt,index){
@@ -208,10 +229,19 @@
 			moveDown: function(evt,index){
 				$scope.model.content.columnSelectedOfDataset.splice(index+1, 0, $scope.model.content.columnSelectedOfDataset.splice(index, 1)[0]);
 			},
+			changeColumn: function(row){
+				for(var k in $scope.model.content.columnSelectedOfDataset){
+					if($scope.model.content.columnSelectedOfDataset[k].$$hashKey == row.$$hashKey){
+						$scope.model.content.columnSelectedOfDataset[k].name = row.alias;
+						break;
+					}
+				}
+			},
 			canSee : function(row){
 				return angular.equals(row.fieldType, "MEASURE");
 			},
 			typeList: [{"code":"java.lang.String", "name":"String"},{"code":"java.lang.Integer", "name":"Number"},{"code":"java.math.BigDecimal", "name":"Number"}],
+			columnList : ($scope.local && $scope.local.metadata) ? $scope.local.metadata.fieldsMeta : [] ,
 			getColor :function(){
 				return $scope.selectedColumn.style !=undefined ? $scope.selectedColumn.style.color : "";
 			},
@@ -225,7 +255,7 @@
 					parent : angular.element(document.body),
 					clickOutsideToClose:true,
 					escapeToClose :true,
-					preserveScope: true,
+					preserveScope: false,
 					autoWrap:false,
 					fullscreen: true,
 					locals:{model:$scope.model, selectedColumn : $scope.selectedColumn},
@@ -388,7 +418,7 @@ function controllerCockpitColumnsConfigurator($scope,sbiModule_translate,$mdDial
 	}
 }
 
-function cockpitStyleColumnFunction($scope,sbiModule_translate,$mdDialog,model,selectedColumn,cockpitModule_datasetServices,$mdToast,cockpitModule_generalOptions ){
+function cockpitStyleColumnFunction($scope,sbiModule_translate,$mdDialog,$mdPanel,model,selectedColumn,cockpitModule_generalServices,cockpitModule_datasetServices,$mdToast,cockpitModule_generalOptions,sbiModule_messaging,knModule_fontIconsService){
 	$scope.translate=sbiModule_translate;
 	$scope.cockpitModule_generalOptions=cockpitModule_generalOptions;
 	$scope.selectedColumn = angular.copy(selectedColumn);
@@ -398,8 +428,30 @@ function cockpitStyleColumnFunction($scope,sbiModule_translate,$mdDialog,model,s
 	$scope.colorPickerProperty={placeholder:sbiModule_translate.load('sbi.cockpit.color.select') ,format:'rgb'}
 	$scope.visTypes=['Chart','Text','Text & Chart','Icon only'];
 	$scope.icons=["fa fa-warning","fa fa-bell","fa fa-bolt","fa fa-commenting","fa fa-asterisk","fa fa-ban", "fa fa-check","fa fa-clock-o","fa fa-close","fa fa-exclamation-circle","fa fa-flag","fa fa-star"];
+	$scope.availableIcons = knModule_fontIconsService.icons;
+	
+	$scope.getTemplateUrl = function(template){
+		return cockpitModule_generalServices.getTemplateUrl('tableWidget',template)
+	}
+	
+	$scope.hasPrecision = function(column){
+		if(column.type == 'java.lang.Double' || column.type == 'java.lang.Float' || column.type == 'java.math.BigDecimal' || column.type == 'java.lang.Long'){
+			return true;
+		}
+		return false;
+	}
+	
+	$scope.chooseIcon = function(range) {
+		$scope.tempVar = !$scope.tempVar;
+		$scope.currentRange=range;
 
-
+  	}
+	$scope.setIcon = function(family,icon){
+		$scope.currentRange.icon = family.className+' '+icon.className;
+		$scope.tempVar = !$scope.tempVar;
+	}
+	
+	
 	if(!$scope.selectedColumn.hasOwnProperty('colorThresholdOptions'))
 	{
 		$scope.selectedColumn.colorThresholdOptions={};
@@ -411,7 +463,7 @@ function cockpitStyleColumnFunction($scope,sbiModule_translate,$mdDialog,model,s
 	}
 
 
-	$scope.$watch("selectedColumn.visType",function(newValue, oldValue){
+	$scope.changeVisType = function(){
 		if($scope.selectedColumn.visType==undefined){
 			$scope.selectedColumn.visType="Text";
 		}else if($scope.selectedColumn.visType=="Chart"){
@@ -423,8 +475,7 @@ function cockpitStyleColumnFunction($scope,sbiModule_translate,$mdDialog,model,s
 		}else if($scope.selectedColumn.visType=='Icon only'){
 			$scope.selectedColumn.text.enabled=false;
 		}
-
-	})
+	}
 
 
 
@@ -480,20 +531,18 @@ function cockpitStyleColumnFunction($scope,sbiModule_translate,$mdDialog,model,s
 		}
 	}
 
-
 	$scope.cleanStyleColumn = function(){
 		$scope.selectedColumn.style = undefined;
 	}
-	$scope.saveColumnStyleConfiguration = function(){
-		angular.copy($scope.selectedColumn,selectedColumn)
 
+	$scope.saveColumnStyleConfiguration = function(){
+		angular.copy($scope.selectedColumn,selectedColumn);
 		$mdDialog.cancel();
 	}
 
 	$scope.cancelcolumnStyleConfiguration = function(){
 		$mdDialog.cancel();
 	}
-
 
 	$scope.checkIfDisable = function(){
 		return false;
@@ -512,6 +561,7 @@ function controllerCockpitSummaryInfo($scope,sbiModule_translate,$mdDialog,items
 		items.resolve($scope.row);
 		$mdDialog.hide();
 	}
+
 	$scope.cancelConfiguration=function(){
 		$mdDialog.cancel();
 	}

@@ -1,6 +1,7 @@
 
 
 <script>
+
 var sbiM=angular.module('sbiModule',["ngSanitize"]);
 
 // sbiM.config(function($mdThemingProvider) {
@@ -139,6 +140,47 @@ sbiM.config(function($mdDateLocaleProvider) {
 });
 
 
+sbiM.config(['$httpProvider',function ($httpProvider) {
+	$httpProvider.interceptors.push(['$rootScope', '$q',
+		function ($rootScope, $q) {
+			return {
+				responseError: function (response) {
+					if (response.status === 401) {
+						redirectToLoginUrl();
+					}
+					return $q.reject(response);
+				}
+			};
+		}]);
+
+	var loginUrl = '<%= GeneralUtilities.getSpagoBiContext() %>'; // login url, used when session is expired
+
+	var redirectToLoginUrl = function() {
+    	var sessionExpiredSpagoBIJSFound = false;
+    	try {
+    		var currentWindow = window;
+    		var parentWindow = parent;
+    		while (parentWindow != currentWindow) {
+    			if (parentWindow.sessionExpiredSpagoBIJS) {
+    				parentWindow.location = loginUrl;
+    				sessionExpiredSpagoBIJSFound = true;
+    				break;
+    			} else {
+    				currentWindow = parentWindow;
+    				parentWindow = currentWindow.parent;
+    			}
+    		}
+    	} catch (err) {
+    		console.log(err);
+    	}
+    	
+    	if (!sessionExpiredSpagoBIJSFound) {
+    		window.location = loginUrl;
+    	}
+    };
+}]);
+
+
 sbiM.factory('sbiModule_user',function(){
 	
 	var user={};
@@ -239,6 +281,12 @@ sbiM.service('sbiModule_util',function(){
 	};
 });
 
+
+sbiM.service('kn_regex',function(){
+	this.extendedAlphanumeric = /^([\pL\w\s\-\_\(\)\[\]\;\:\!\?\,\.\'\"\x2F\x5F%])*$/;
+	this.xss = /^((?!<A|<LINK|<IMG|<SCRIPT|&LT;A|&LT;LINK|&LT;IMG|&LT;SCRIPT|{{).)*$/i;
+	this.alphanumeric = /^([a-zA-Z0-9\s\-\_])*$/;
+});
 
 sbiM.service('sbiModule_messaging',function(sbiModule_restServices,$mdToast){
 	
@@ -721,6 +769,37 @@ sbiM.service('sbiModule_helpOnLine', function(sbiModule_config,$mdDialog,sbiModu
 		});
 	};
 });
+
+
+sbiM.service('sbiModule_i18n', function(sbiModule_config, sbiModule_restServices) {
+	
+	var self = this;
+	self.i18nMap = {};
+
+    return {
+        
+    	loadI18nMap : function(locale){
+    		sbiModule_restServices.restToRootProject();
+    		var promise = sbiModule_restServices.promiseGet("2.0/i18nMessages","?currCountry="+sbiModule_config.curr_country+"&currLanguage="+sbiModule_config.curr_language).then(
+    				function(response){
+    					self.i18nMap = response.data;
+    			},function(response){
+    				alert("Errore "+response.data.errors[0].message);
+    			});
+    		return promise;
+    	},
+        
+        getI18n : function (label) { // return translation of a label if present, otherwise return the label
+    		if(self.i18nMap[label] != undefined){
+    			return self.i18nMap[label];
+    		}
+    		else return label; 
+        }
+    	
+      };
+		
+});
+
 </script>
 
 
@@ -728,4 +807,5 @@ sbiM.service('sbiModule_helpOnLine', function(sbiModule_config,$mdDialog,sbiModu
 <script type="text/javascript" src="${pageContext.request.contextPath}/js/src/angular_1.4/tools/commons/sbiModule_services/sbiModule_dateServices.js"></script>
 <!-- sbiModule_jsonServices -->
 <script type="text/javascript" src="${pageContext.request.contextPath}/js/src/angular_1.4/tools/commons/sbiModule_services/sbiModule_jsonServices.js"></script>
+<script type="text/javascript" src="<%=request.getParameter(SpagoBIConstants.SBI_HOST)+request.getParameter(SpagoBIConstants.SBI_CONTEXT)%>/js/lib/angular-localization/<%=curr_language%>-<%=curr_country%>.js"></script>
 	 

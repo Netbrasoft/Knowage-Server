@@ -10,15 +10,135 @@
     height: 100%;
     background-color: rgba(240,240,240,1);
     background-image: #fff;
+
+    cockpit-html-widget {
+    	height: 100%;
+    	overflow: auto;
+
+    }
     
-    cockpit-image-widget {
-    	&.fadeOut {
-        	opacity: 1 !important;
+    cockpit-discovery-widget {
+    	.discoveryCardsContainer {
+    		height: calc(100% - 75px);
     	}
+    	.discoveryFiltersCard {
+    		
+    		&.sidenav-add, &.sidenav-remove {
+    			transition: max-width .4s linear;
+    		}
+    		&.sidenav {
+    			max-width: 0;
+    			margin-left: 0;
+    			margin-right: 0;
+    			left: -300px;
+    			&.open-add, &.open-remove {
+    				transition: left .4s linear;
+    			}
+    			&.open,&.open-remove {
+    				position: absolute;
+    				left: -300px;
+    				max-width: 85%;
+    				width: 100%;
+    				height: calc(100% - 145px);
+				    top: 130px;
+				    z-index: 99;
+				    md-card-content {
+				    	height: 100%;
+				    }
+    			}
+    			&.open{
+				    left: 9px;
+    			}
+    		}
+    		.discoveryFiltersList {
+	    		overflow-y: auto;
+	    		@include coolScrollBars($baseColor,6px);
+	    		._md-subheader-inner {
+	    			padding:8px;
+	    			._md-subheader-content {
+    				    display: flex;
+					    align-items: center;
+					    justify-content: space-between;
+					    height: 14px;
+					    md-icon {
+					    	margin:0;
+					    }
+	    			}
+	    		}
+	    		.discoveryFiltersItem {
+	    			&:nth-last-child {
+	    				border-bottom: none;
+	    			}
+	    			border-bottom: 1px solid $bordersColor;
+	    			padding: 0 8px;
+					min-height: 24px;
+					height: 24px;
+					.discoveryFiltersListName {
+						font-size: $mediumFontSize;
+					}
+	    			.chip {
+	    				background-color: $ternaryColor;
+					    border-radius: 15px;
+					    min-width: 40px;
+					    text-align: center;
+					    font-size: $mediumFontSize;
+	    			}
+	    		}
+	    	}
+    	}
+    	.discoveryViewCard.md-knowage-theme {
+    		.ternaryToolbar {
+				background-color: $contentBackground !important;
+				md-icon {
+					color: $smallTextColor !important;
+				}
+			}
+    		md-card-content {
+    			height: calc(100% - 112px); 
+	    		overflow-y: auto;
+	    		@include coolScrollBars($baseColor,6px);
+    		}
+    		.discoveryListView {
+				.discoveryItem {
+					padding: 4px 16px;
+					.md-avatar {
+						color: white;
+						font-size: 1.5rem;
+						font-weight: 100;
+						display: flex;
+					    justify-content: center;
+					    align-items: center;
+					}
+					h3, p {
+						margin: 0;
+					}
+					h3 {
+						font-size: 16px;
+					    font-weight: 400;
+					    letter-spacing: .01em;
+					    line-height: 1.2em;
+					    overflow: hidden;
+					    white-space: nowrap;
+					    text-overflow: ellipsis;
+					}
+					p {
+						font-size: .8rem;
+					    font-weight: 500;
+					    letter-spacing: .01em;
+					    margin: 0;
+					    line-height: 1rem;
+					}
+				}
+			}
+    	}
+    	
+    }
+    cockpit-image-widget {
     	width:100%;
 		height:100%;
     	.widgetImageDiv
     	{	
+    		outline: none;
 	    	width:100%;
 			height:100%;
 			background-repeat: no-repeat;  
@@ -26,8 +146,7 @@
 	    }
     }
     
-    
-    
+
 	cockpit-widget{
 		&>li{
 			&.fullScreenWidget{
@@ -64,6 +183,12 @@
 	}
 
 	cockpit-table-widget {
+		.kn-noItems {
+			top: 40px;
+			p {
+				margin: 0;
+			}
+		}
 		.highlight {
 			background-color: $secondaryColor !important;
 		}
@@ -92,7 +217,6 @@
 		.cockpitTablePagination {
 		        height: 36px;
 		        min-height: 36px;
-		        background-color:white;
 		        position: relative;
 		        font-size: $baseFontSize;
 		        display: flex;
@@ -111,6 +235,9 @@
 		                margin-right: 10px;
 		            }
 		        }
+		        .next, .prev{
+		        	margin: 0;
+		        }
 		    }
 		cockpit-table {
 			outline: none;
@@ -125,27 +252,26 @@
 	        display: flex;
 		    flex-direction: column;
 		    height: 100%;
-		    overflow-y: auto;
+		    //overflow-y: auto;
 		    position: relative;
-		    &::-webkit-scrollbar-track{
-				-webkit-box-shadow: inset 0 0 6px rgba(0,0,0,0.3);
-				border-radius: 10px;
-				background-color: #F5F5F5;
-			}
-
-			&::-webkit-scrollbar{
-				width: 6px;
-				height: 6px;
-				background-color: #F5F5F5;
-			}
-
-			&::-webkit-scrollbar-thumb{
-				border-radius: 10px;
-				-webkit-box-shadow: inset 0 0 6px rgba(0,0,0,.3);
-				background-color: lighten($baseColor,15%);
-			}
 		    .cockpitTableContainer {
 		    	width: 100%;
+		    	&.main {
+		    		overflow-y: auto;
+		    		@include coolScrollBars($baseColor,6px);
+		    		margin-top: 32px; 
+		    		thead {
+		    			display: none;
+		    		}
+		    	}
+		    	&.fake {
+		    		position: absolute;
+		    		overflow: hidden;
+		    		top: 0;
+		    		table {
+		    			position: relative;
+		    		}
+		    	}
 		    	//overflow-y: auto;
 		    	table.cockpitTable {
 		    		table-layout: fixed;
@@ -173,7 +299,7 @@
 			                text-align: left;
 			                background-color: $contentBackground;
 			                color: $darkTextColor;
-			                opacity: .7;
+			                opacity: .85;
 			                font-size: 12px;
 			                font-weight: 700;
 			                white-space: nowrap;
@@ -272,6 +398,14 @@
 			        }
 			        tfoot {
 			        	tr {
+			        		&.summaryTitle {
+		        				position: absolute;
+		        				td{
+		        					min-height: 30px;
+		        					line-height: 28px;
+		        					vertical-align: middle;
+		        				}
+		        			}
 			        		border-bottom: none;
 			        		&.summary {
 			        			border-bottom: 1px solid #ddd;
@@ -365,17 +499,15 @@
 	}
 	
     .openSheetMenuIconButton{
-    	position: absolute;
 	    color: black;
 	    margin: 0;
 	    padding: 0;
-	    top: 8px;
 	    width: 24px;
 	    height: 24px;
 	    min-height: 24px;
     	&:hover{
     	    background-color: rgba(158,158,158,0.2)!important;
-    		}
+		}
     }
     
     .overlayGray {
@@ -430,6 +562,30 @@
             color: rgb(66,66,66);
         }
     }
+
+	.htmlWidgetConfiguration {
+		position: absolute;
+   		width: 90%;
+   		height: 90%;
+   		margin: 2% 5%;
+   		.htmlEditor {
+   			.CodeMirror {
+				height: 500px;
+			}
+   		}
+		.CodeMirror {
+			width: 100%;
+		}
+		.widgetId {
+			text-transform: none;
+		}
+		.availableFunctions {
+			.description {
+				font-size: $mediumFontSize;
+			}
+		}
+	}    
+
 	.customTableWidgetConfiguration {
 	    position: absolute;
    		width: 90%;
@@ -438,14 +594,17 @@
 		&.textWidget{
 			wysiwyg-edit{
 				.tinyeditor {
-					height: 100%;
+					height: 500px;
 					padding: 0;
 					border: 0;
 					.sizer{
-						height: calc( 100% - 20px);
+						height: calc( 100% - 33px);
 						.resizer{
 							display:none;
 						}
+					}
+					.tinyeditor-header {
+						background: $secondaryColor !important;
 					}
 					.tinyeditor-footer{
 						display:none;
@@ -559,14 +718,9 @@
         }
     }
 
-    .fadeOut {
-        transition: 0.3s linear all;
-        opacity: 1;
-    }
-
-    .fadeIn {
-        transition: 0.9s linear all;
-        opacity: 1;
+    cockpit-grid {
+    	overflow-y: auto;
+    	overflow-y: overlay;
     }
 
     .gridster {
@@ -574,133 +728,42 @@
 			width: calc(100% - 20px);
 		}
 		&.cockpitEditMode{
-			background-size:40px 10px;
+			background-size:100% 30px;
 			min-height: 100% !important;
-			border: $cockpitDefaultBorder;
-			background-image:repeating-linear-gradient(0deg, #e2e2e2, #e2e2e2 1px, transparent 1px, transparent 40px), repeating-linear-gradient(-90deg, #e2e2e2, #e2e2e2 1px, transparent 1px, transparent 10px);
+			background-position: 0 0;
+			background-image:repeating-linear-gradient(0deg, #e2e2e2, #e2e2e2 1px, transparent 1px, transparent 30px), repeating-linear-gradient(-90deg, #e2e2e2, #e2e2e2 1px, transparent 1px, transparent 2%);
 			.showActionButtonHandler {
 				opacity: .4 !important;
+				&:hover {
+					opacity: 1 !important;
+				}
 			}
-		}
-        
-		//min-height: calc(100% - 20px);
+		}        
 
         .gridster-item{
+        	&.fixedLeft {
+        		.showActionButtonHandler {
+        			left: 0 !important;
+        		}
+        	}
 			 md-card.md-knowage-theme md-card-title {
+			 	height:32px;
+			 	min-height: 32px;
 				padding: 0;
 				margin: 0;
-				min-height: 40px;
 				md-toolbar.md-knowage-theme {
 					background-color: transparent !important;
 					color: $baseColor !important;
-					min-height: 32px;
+					min-height: 0;
+					height: 100%;
 					.md-toolbar-tools {
-					   height: 32px; 
+						height: 100%;
 					}
 				}
 			}
-			
-			&.leftPosition .showActionButtonHandler {
-				left: 0;
+			&.expandedWidget {
+				background-color: $lightTextColor;
 			}
-			 
-			
-			&.leftPosition .widgetActionButton{
-					border-right:0px !important;
-				    box-shadow: none!important;
-					left: -54px;
-					-ms-flex-direction: column;
-					flex-direction: column;
-					box-sizing: border-box;
-					display: -ms-flexbox;
-					display: flex;
-				}
-			&.rightPosition .widgetActionButton{
-				border-left:0px !important;
-				box-shadow: none!important;
-				right: -54px;
-				-ms-flex-direction: column;
-				flex-direction: column;
-				box-sizing: border-box;
-				display: -ms-flexbox;
-				display: flex;
-			}
-			&.topPosition .widgetActionButton{
-				border-left: 0px !important;
-				border-bottom: 0px !important;
-				box-shadow: none!important;
-				right: 0px;
-				left: inherit;
-				-ms-flex-direction: row;
-				flex-direction: row;
-				box-sizing: border-box;
-				display: -ms-flexbox;
-				display: flex!important;
-			}
-        }
-
-        .gridster-item md-card-title md-toolbar .md-toolbar-tools button, md-toolbar.miniToolbar .md-toolbar-tools button {
-            height: 42px;
-            width: 42px;
-        }
-    }
-
-    .dragCursor {
-        cursor: move;
-    }
- 
-    /* CUSTOM CARDS */
-
-
-    md-card.md-knowage-theme {
-        md-card-title {
-            padding:$standardPadding;
-            span.md-headline {
-                font-size: $headerFontSize;
-                color: $baseColor;
-            }
-        }
-
-        &.placedWidget {
-            box-shadow: none;
-			position:relative;
-            border-radius: 0;
-			&.editWidgetMode{
-				border: 1px dashed $bordersColor;
-			}
-            
-            md-card-title{
-           	 flex: inherit;
-           	 &.titleOnTop {
-           	 	position: relative;
-           	 	z-index: 9999;
-           	 }
-            }
-            &:hover {
-            	.showActionButtonHandler {
-            		opacity: 1 !important;
-            	}
-            }
-            .compressWidget {
-            	position: absolute;
-			    right: 0;
-			    top: 4px;
-				width: 40px;
-				height: 40px;
-				z-index: 9990;
-				background-color: rgba($baseColor, .6);
-				md-icon {
-					color: $lightTextColor;
-				}
-				&:hover{
-					box-shadow: 0px 2px 3px $shadowsColor;
-					background-color: rgba($baseColor, 1);
-				}
-				
-            }
-            .noMouse {
-            	pointer-events: none;
-            }
 			.showActionButtonHandler{
 			    position: absolute;
 			    right: 0;
@@ -729,20 +792,125 @@
 					}
 					box-shadow: 0px 2px 3px $shadowsColor;
 				}
+				.stackedIcons {
+					padding: 4px;
+				}
 			}
 			
-			.widgetActionButton{
-				position:absolute;
-				background-color: white;
-				top: -1px;
-				border: $cockpitDefaultBorder;
-				
-			}    	
-			.widgetActionButton>.md-button{
-				z-index: 10;
+			&.leftPosition .showActionButtonHandler {
+				left: 0;
 			}
-    
+        }
 
+        .gridster-item md-card-title md-toolbar .md-toolbar-tools button, md-toolbar.miniToolbar .md-toolbar-tools button {
+            height: 42px;
+            width: 42px;
+        }
+    }
+
+    .dragCursor {
+        cursor: move;
+    }
+ 
+    /* CUSTOM CARDS */
+
+
+    md-card.md-knowage-theme {
+        md-card-title {
+            padding:$standardPadding;
+            span.md-headline {
+                font-size: $headerFontSize;
+                color: $baseColor;
+            }
+        }
+
+        &.placedWidget {
+            box-shadow: none;
+			position:relative;
+			overflow: hidden;
+            border-radius: 0;
+			&.editWidgetMode{
+				border: 1px dashed $bordersColor;
+			}
+            
+            md-card-title{
+           	 flex: inherit;
+           	 &.titleOnTop {
+           	 	position: relative;
+           	 	z-index: 9999;
+           	 }
+            }
+            .viewModeMenu {
+            	transition: background-color .3s ease;
+            	position: absolute;
+            	top: 0;
+				right:0;
+            	width: 40px;
+            	z-index: 20;
+            	.floatingFilter {
+            		opacity: 1 !important;
+            		md-icon {
+            			top: 8px;
+            			right: 0;
+            		}
+            		.ban{
+            			display:none;
+            			color: red;
+            		}
+            		&:hover {
+            			.ban {
+            				display: block;
+            			}
+            		}
+            	}
+            	.md-button {
+            		margin: 0;
+            		opacity: 0;
+            	}
+            }
+            &:hover {
+            	.viewModeMenu {	
+					background-color: rgba(white,.6);
+            		.md-button {
+            			opacity: 1 !important;
+            		}
+            	}
+            }
+            .compressWidget {
+            	position: absolute;
+			    right: 0;
+			    top: 4px;
+				width: 40px;
+				height: 40px;
+				z-index: 9990;
+				background-color: rgba($baseColor, .6);
+				md-icon {
+					color: $lightTextColor;
+				}
+				&:hover{
+					box-shadow: 0px 2px 3px $shadowsColor;
+					background-color: rgba($baseColor, 1);
+				}
+				
+            }
+            .floatingSearch{
+            	position: absolute;
+			    right: 0;
+			    top: 4px;
+				width: 40px !important;
+				height: 40px;
+				z-index: 11;
+				&.activeSearch{
+					right:40px;
+				}
+				&:hover{
+					opacity:.5;
+				}
+            }
+            .noMouse {
+            	pointer-events: none;
+            }
+			
             md-toolbar.md-knowage-theme {
                 background-color: transparent;
                 color: $baseColor;
@@ -861,21 +1029,22 @@
         md-content.md-knowage-theme {
             background-color: $listBackground;
         }
+        &>div {
+        	height: 100%;
+        }
     }
 
     .greyListItem {
         background-color: $detailBackground;
         border-top: 1px solid $listBackground;
     }
-
-	md-tabs.cockpitSheetTabs>md-tabs-wrapper{
-		margin-left: 50px;
-	}
 	
 	.md-button.addSheetTabButton{
 	    bottom: 0;
+	    margin-bottom: 1px;
     	position: absolute;
     	min-width: 40px;
+    	z-index: 9;
     	}
     	
 	.selectedImage{
@@ -944,7 +1113,7 @@
 								font-family: Roboto,"Helvetica Neue",sans-serif;
 								text-align: center;
 								font-size: $headerFontSize;
-								color: black;
+								color: #3b678c;
 								font-weight: 600;								
 							}
 							.sortIcon{
@@ -980,7 +1149,13 @@
 							color:white;
 						}
 						&.crosstab-header-text {
-							border-top:none;							
+							border-top:none;	
+							text-align: center;
+							font-family: Roboto,"Helvetica Neue",sans-serif;
+							text-align: center;
+							font-size: $headerFontSize;
+							color: #3b678c;
+							font-weight: 600;							
 						}
 						&.sortIcon {
 							border-top: none;
@@ -1019,7 +1194,21 @@
     background-color: rgba(33,33,33,1.0);
 }
 
-
+.iconSelectorSide {
+	box-shadow: -3px 0 3px $shadowsColor;
+	md-content {
+		height: 635px;
+		h3 {
+			font-size: $headerFontSize;
+			text-transform: uppercase;
+			font-weight: 100;
+			margin: 4px 0;
+		}
+		md-grid-tile {
+			border: 1px solid $bordersColor;
+		}
+	}
+}
 
 &.disableanimation {
 	/** disable transitions and animations for tab-contents**/
@@ -1261,17 +1450,6 @@
 	
 //IE style
 @media all and (-ms-high-contrast: none), (-ms-high-contrast: active) {
-	 .cockpitSheetTabsHook {
-    	md-tabs-canvas {
-    		width: 10px;
-    	}
-    	md-tabs-wrapper {
-    		width: 10px;
-    	}
-    	md-tab-data {
-    		display: none;
-    	}
-    }
     cockpit-table {
 	    .cockpitTableContainer {
 	    	table.cockpitTable {
@@ -1284,6 +1462,21 @@
 			.widgetsContainer {
 				.widgetContainer {
 					min-width: 100px;
+				}
+			}
+		}
+	}
+	cockpit-sheet {
+		md-tabs {
+			md-tabs-wrapper {
+				md-tabs-canvas {
+					md-pagination-wrapper {
+						.md-tab {
+							span {
+								top: -8px;
+							}
+						}
+					}
 				}
 			}
 		}
@@ -1498,43 +1691,100 @@
 				}
 			}
 		}
+		.fixedSelectionButton {
+			z-index: 50 !important;
+		}
 	}
 
 	cockpit-sheet {
-		md-tabs-content-wrapper {
-			bottom: 0;
-		}
-		md-ink-bar {
-			display: none;
-		}
-		.addSheetTabButton {
-			background-color: #f0f0f0;
-		} 
-		md-tabs {
-			background-color: transparent;
-			md-tab-item {
-				background-color: #f0f0f0;
-			    border-radius: 4px;
-			    padding: 8px 30px 8px 15px;
-			    top: 4px;
-			    overflow: hidden;
-			    &.md-active {
-			    	background-color: $baseColor;
-			    	color: $lightTextColor !important;
-			    	md-icon {
-			    		color: $lightTextColor !important;
-			    	}
-			    }
+		.md-button.addSheetTabButton{
+		    bottom: 2px;
+		    margin-bottom: 1px;
+	    	position: absolute;
+	    	min-width: 24px;
+		    padding: 0;
+		    width: 24px;
+	    	height: 24px;
+	    	min-height: 24px;
+	    	z-index: 9;
+	    	&:hover {
+				background-color: darken($detailBackground,5%);
 			}
-			md-tab-item:only-of-type {
-				display: none
-			} 
+    	}
+		md-tabs {
+			padding-bottom: 28px;
 			&.highlander {
-				md-tab-item {
+				padding-bottom: 0;
+				md-tabs-wrapper {
 					display: none;
 				}
+				md-tabs-content-wrapper {
+					bottom: 0;
+				}
+				.md-button.addSheetTabButton {
+					width: 32px;
+					height: 32px;
+					background-color: $detailBackground;
+					border: 1px solid $bordersColor;
+				}
+			}
+			&.cockpitSheetTabs {
+				md-pagination-wrapper{
+					padding-left: 24px;
+				}
+				&>md-tabs-wrapper{}
+				}
+			md-tabs-wrapper {
+				background-color: $detailBackground;
+				border-top: 1px solid $bordersColor;
+				margin-left: 0;
+				width: 100%;
+				height: 30px;
+				md-prev-button {
+					left: 32px;
+				}
+				md-tabs-canvas {
+					height: 30px;
+					md-pagination-wrapper {
+						height: 30px;
+						.md-tab {
+							cursor: pointer;
+							transition: background-color .3s ease-in;
+							border: 1px solid $detailBackground;
+							line-height: 24px;
+							height: 24px;
+							padding: 0 8px;
+							font-size: $mediumFontSize;
+							text-transform: none;
+							margin: 2px 4px;
+							border-radius: 2px;
+							&:first-child {
+								margin-left: 10px;
+							}
+							span {
+								position: relative;
+								outline: none;
+								top: -1px;
+							}
+							&:hover {
+								background-color: darken($detailBackground,5%);
+							}
+							&.md-active {
+								background-color: darken($detailBackground,10%);
+								border: 1px solid $bordersColor;
+							}
+						}
+					}
+					md-ink-bar {
+						display: none;
+					}
+				}
+			}
+			md-tabs-content-wrapper {
+				bottom: 28px;
 			}
 		}
+
 	}
 
 	.widgetSearchBar {
@@ -1585,7 +1835,7 @@
 			}
 				min-height: $smallLineHeight;
 				height: $smallLineHeight;
-				.md-button.md-icon-button {
+				.md-button, .md-button.md-icon-button {
 					min-height: $smallLineHeight;
 					height: $smallLineHeight;
 					line-height: $smallLineHeight;
@@ -1601,10 +1851,30 @@
 
 	.widgetToolbar {
 		height: $toolbarHeight;
+	    flex-direction: row;
+	    display: flex;
+	    align-items: center;
 	}
 
 	.selectionWidget {
 		width: 100%;
+		md-list{
+			padding-top: 0;
+			md-list-item {
+				height: 32px;
+				max-height: 32px;
+				min-height: 32px;
+				padding-right: 0;
+				border-bottom: 1px solid #ccc;
+			}
+			.selectionSpan {
+				white-space: nowrap;
+				overflow: hidden;
+				text-overflow: ellipsis;
+				display: block;
+				font-size: $mediumFontSize;
+			}
+		}
 		table {
 			border-collapse: collapse;
 			width: 100%;
@@ -1642,5 +1912,115 @@
 		}
 	}
 
+	.cockpitSelectorWidget{
+		.cockpitSelectorWidgetCombobox {
+			padding-top: 0;
+			md-input-container {
+				margin: 8px 0;
+				width: 100%;
+			}
+		}
+		.cSelWRadio,.cSelWCheck{
+			margin-bottom: 8px;
+			outline: none;
+			span {
+				font-size: $mediumFontSize;
+			}
+		}
+		.cSelWScroller {
+			&.horizontal {
+				display: flex;
+				flex-direction: row;
+				align-items: center;
+				.cSelWCheckContainer, md-radio-group{
+					md-radio-button, md-checkbox {
+						margin-right: 16px;
+					}
+					display: flex;
+					flex-direction: row;
+					align-items: center;
+					._md-label{
+						white-space: nowrap;
+					}
+				}
+				
+			}
+			&.grid {
+				.cSelWCheckContainer, md-radio-group{
+					display: flex;
+					flex-direction: row;
+					flex-wrap: wrap;
+					md-radio-button, md-checkbox {
+						margin-right: 8px;
+						width: 150px;
+						span {
+							overflow: hidden;
+							text-overflow: ellipsis;
+							white-space: nowrap;
+							display: block;
+							width: 120px;
+						}
+					}
+				}
+			}
+			padding-left: 8px;
+			padding-top: 4px;
+			overflow-y: auto;
+			height: 100%;
+			@include coolScrollBars($baseColor,6px);
+		}
+	}
+
+	.cockpitSelectorWidgetSettings {
+		.alternatedInput{
+			.radioContainer {
+				margin: 0;
+				height: $biggerLineHeight;
+				md-radio-group {
+					height: 100%;
+				}
+			}
+			md-input-container{
+				&:nth-child(even) {
+					background-color: lighten($ternaryColor,15%);
+				}
+				&:last-child{
+					background-color: transparent;
+				}
+			}
+		}
+	}
+	button md-icon{
+		display: flex !important;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.imagesLibrary {
+    	.imageContainer {
+    		.imageEraser {
+    			transition: all .3s ease-in;
+    			position: absolute;
+    			bottom: 4px;
+			    z-index: 10;
+			    right: 8px;
+    			&:hover{
+    				background-color: $bordersColor;
+    			}
+    		}
+    	}
+    }
 	
+}
+
+#cockpitDataConfig {
+	.md-fab.md-mini {
+		top:10px;
+	}	
+}
+
+.hasCrossNavigation {
+	cockpit-image-widget {
+		cursor: pointer;
+	}
 }

@@ -17,6 +17,16 @@
  */
 package it.eng.spagobi.commons.serializer;
 
+import java.util.Date;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Locale;
+
+import org.apache.log4j.Logger;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import it.eng.spago.base.SourceBean;
 import it.eng.spago.base.SourceBeanException;
 import it.eng.spagobi.commons.dao.DAOFactory;
@@ -28,16 +38,6 @@ import it.eng.spagobi.tools.dataset.constants.DataSetConstants;
 import it.eng.spagobi.tools.dataset.service.ManageDatasets;
 import it.eng.spagobi.utilities.assertion.Assert;
 import it.eng.spagobi.utilities.json.JSONUtils;
-
-import java.util.Date;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Locale;
-
-import org.apache.log4j.Logger;
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
 
 public class DataSetJSONSerializer implements Serializer {
 
@@ -105,6 +105,7 @@ public class DataSetJSONSerializer implements Serializer {
 	public static final String CSV_FILE_DELIMITER_CHARACTER = "csvDelimiter";
 	public static final String CSV_FILE_QUOTE_CHARACTER = "csvQuote";
 	public static final String CSV_FILE_ENCODING = "csvEncoding";
+	public static final String FILE_DATE_FORMAT = "dateFormat";
 	public static final String FILE_TYPE = "fileType";
 
 	public static final String XSL_FILE_SKIP_ROWS = "skipRows";
@@ -118,6 +119,7 @@ public class DataSetJSONSerializer implements Serializer {
 	public static final String CKAN_CSV_FILE_QUOTE_CHARACTER = "ckanCsvQuote";
 	public static final String CKAN_CSV_FILE_ENCODING = "ckanCsvEncoding";
 	public static final String CKAN_FILE_TYPE = "ckanFileType";
+	public static final String CKAN_CSV_DATE_FORMAT = "ckanDateFormat";
 
 	public static final String CKAN_XSL_FILE_SKIP_ROWS = "ckanSkipRows";
 	public static final String CKAN_XSL_FILE_LIMIT_ROWS = "ckanLimitRows";
@@ -128,6 +130,7 @@ public class DataSetJSONSerializer implements Serializer {
 	public static final String FEDERATION_ID = "federationId";
 
 	public static final String IS_REALTIME = "isRealtime";
+	public static final String IS_ITERABLE = "isIterable";
 
 	@SuppressWarnings("unchecked")
 	@Override
@@ -256,6 +259,16 @@ public class DataSetJSONSerializer implements Serializer {
 						result.put(CSV_FILE_QUOTE_CHARACTER, csvQuote);
 					}
 					// added this check for retrocompatibility
+					if (jsonConf.has(DataSetConstants.FILE_DATE_FORMAT)) {
+						String dateFormat = jsonConf.getString(DataSetConstants.FILE_DATE_FORMAT);
+						if (dateFormat != null) {
+							result.put(FILE_DATE_FORMAT, dateFormat);
+						}
+					} else {
+						result.put(FILE_DATE_FORMAT, "");
+					}
+
+					// added this check for retrocompatibility
 					if (jsonConf.has(DataSetConstants.CSV_FILE_ENCODING)) {
 						String csvEncoding = jsonConf.getString(DataSetConstants.CSV_FILE_ENCODING);
 						if (csvEncoding != null) {
@@ -302,6 +315,14 @@ public class DataSetJSONSerializer implements Serializer {
 							result.put(CKAN_CSV_FILE_ENCODING, "");
 						}
 
+						if (jsonConf.has(DataSetConstants.CKAN_CSV_DATE_FORMAT)) {
+							String dateFormat = jsonConf.getString(DataSetConstants.CKAN_CSV_DATE_FORMAT);
+							if (dateFormat != null) {
+								result.put(CKAN_CSV_DATE_FORMAT, dateFormat);
+							}
+						} else {
+							result.put(CKAN_CSV_DATE_FORMAT, "");
+						}
 						String ckanSkipRows = jsonConf.getString(DataSetConstants.CKAN_XSL_FILE_SKIP_ROWS);
 						if (ckanSkipRows != null) {
 							result.put(CKAN_XSL_FILE_SKIP_ROWS, ckanSkipRows);
@@ -381,6 +402,10 @@ public class DataSetJSONSerializer implements Serializer {
 					result.put(FLAT_TABLE_NAME, jsonConf.getString(DataSetConstants.FLAT_TABLE_NAME));
 				} else if (DataSetConstants.DS_REST_NAME.equalsIgnoreCase(type)) {
 					manageRESTDataSet(jsonConf, result);
+				} else if (DataSetConstants.DS_SOLR_NAME.equalsIgnoreCase(type)) {
+					manageSolrDataSet(jsonConf, result);
+				} else if (type.equalsIgnoreCase(DataSetConstants.SPARQL)) {
+					manageSPARQLDataSet(jsonConf, result);
 				}
 			} catch (Exception e) {
 				logger.error("Error while defining dataset configuration.  Error: " + e.getMessage());
@@ -399,6 +424,7 @@ public class DataSetJSONSerializer implements Serializer {
 			result.put(END_DATE, ds.getEndDateField());
 			result.put(SCHEDULING_CRON_LINE, ds.getSchedulingCronLine());
 			result.put(IS_REALTIME, ds.isRealtime());
+			result.put(IS_ITERABLE, ds.isIterable());
 			result.put(OWNER, ds.getOwner());
 			result.put(DATE_IN, ds.getDateIn());
 			result.put(SCOPE_CD, ds.getScopeCd());
@@ -415,6 +441,18 @@ public class DataSetJSONSerializer implements Serializer {
 		return result;
 	}
 
+	private void manageSPARQLDataSet(JSONObject conf, JSONObject result) throws JSONException {
+		for (String attr : DataSetConstants.SPARQL_ATTRIBUTES) {
+			if (!conf.has(attr)) {
+				continue;
+			}
+			Object value = conf.get(attr);
+			Assert.assertNotNull(value, "json value");
+			result.put(attr, value.toString());
+		}
+
+	}
+
 	private static void manageRESTDataSet(JSONObject conf, JSONObject result) throws JSONException {
 		for (String attr : DataSetConstants.REST_ALL_ATTRIBUTES) {
 			if (!conf.has(attr)) {
@@ -425,7 +463,19 @@ public class DataSetJSONSerializer implements Serializer {
 			Assert.assertNotNull(value, "json value");
 			result.put(attr, value.toString());
 		}
+	}
 
+	private static void manageSolrDataSet(JSONObject conf, JSONObject result) throws JSONException {
+		manageRESTDataSet(conf, result);
+		for (String attr : DataSetConstants.SOLR_ALL_ATTRIBUTES) {
+			if (!conf.has(attr)) {
+				// optional attribute
+				continue;
+			}
+			Object value = conf.get(attr);
+			Assert.assertNotNull(value, "json value");
+			result.put(attr, value.toString());
+		}
 	}
 
 	public static Object metadataSerializerChooser(String meta) throws SourceBeanException, JSONException {

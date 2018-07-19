@@ -126,7 +126,12 @@ angular.module('cockpitModule')
 
 	}
 })
-.directive('cockpitWidget',function(cockpitModule_widgetConfigurator,cockpitModule_widgetServices,$compile,cockpitModule_widgetSelection,$rootScope,cockpitModule_datasetServices){
+.filter('i18n', function(sbiModule_i18n) {
+	return function(label) {
+		return sbiModule_i18n.getI18n(label);
+	}
+})
+.directive('cockpitWidget',function(cockpitModule_widgetConfigurator,cockpitModule_widgetServices,$compile,cockpitModule_widgetSelection,$rootScope,cockpitModule_datasetServices, cockpitModule_properties){
 	   return{
 		   templateUrl: baseScriptPath+ '/directives/cockpit-widget/templates/cockpitWidget.html',
 		   controller: cockpitWidgetControllerFunction,
@@ -143,32 +148,45 @@ angular.module('cockpitModule')
                     post: function postLink(scope, element, attrs, ctrl, transclud) {
                     	// init the widget
                     	element.ready(function () {
-                    		var objType=cockpitModule_widgetConfigurator[scope.ngModel.type.toLowerCase()];
-                    		var dataset;
-                    		if (scope.ngModel.dataset){
-                        		dataset = cockpitModule_datasetServices.getDatasetById(scope.ngModel.dataset.dsId)
-                    		}
+	                    		var objType=cockpitModule_widgetConfigurator[scope.ngModel.type.toLowerCase()];
+	                    		var dataset;
+	                    		if (scope.ngModel.dataset){
+	                        		dataset = cockpitModule_datasetServices.getDatasetById(scope.ngModel.dataset.dsId)
+	                    		}
+	                    		if(scope.ngModel.type.toLowerCase()=="chart" && scope.ngModel.drillable == undefined){
+	                    			if(scope.ngModel.cliccable){
+	                    				scope.ngModel.drillable = false;	
+	                    			} else {
+	                    				scope.ngModel.drillable = true;
+	                    			}
+	                    			
+	                    		}
 
-                    		scope.updateble=objType.updateble==undefined? true : objType.updateble;
-                    		//if the dataset is realtime disable the cliccable icon in the toolbar
-                    		if (dataset && dataset != null && dataset.isRealtime){
-                        		scope.cliccable= false;
-                    		} else {
-                        		scope.cliccable=objType.cliccable==undefined? true : objType.cliccable;
-                    		}
-                    		if(objType!=undefined){
-                    			var directive = document.createElement("cockpit-"+scope.ngModel.type.toLowerCase()+"-widget" );
-                    			var content=element[0].querySelector("md-card-content");
-                    			content.appendChild(directive);
-                    			$compile(content)(scope) ;
-                    			scope.initializeWidgetProperty(directive);
-                    			scope.subCockpitWidget=angular.element(directive);
-                    			scope.gridsterItem=angular.element(scope.cockpitWidgetItem[0].querySelector("li.gridster-item"))
-                    		}else{
-                    			console.error(scope.ngModel.type+" widget not defined");
-                    		}
+	                    		if(scope.ngModel.type == "selector"){
+	                    			scope.updateble = true;
+	                    		}else{
+	                    			scope.updateble=objType.updateble==undefined? true : objType.updateble;
+	                    		}
+	                    		//if the dataset is realtime disable the cliccable icon in the toolbar
+	                    		if (dataset && dataset != null && dataset.isRealtime){
+	                        		scope.cliccable= false;
+	                    		} else {
+	                        		scope.cliccable=objType.cliccable==undefined? true : objType.cliccable;
+	                    		}
+	                    		if(objType!=undefined){
+	                    			var directive = document.createElement("cockpit-"+scope.ngModel.type.toLowerCase()+"-widget" );
+	                    			var content=element[0].querySelector("md-card-content");
+	                    			content.appendChild(directive);
+	                    			$compile(content)(scope) ;
+	                    			scope.initializeWidgetProperty(directive);
+	                    			scope.subCockpitWidget=angular.element(directive);
+	                    			scope.gridsterItem=angular.element(scope.cockpitWidgetItem[0].querySelector("li.gridster-item"))
+	                    		}else{
+	                    			console.error(scope.ngModel.type+" widget not defined");
+	                    		}
 
-                    		scope.refreshWidgetStyle();
+	                    		scope.refreshWidgetStyle();
+
                         });
 
                     	scope.initializeWidgetProperty=function(directive){
@@ -190,9 +208,9 @@ angular.module('cockpitModule')
                     			}
                     		};
 
-                    		scope.refreshWidget=function(options,nature){
+                    		scope.refreshWidget=function(options,nature,changedChartType){
                     			var finOptions=options==undefined? (scope.getOptions == undefined? {} :  scope.getOptions()) : options;
-                    			cockpitModule_widgetServices.refreshWidget(angular.element(directive),scope.ngModel,nature==undefined? 'refresh' : nature, finOptions);
+                    			cockpitModule_widgetServices.refreshWidget(angular.element(directive),scope.ngModel,nature==undefined? 'refresh' : nature, finOptions, undefined, changedChartType);
                     		};
                     	}
 
@@ -202,19 +220,45 @@ angular.module('cockpitModule')
 	   }
 });
 
-function cockpitWidgetControllerFunction($scope,$rootScope,cockpitModule_widgetServices,cockpitModule_properties,cockpitModule_template,cockpitModule_analyticalDrivers,cockpitModule_datasetServices,sbiModule_restServices,$q,cockpitModule_documentServices,cockpitModule_crossServices,cockpitModule_widgetSelection,$timeout,cockpitModule_gridsterOptions,sbiModule_translate,sbiModule_user,$mdDialog){
+function cockpitWidgetControllerFunction(
+		$scope,
+		$rootScope,
+		cockpitModule_widgetServices,
+		cockpitModule_properties,
+		cockpitModule_template,
+		cockpitModule_analyticalDrivers,
+		cockpitModule_datasetServices,
+		sbiModule_restServices,
+		$q,
+		cockpitModule_documentServices,
+		cockpitModule_crossServices,
+		cockpitModule_widgetSelection,
+		$timeout,
+		cockpitModule_gridsterOptions,
+		sbiModule_translate,
+		sbiModule_user,
+		sbiModule_i18n,
+		sbiModule_config,
+		$filter,
+		$mdDialog)
+	{
 
-
+	$scope.openMenu = function($mdMenu, ev) {
+	      $mdMenu.open(ev);
+	    };
 
 	$scope.cockpitModule_properties=cockpitModule_properties;
 	$scope.cockpitModule_template=cockpitModule_template;
 	$scope.translate		= sbiModule_translate;
+	$scope.i18n		= sbiModule_i18n;
+	$scope.enterpriseEdition = (sbiModule_user.functionalities.indexOf("EnableButtons")>-1)? true:false;
 	$scope.tmpWidgetContent	= {};
 	$scope.editingWidgetName= false;
-	$scope.extendedStyle	= {}; // the merge of the widget style and the
+	$scope.extendedStyle	= {};
 
 	$scope.borderShadowStyle= {};
 	$scope.titleStyle		= {};
+	
 	$scope.widgetSpinner	= false;
 	$scope.widgetSearchBar 	= false; // default searchBar unactive
 	$scope.activeSearch 	= false; // default search unactive
@@ -246,7 +290,7 @@ function cockpitWidgetControllerFunction($scope,$rootScope,cockpitModule_widgetS
 		$scope.ngModel.search ={"columns" : []};
 		for(var k in $scope.ngModel.content.columnSelectedOfDataset){
 			var column = $scope.ngModel.content.columnSelectedOfDataset[k];
-			if(column.fieldType == "ATTRIBUTE"){
+			if(column.fieldType == "ATTRIBUTE" && column.type == "java.lang.String"){
 				$scope.ngModel.search.columns.push(column.name);
 			}
 		}
@@ -254,7 +298,7 @@ function cockpitWidgetControllerFunction($scope,$rootScope,cockpitModule_widgetS
 
 	// davverna - method to set the actual model and search parameters to refresh the widget table
 	$scope.searchColumns = function(){
-		if($scope.ngModel.search.text != ""){
+		if($scope.ngModel.search.text != "" && $scope.ngModel.search.columns.length > 0){
 			$scope.activeSearch = true;
 			$scope.refreshWidget();
 		}
@@ -319,11 +363,12 @@ function cockpitWidgetControllerFunction($scope,$rootScope,cockpitModule_widgetS
 		switch(eventType){
 		case "REFRESH"  :
 			if($scope.refresh==undefined){
-				$timeout(function(){
+				/*$timeout(function(){
 					$scope.refresh(config.element,config.width,config.height, config.data,config.nature,config.associativeSelection);
-				},1000);
+				},1000);*/
+				$scope.refresh(config.element,config.width,config.height, config.data,config.nature,config.associativeSelection);
 			}else{
-				$scope.refresh(config.element,config.width,config.height,config.data,config.nature,config.associativeSelection);
+				$scope.refresh(config.element,config.width,config.height,config.data,config.nature,config.associativeSelection, config.changedChartType,config.chartConf);
 			}
 			break;
 		case "INIT" :
@@ -388,7 +433,6 @@ function cockpitWidgetControllerFunction($scope,$rootScope,cockpitModule_widgetS
 					if(associativeSelection==undefined || associativeSelection.hasOwnProperty(dataset.label)){
 						var option =$scope.getOptions == undefined? {} :  $scope.getOptions();
 						cockpitModule_widgetServices.refreshWidget($scope.subCockpitWidget,$scope.ngModel,'selections',option);
-// $scope.refreshWidget();
 					}
 				}
 		}
@@ -397,11 +441,8 @@ function cockpitWidgetControllerFunction($scope,$rootScope,cockpitModule_widgetS
 				$scope.initWidget();
 			}else{
 				if(associativeSelection==undefined || associativeSelection.hasOwnProperty(document.DOCUMENT_LABEL)){
-// $scope.refreshWidget();
 					var option =$scope.getOptions == undefined? {} :  $scope.getOptions();
 					cockpitModule_widgetServices.refreshWidget($scope.subCockpitWidget,$scope.ngModel,'selections',option);
-					// to-do testare se funziona con la chiamata sotto
-// $scope.refreshWidget(undefined,'selections');
 				}
 			}
 		}
@@ -440,6 +481,12 @@ function cockpitWidgetControllerFunction($scope,$rootScope,cockpitModule_widgetS
 		cockpitModule_widgetServices.deleteWidget(cockpitModule_properties.CURRENT_SHEET,$scope.ngModel,nomessage);
 	}
 
+	$scope.clearAllSelectionsAndRefresh=function(){
+		cockpitModule_widgetSelection.clearAllSelections();
+		cockpitModule_widgetSelection.refreshAllWidgetWhithSameDataset($scope.getDataset().label);
+	}
+
+
 	$scope.cloneWidget = function(){
 		var newModel = angular.copy($scope.ngModel);
 		newModel.id = new Date().getTime();
@@ -470,20 +517,62 @@ function cockpitWidgetControllerFunction($scope,$rootScope,cockpitModule_widgetS
 	    })
 	    .then(function() {
 	    	if($scope.targetSheet.index!=cockpitModule_properties.CURRENT_SHEET){
-		    	cockpitModule_widgetServices.addWidget($scope.targetSheet.index,angular.copy($scope.ngModel));
+		    	cockpitModule_widgetServices.moveWidget($scope.targetSheet.index,angular.copy($scope.ngModel));
 				cockpitModule_widgetServices.deleteWidget(cockpitModule_properties.CURRENT_SHEET,$scope.ngModel,true);
+				$scope.refreshWidget(undefined,'filters');
 	    	}
 	    });
 	}
 
-	$scope.openSearchBar = function(){
-		$scope.widgetSearchBar == false ? $scope.widgetSearchBar = true : $scope.widgetSearchBar = false;
+	$scope.openSearchBar = function(ev,widgetName){
+		//$scope.widgetSearchBar == false ? $scope.widgetSearchBar = true : $scope.widgetSearchBar = false;
+		$mdDialog.show({
+			controller: function ($scope,$mdDialog,ngModel) {
+				$scope.widgetName = widgetName;
+				$scope.searchColumnsModal = function(){
+					$mdDialog.hide();
+				}
+				$scope.cancel = function(){
+					$mdDialog.cancel();
+				}
+			},
+			scope: $scope,
+			preserveScope:true,
+	      templateUrl: currentScriptPath+'/templates/tableSearch.tpl.html',
+	      targetEvent: ev,
+	      clickOutsideToClose:true,
+	      locals: {ngModel:$scope.ngModel}
+	    })
+	    .then(function() {
+	    	$scope.searchColumns();
+	    });
 	}
 
+	$scope.chartsForDrill = ["bar","pie","line","treemap"]
+	$scope.changeClickability = function(){
+		if($scope.ngModel.cliccable && !$scope.ngModel.drillable){
+			$scope.ngModel.cliccable = false;
+			$scope.ngModel.drillable = true;
+		} else if(!$scope.ngModel.cliccable && $scope.ngModel.drillable){
+			$scope.ngModel.cliccable = false;
+			$scope.ngModel.drillable = false;
+		}  else {
+			$scope.ngModel.cliccable = true;
+			$scope.ngModel.drillable = false;
+		}
+		$scope.$broadcast("drillClick",{ "drillable": $scope.ngModel.drillable, "cliccable": $scope.ngModel.cliccable});;
+	}
 	$scope.doSelection = function(columnName,columnValue,modalColumn,modalValue,row, skipRefresh){
 		if($scope.ngModel.cliccable==false){
 			console.log("widget is not cliccable")
 			return;
+		}
+		//check if is a realtime dataset to disable selection
+		if ($scope.ngModel.dataset.dsId != undefined){
+    		var dataset = cockpitModule_datasetServices.getDatasetById($scope.ngModel.dataset.dsId)
+    		if (dataset.isRealtime){
+    			return;
+    		}
 		}
 
 		// check if cross navigation was enable don this widget
@@ -545,8 +634,73 @@ function cockpitWidgetControllerFunction($scope,$rootScope,cockpitModule_widgetS
 					outputParameter[model.cross.cross.outputParameter] = columnValue;
 				}
 
+
+				// parse output parameters if enabled
+				var otherOutputParameters = [];
+				var passedOutputParametersList = model.cross.cross.outputParametersList;
+
+				// get Aliases for column
+				var columnAliasesMap = {};
+				if(model.content.columnSelectedOfDataset){
+					for(var i = 0; i<model.content.columnSelectedOfDataset.length; i++){
+						var colDataset = model.content.columnSelectedOfDataset[i];
+						if(colDataset.aliasToShow && colDataset.aliasToShow != ""){
+							if(colDataset.alias){
+								columnAliasesMap[colDataset.alias] = colDataset.aliasToShow;
+							}
+						}
+					}
+				}
+
+				for(par in passedOutputParametersList){
+					var content = passedOutputParametersList[par];
+
+					if(content.enabled == true){
+
+						/*if(content.dataType == 'date' && content.value != undefined && content.value != ''){
+
+							content.value = content.value.toLocaleDateString('en-US');
+							content.value+= "#MM/dd/yyyy";
+						}*/
+
+						if(content.type == 'static'){
+							var objToAdd = {};
+							objToAdd[par] = content.value;
+							otherOutputParameters.push(objToAdd);
+						}
+						else if(content.type == 'dynamic'){
+							if(content.column){
+								var columnNameToSearch = columnAliasesMap[content.column] ?  columnAliasesMap[content.column] : content.column;
+								var valToAdd = row[columnNameToSearch];
+								var objToAdd = {};
+								objToAdd[par] = valToAdd;
+								otherOutputParameters.push(objToAdd);
+							}
+						}
+						else if(content.type == 'selection'){
+							var selectionsObj = cockpitModule_template.getSelections();
+							if(selectionsObj){
+								var found = false;
+								for(var i = 0; i < selectionsObj.length && found == false; i++){
+									if(selectionsObj[i].ds == content.dataset && selectionsObj[i].columnName == content.column){
+										var val = selectionsObj[i].value;
+										var objToAdd = {};
+										objToAdd[par] = val;
+										otherOutputParameters.push(objToAdd);
+										found = true;
+									}
+								}
+							}
+						}
+					}
+				}
+
+
+
+
+
 				// parse static parameters if present
-				var staticParameters = [];
+				/*var staticParameters = [];
 				if(model.cross.cross.staticParameters && model.cross.cross.staticParameters != ""){
 					var err=false;
 					try{
@@ -580,14 +734,14 @@ function cockpitWidgetControllerFunction($scope,$rootScope,cockpitModule_widgetS
 
 						}
 
-				}
+				}*/
 
 				// if destination document is specified don't ask
 				if(model.cross.cross.crossName != undefined){
-					parent.execExternalCrossNavigation(outputParameter,{},model.cross.cross.crossName,null,staticParameters);
+					parent.execExternalCrossNavigation(outputParameter,{},model.cross.cross.crossName,null,otherOutputParameters);
 				}
 				else{
-					parent.execExternalCrossNavigation(outputParameter,{},null,null,staticParameters);
+					parent.execExternalCrossNavigation(outputParameter,{},null,null,otherOutputParameters);
 				}
 				return;
 			}
@@ -701,14 +855,26 @@ function cockpitWidgetControllerFunction($scope,$rootScope,cockpitModule_widgetS
 				}else{
 					if(!cockpitModule_template.configuration.filters.hasOwnProperty(dsLabel)){
 						cockpitModule_template.configuration.filters[dsLabel]={};
+					} else{
+						if(Object.keys(cockpitModule_template.configuration.filters).length > 1){ // sort keys
+							var temp = cockpitModule_template.configuration.filters[dsLabel];
+							delete cockpitModule_template.configuration.filters[dsLabel];
+							cockpitModule_template.configuration.filters[dsLabel] = temp;
+						}
 					}
 					if (Array.isArray(originalColumnName)){
 						for (var o=0; o < originalColumnName.length; o++){
 							var singleOriginalColumnValue = originalColumnName[o];
+							if(cockpitModule_template.configuration.filters[dsLabel].hasOwnProperty(singleOriginalColumnValue)){ // sort keys
+								delete cockpitModule_template.configuration.filters[dsLabel][singleOriginalColumnValue];
+							}
 							cockpitModule_template.configuration.filters[dsLabel][singleOriginalColumnValue]=columnValue[o];
 							cockpitModule_template.configuration.aliases.push({'dataset':dsLabel,'column':singleOriginalColumnValue,'alias':columnName[o]});
 						}
 					}else{
+							if(cockpitModule_template.configuration.filters[dsLabel].hasOwnProperty(originalColumnName)){ // sort keys
+								delete cockpitModule_template.configuration.filters[dsLabel][originalColumnName];
+							}
 							// 02/02/17 - davverna
 							// if columnvalue is an array, usually from a bulk selection, I use a copy to avoid the direct object binding.
 							// With the double click there is not the same issue because the binding is on a primitive value (string).
@@ -739,6 +905,9 @@ function cockpitWidgetControllerFunction($scope,$rootScope,cockpitModule_widgetS
 		}
 		$scope.editWidget().then(
 				function(){
+					if(typeof $scope.reinit !== "undefined"){
+						$scope.reinit();
+					}
 					clearRedundantStyle();
 					$scope.refreshWidgetStyle();
 					if(initOnFinish){
@@ -754,7 +923,6 @@ function cockpitWidgetControllerFunction($scope,$rootScope,cockpitModule_widgetS
 			return deferred.promise;
 		}
 	}
-
 
 	var clearRedundantStyle=function(){
 		for(var prop in $scope.ngModel.style){
@@ -783,51 +951,64 @@ function cockpitWidgetControllerFunction($scope,$rootScope,cockpitModule_widgetS
 		return cockpitModule_analyticalDrivers;
 	}
 
-	$scope.editWidgetName=function(){
-		if(cockpitModule_properties.EDIT_MODE){
-			$scope.editingWidgetName=true;
-			angular.copy($scope.ngModel.content,$scope.tmpWidgetContent);
-		}
-	}
-	$scope.applyEditName=function(e){
-		e.stopPropagation();
-		$scope.editingWidgetName=false;
-		$scope.ngModel.content.name=$scope.tmpWidgetContent.name;
-		$scope.tmpWidgetContent={};
-	}
-	$scope.cancelEditName=function(e){
-		e.stopPropagation();
-		$scope.editingWidgetName=false;
-		$scope.tmpWidgetContent={};
-	}
-
 	$scope.refreshWidgetStyle=function(){
-		angular.copy({},$scope.extendedStyle);
-		angular.copy({},$scope.borderShadowStyle);
-		angular.copy({},$scope.titleStyle);
 
 		// update extended style
 		angular.copy(angular.merge({},cockpitModule_template.configuration.style,$scope.ngModel.style),$scope.extendedStyle);
 
+		// update border style
+		if($scope.extendedStyle.borders!=undefined){
+			if($scope.extendedStyle.borders){
+				angular.merge($scope.borderShadowStyle,$scope.extendedStyle.border);
+			}else{
+				delete $scope.borderShadowStyle['border-color'];
+				delete $scope.borderShadowStyle['border-width'];
+				delete $scope.borderShadowStyle['border-style'];
+			}
+		}
+
 		// update shadow style
-		if($scope.extendedStyle.borders!=undefined && $scope.extendedStyle.borders==true){
-			angular.merge($scope.borderShadowStyle,$scope.extendedStyle.border);
+		if($scope.extendedStyle.shadows!=undefined){
+			if($scope.extendedStyle.shadows){
+				angular.merge($scope.borderShadowStyle,$scope.extendedStyle.shadow);
+			}else{
+				delete $scope.borderShadowStyle['box-shadow'];
+			}
 		}
-		// update borders style
-		if($scope.extendedStyle.shadows!=undefined && $scope.extendedStyle.shadows==true){
-			angular.merge($scope.borderShadowStyle,$scope.extendedStyle.shadow);
-		}
-		// update title style
+//		// update title style
 		if($scope.extendedStyle.titles!=undefined && $scope.extendedStyle.titles==true){
-			angular.merge($scope.titleStyle,$scope.extendedStyle.title);
+			if($scope.ngModel.content.name && $scope.extendedStyle.title){
+				$scope.extendedStyle.title.label = $scope.extendedStyle.title.label ? $scope.extendedStyle.title.label : $scope.ngModel.content.name;
+			}
+			if($scope.extendedStyle.title && !$scope.extendedStyle.title.font){
+				$scope.extendedStyle.title.font = {};
+				$scope.ngModel.style.title.font = {};
+
+				if($scope.extendedStyle.title['font-weight']){
+					$scope.extendedStyle.title.font['font-weight'] = $scope.extendedStyle.title['font-weight'];
+					$scope.ngModel.style.title.font['font-weight'] = $scope.extendedStyle.title['font-weight'];
+					}
+				if($scope.extendedStyle.title['font-size']){
+					$scope.extendedStyle.title.font['font-size'] = $scope.extendedStyle.title['font-size'];
+					$scope.ngModel.style.title.font['font-size'] = $scope.extendedStyle.title['font-size'];
+					}
+				if($scope.extendedStyle.title['font-family']){
+					$scope.extendedStyle.title.font['font-family'] = $scope.extendedStyle.title['font-family'];
+					$scope.ngModel.style.title.font['font-family'] = $scope.extendedStyle.title['font-family'];
+					}
+				if($scope.extendedStyle.title.color){
+					$scope.extendedStyle.title.font.color = $scope.extendedStyle.title.color;
+					$scope.ngModel.style.title.font.color = $scope.extendedStyle.title.color;
+					}
+			}
+			if($scope.extendedStyle.title && $scope.extendedStyle.title.height){
+				$scope.extendedStyle.title['min-height'] = $scope.extendedStyle.title.height;
+			}
 		}
 
 		// update widgets background color
-		if($scope.extendedStyle.backgroundColor!=undefined) {
-			var tempBackGround={'background-color': $scope.extendedStyle.backgroundColor};
-			angular.merge($scope.borderShadowStyle,tempBackGround);
-		}
-
+		var tempBackGround={'background-color': $scope.extendedStyle.backgroundColor || ''};
+		angular.merge($scope.borderShadowStyle,tempBackGround);
 
 		// update sheets background color
 		if($scope.extendedStyle.sheetsBackgroundColor!=undefined && $scope.cockpitModule_template.style) {
@@ -837,14 +1018,10 @@ function cockpitWidgetControllerFunction($scope,$rootScope,cockpitModule_widgetS
 
 		}
 
-
-
 		// update header height
 		if($scope.extendedStyle.headerHeight!=undefined){
 			$scope.headerHeight=$scope.extendedStyle.headerHeight;
 		}
-
-
 
 	}
 
@@ -865,9 +1042,6 @@ function cockpitWidgetControllerFunction($scope,$rootScope,cockpitModule_widgetS
 
 
 	$scope.expandWidget=function(){
-//		if($scope.ngModel.type == "table"){
-//			$scope.$root.$broadcast("WIDGET_EVENT"+$scope.ngModel.id,"WIDGET_SPINNER",{show:true});
-//		}
 
 		if(angular.element($scope.cockpitWidgetItem[0].firstElementChild).hasClass("fullScreenWidget")){
 			cockpitModule_widgetServices.setFullPageWidget(false);
@@ -955,6 +1129,51 @@ function cockpitWidgetControllerFunction($scope,$rootScope,cockpitModule_widgetS
 			return true;
 		}
 		return false;
+	}
+	$scope.chartTypes = [];
+	$scope.showChartTypes = function(ev,widgetName){
+		if(!$scope.ngModel.content.chartTemplateOriginal){
+			$scope.ngModel.content.chartTemplateOriginal = angular.copy($scope.ngModel.content.chartTemplate);
+
+		}else{
+			$scope.ngModel.content.chartTemplate = angular.copy($scope.ngModel.content.chartTemplateOriginal);
+		}
+		$scope.chartTypes.length = 0;
+		var serie = $scope.ngModel.content.chartTemplate.CHART.VALUES.SERIE;
+		var numOfCateg = cockpitModule_widgetServices.checkNumOfCategory($scope.ngModel.content.chartTemplate.CHART.VALUES.CATEGORY);
+		var minMaxCategoriesSeries = cockpitModule_widgetServices.createCompatibleCharts();
+		for (var attrname in minMaxCategoriesSeries.serie.min) {
+			if((minMaxCategoriesSeries.serie.min[attrname] <= serie.length) && (minMaxCategoriesSeries.categ.min[attrname] <= numOfCateg) ){
+				$scope.chartTypes.push(attrname)
+			}
+		}
+
+		$mdDialog.show({
+			controller: function ($scope,$mdDialog,ngModel) {
+				$scope.widgetName = widgetName;
+
+				$scope.changeChartType = function(type){
+					var chartType = $scope.ngModel.content.chartTemplate.CHART.type.toLowerCase();
+					var categories = cockpitModule_widgetServices.checkCategories($scope.ngModel.content.chartTemplate);
+					delete $scope.ngModel.content.chartTemplate.CHART.VALUES.CATEGORY;
+					var maxcateg = minMaxCategoriesSeries.categ.max[type] ? minMaxCategoriesSeries.categ.max[type] : undefined;
+					$scope.ngModel.content.chartTemplate.CHART.VALUES.CATEGORY = cockpitModule_widgetServices.compatibleCategories(type, categories, maxcateg);
+					if(minMaxCategoriesSeries.serie.max[type]) $scope.ngModel.content.chartTemplate.CHART.VALUES.SERIE.length = minMaxCategoriesSeries.serie.max[type];
+					$scope.ngModel.content.chartTemplate.CHART.type = type.toUpperCase();
+					$scope.$broadcast("changeChart",{ "type": type});
+					$mdDialog.hide();
+				}
+				$scope.cancel = function(){
+					$mdDialog.cancel();
+				}
+			},
+			scope: $scope,
+			preserveScope:true,
+	      templateUrl: currentScriptPath+'/templates/chartTypes.tpl.html',
+	      targetEvent: ev,
+	      clickOutsideToClose:true,
+	      locals: {ngModel:$scope.ngModel}
+	    })
 	}
 };
 

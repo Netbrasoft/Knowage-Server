@@ -2,7 +2,7 @@
 	var documentExecutionModule = angular.module('documentExecutionModule');
 
 	documentExecutionModule.service('docExecute_exportService', function(sbiModule_translate,sbiModule_config,
-			execProperties,sbiModule_user,sbiModule_restServices,$http,sbiModule_dateServices, documentExecuteServices, sbiModule_download, $q, $rootScope, sbiModule_messaging,multipartForm,$sce,$mdPanel) {
+			execProperties,sbiModule_user,sbiModule_restServices,$http,sbiModule_dateServices, documentExecuteServices, sbiModule_download, $q, $rootScope, sbiModule_messaging,multipartForm,$sce,$mdPanel,$mdToast) {
 
 		var dee = this;
 
@@ -11,58 +11,99 @@
 			return dee.exporting;
 		}
 
+
+		// for jasper substitute outputType to previous URL,
+		// in order not to lose subreport infos that are inserted by driver
+		dee.getJasperExportationUrl = function(format,paramsExportType,actionPath){
+			var previousUrl = execProperties.documentUrl;
+			var newUrl = previousUrl;
+
+			var indexOutputType = previousUrl.search("outputType");
+			if(indexOutputType>0){
+				var indexAnd = previousUrl.indexOf("&",indexOutputType);
+				var toSubstitute = previousUrl.substring(indexOutputType, indexAnd);
+				var toSubstituteWith = "outputType="+format;
+				newUrl = newUrl.replace(toSubstitute, toSubstituteWith);
+			}
+			else{
+				newUrl+="&outputType="+format;
+			}
+			return sbiModule_config.host + newUrl;
+		}
+
 		dee.getExportationUrl = function(format,paramsExportType,actionPath){
 			// https://production.eng.it/jira/browse/KNOWAGE-1443
 			// actionPath has no '/' at the beginning
-			var urlService = sbiModule_config.host + '/' + actionPath+'?';
-			var sbiContext = 'SBICONTEXT='+sbiModule_config.contextName
-			var docName = '&documentName='+execProperties.executionInstance.OBJECT_LABEL;
-			var sbiExeRole = '&SBI_EXECUTION_ROLE='+execProperties.selectedRole.name;
-			var country = '&SBI_COUNTRY='+sbiModule_config.curr_country;
-			var idDocument = '&document='+ execProperties.executionInstance.OBJECT_ID;
-			var language = '&SBI_LANGUAGE='+sbiModule_config.curr_language;
-			var host = '&SBI_HOST='+sbiModule_config.host;
-			var dateFormat = '&dateformat='+sbiModule_config.serverDateFormat;
-			var controller ='&SBI_SPAGO_CONTROLLER='+sbiModule_config.adapterPathNoContext;
-			var userID = '&user_id='+sbiModule_user.userId;
-			var sbiExeId= '&SBI_EXECUTION_ID=' + execProperties.executionInstance.SBI_EXECUTION_ID;
-			var isFromCross = '&isFromCross=false';
-			var sbiEnv = '&SBI_ENVIRONMENT=DOCBROWSER';
-			var outputType = '&outputType='+ format;
-			var paramsFilter='';
-			if(execProperties.parametersData.documentParameters && execProperties.parametersData.documentParameters.length>0){
-				var paramsArr = execProperties.parametersData.documentParameters;
-				for(var i=0; i<paramsArr.length; i++){
-					var currParam = paramsArr[i];
-					if(currParam.parameterValue && currParam.parameterValue!=''){
-						//date
-						if(currParam.type=="DATE"){
-							var dateParam = sbiModule_dateServices.formatDate(currParam.parameterValue, sbiModule_config.serverDateFormat);
-							paramsFilter=paramsFilter+'&'+currParam.urlName+'='+dateParam;
-						}else if(currParam.type=="DATE_RANGE"){
-							var dateParam = sbiModule_dateServices.formatDate(currParam.parameterValue, sbiModule_config.serverDateFormat);
-							if(paramsArr[i].datarange && paramsArr[i].datarange.opt){
-								var rangeArr = paramsArr[i].datarange.opt.split('_');
-								var rangeType = documentExecuteServices.getRangeCharacter(rangeArr[0]);
-								var rangeQuantity = rangeArr[1];
-								paramsFilter=paramsFilter+'&'+currParam.urlName+'='+dateParam+'_'+rangeQuantity+rangeType;
+			var exportUrl;
+			// if is to export a jasper report get url from
+			if(actionPath.indexOf("knowagejasperreportengine") != -1 ){
+				exportUrl = dee.getJasperExportationUrl(format,paramsExportType,actionPath);
+			}
+			else{
+				// other kind of export
+
+				if(!actionPath.startsWith('/')){
+					actionPath = '/' + actionPath;
+				}
+
+				var urlService = null;
+				if(actionPath.indexOf('?') >=0 ){
+					urlService = sbiModule_config.host + actionPath+'&';
+				}
+				else{
+					urlService = sbiModule_config.host + actionPath+'?';
+				}
+
+				var sbiContext = 'SBICONTEXT='+sbiModule_config.contextName
+				var docName = '&documentName='+execProperties.executionInstance.OBJECT_LABEL;
+				var sbiExeRole = '&SBI_EXECUTION_ROLE='+execProperties.selectedRole.name;
+				var country = '&SBI_COUNTRY='+sbiModule_config.curr_country;
+				var idDocument = '&document='+ execProperties.executionInstance.OBJECT_ID;
+				var language = '&SBI_LANGUAGE='+sbiModule_config.curr_language;
+				var host = '&SBI_HOST='+sbiModule_config.host;
+				var dateFormat = '&dateformat='+sbiModule_config.serverDateFormat;
+				var controller ='&SBI_SPAGO_CONTROLLER='+sbiModule_config.adapterPathNoContext;
+				var userUniqueIdentifier = '&user_id='+sbiModule_user.userUniqueIdentifier;
+				var sbiExeId= '&SBI_EXECUTION_ID=' + execProperties.executionInstance.SBI_EXECUTION_ID;
+				var isFromCross = '&isFromCross=false';
+				var sbiEnv = '&SBI_ENVIRONMENT=DOCBROWSER';
+				var outputType = '&outputType='+ format;
+				var paramsFilter='';
+				if(execProperties.parametersData.documentParameters && execProperties.parametersData.documentParameters.length>0){
+					var paramsArr = execProperties.parametersData.documentParameters;
+					for(var i=0; i<paramsArr.length; i++){
+						var currParam = paramsArr[i];
+						if(currParam.parameterValue && currParam.parameterValue!=''){
+							//date
+							if(currParam.type=="DATE"){
+								var dateParam = sbiModule_dateServices.formatDate(currParam.parameterValue, sbiModule_config.serverDateFormat);
+								paramsFilter=paramsFilter+'&'+currParam.urlName+'='+dateParam;
+							}else if(currParam.type=="DATE_RANGE"){
+								var dateParam = sbiModule_dateServices.formatDate(currParam.parameterValue, sbiModule_config.serverDateFormat);
+								if(paramsArr[i].datarange && paramsArr[i].datarange.opt){
+									var rangeArr = paramsArr[i].datarange.opt.split('_');
+									var rangeType = documentExecuteServices.getRangeCharacter(rangeArr[0]);
+									var rangeQuantity = rangeArr[1];
+									paramsFilter=paramsFilter+'&'+currParam.urlName+'='+dateParam+'_'+rangeQuantity+rangeType;
+								}
 							}
-						}
-						else{
-							if(!currParam.multivalue) {
-								paramsFilter=paramsFilter+'&'+currParam.urlName+'='+currParam.parameterValue;
-							}
-							else {
-								var multivalue = "{;{"+currParam.parameterValue.join([separator = ';'])+"}"+currParam.type+"}";
-								paramsFilter=paramsFilter+'&'+currParam.urlName+'='+multivalue;
+							else{
+								if(!currParam.multivalue) {
+									paramsFilter=paramsFilter+'&'+currParam.urlName+'='+currParam.parameterValue;
+								}
+								else {
+									var multivalue = "{;{"+currParam.parameterValue.join([separator = ';'])+"}"+currParam.type+"}";
+									paramsFilter=paramsFilter+'&'+currParam.urlName+'='+multivalue;
+								}
 							}
 						}
 					}
 				}
+				var exportationUrl =  sbiContext + docName + sbiExeRole + country + idDocument + language + host + dateFormat + controller + userUniqueIdentifier + sbiExeId + isFromCross + sbiEnv + outputType + paramsFilter + paramsExportType;
+				var url = encodeURIComponent(exportationUrl).replace(/'/g,"%27").replace(/"/g,"%22").replace(/%3D/g,"=").replace(/%26/g,"&");
+				exportUrl = urlService + url;
 			}
-			var exportationUrl =  sbiContext + docName + sbiExeRole + country + idDocument + language + host + dateFormat + controller + userID + sbiExeId + isFromCross + sbiEnv + outputType + paramsFilter + paramsExportType;
-			var url = encodeURIComponent(exportationUrl).replace(/'/g,"%27").replace(/"/g,"%22").replace(/%3D/g,"=").replace(/%26/g,"&");
-			return urlService + url;
+			return exportUrl;
 		};
 
 		dee.exportDocumentChart = function(exportType,mimeType){
@@ -108,9 +149,8 @@
 
 
 		dee.exportQbeTo = function(mimeType, contentUrl){
-			var paramsExportType = '&ACTION_NAME=EXPORT_RESULT_ACTION&MIME_TYPE='+format+'&RESPONSE_TYPE=RESPONSE_TYPE_ATTACHMENT';
-//			window.open(dee.getExportationUrl(format,paramsExportType,'knowageqbeengine/servlet/AdapterHTTP') , 'name', 'resizable=1,height=750,width=1000');
-			window.open(dee.getExportationUrl(format,paramsExportType, sbiModule_config.qbeEngineContextName + '/servlet/AdapterHTTP') , 'name', 'resizable=1,height=750,width=1000');
+			var paramsExportType = '&ACTION_NAME=EXPORT_RESULT_ACTION&MIME_TYPE='+mimeType+'&RESPONSE_TYPE=RESPONSE_TYPE_ATTACHMENT';
+			window.open(dee.getExportationUrl(mimeType, paramsExportType, sbiModule_config.qbeEngineContextName + '/servlet/AdapterHTTP') , 'name', 'resizable=1,height=750,width=1000');
 		};
 
 
@@ -225,22 +265,34 @@
 
 		}
 
+
+		dee.exportDocCompTo = function(exportType, mimeType){
+			dee.exporting = true;
+
+			window.open(dee.getExportationUrl(exportType,'',sbiModule_config.adapterPath+'?ACTION_NAME=EXPORT_DOCUMENT_COMPOSITION_PDF&inline=false') , 'name', 'resizable=1,height=750,width=1000');
+		};
+
+
 		dee.exportCockpitTo = function(exportType, mimeType){
 			dee.exporting = true;
 
 			dee.getBackendRequestParams(exportType, mimeType).then(function(parameters){
-				dee.buildBackendRequestConf(exportType, mimeType, parameters).then(function(requestConf){
+				dee.buildBackendRequestConf(exportType, mimeType, parameters)
+				.then(function(requestConf){
+					var exportingToast = sbiModule_messaging.showInfoMessage(sbiModule_translate.load("sbi.execution.executionpage.toolbar.export.exporting"), 'Success!', 0);
 					$http(requestConf)
 					.then(function successCallback(response) {
 						var mimeType = response.headers("Content-type");
 						var fileAndExtension = response.headers("Content-Disposition")
+						$mdToast.hide(exportingToast);
+						dee.exporting = false;
 						sbiModule_download.getBlob(
 								response.data,
 								execProperties.executionInstance.OBJECT_LABEL,
 								mimeType,
 								exportType, mimeType,fileAndExtension);
-						dee.exporting = false;
 					}, function errorCallback(response) {
+						$mdToast.cancel(exportingToast);
 						dee.exporting = false;
 						sbiModule_messaging.showErrorMessage(response.errors[0].message, 'Error');
 					});
@@ -264,11 +316,17 @@
 					controller: function($scope,mdPanelRef,sbiModule_translate,deferred,$mdDialog){
 						$scope.translate = sbiModule_translate;
 
+						var iframe = document.getElementById('documentFrame');
+						var gridsterContainer = iframe.contentDocument.getElementById('gridsterContainer');
+						var width = gridsterContainer ? gridsterContainer.parentNode.scrollWidth : 800;
+						var height = gridsterContainer ? gridsterContainer.parentNode.scrollHeight : 600;
+						var zoomFactor = 2.0;
+
 						$scope.parameters = {
-							pdfWidth: 1600,
-							pdfHeight: 1200,
-							pdfWaitTime: 60,
-							pdfZoom: 75, // scale it to [0; 1] interval while saving
+							pdfWidth: width,
+							pdfHeight: height,
+							pdfWaitTime: 30,
+							pdfZoomFactor: zoomFactor,
 							pdfPageOrientation: 'landscape',
 							pdfFrontPage: true,
 							pdfBackPage: true
@@ -280,10 +338,9 @@
 							deferred.reject();
 						}
 
-						$scope.saveDataset=function(){
+						$scope.exportPdf=function(){
 							var parameters = {};
 							angular.copy($scope.parameters, parameters);
-							parameters.pdfZoom = parameters.pdfZoom / 100;
 							deferred.resolve(parameters);
 							mdPanelRef.close();
 							$scope.$destroy();
@@ -587,16 +644,42 @@
 			case "DOCUMENT_COMPOSITE":
 				switch (type) {
 				case "XLS":
-					expObj.func = function(){dee.exportCockpitTo('xls','application/vnd.ms-excel')};
-					break;
+					expObj.func = function(){
+					if(engineDriver!=""){
+						dee.exportCockpitTo('xls','application/vnd.ms-excel');
+					}
+					else{
+						dee.exportDocCompTo('xls','application/vnd.ms-excel');
+					}
+				};
+				break;
 				case "XLSX":
-					expObj.func = function(){dee.exportCockpitTo('xlsx','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')};
-					break;
+					expObj.func = function(){
+					if(engineDriver!=""){
+						dee.exportCockpitTo('xlsx','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+					}
+					else{
+						dee.exportDocCompTo('xlsx','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+					}
+				};
+				break;
 				case "PDF":
-					expObj.func = function(){dee.exportCockpitTo('pdf','application/pdf')};
-					break;
+					expObj.func = function(){
+					if(engineDriver!=""){
+						dee.exportCockpitTo('pdf','application/pdf')}
+					else{
+						dee.exportDocCompTo('pdf','application/pdf')};
+
+				};
+				break;
 				case "JPG":
-					expObj.func = function(){dee.exportCockpitTo('JPG')};
+					expObj.func = function(){
+					if(engineDriver!=""){
+						dee.exportCockpitTo('JPG')}
+					else{
+						dee.exportDocCompTo('JPG')};
+				};
+
 					break;
 				case "APDF":
 					expObj.func = function(){dee.exportCockpitTablesToAPDF()};
@@ -611,7 +694,7 @@
 				break;
 			case "REPORT":
 				expObj.func = function(){
-					if(engineDriver.includes("Jasper")){
+					if(engineDriver.indexOf("Jasper")>=0){
 						dee.exportJasperReportTo(type);
 					}
 					else{

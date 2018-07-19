@@ -17,6 +17,7 @@
  */
 package it.eng.spagobi.commons.utilities;
 
+import java.io.IOException;
 import java.lang.reflect.Method;
 import java.security.Principal;
 import java.util.ArrayList;
@@ -34,6 +35,8 @@ import javax.servlet.http.HttpServletRequest;
 
 import org.apache.log4j.Logger;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jamonapi.Monitor;
 import com.jamonapi.MonitorFactory;
 
@@ -133,7 +136,7 @@ public class UserUtilities {
 
 			userProfile = UserUtilities.getUserProfile(userId);
 
-			logger.debug("userProfile created.UserID= " + (String) userProfile.getUserUniqueIdentifier());
+			logger.debug("User profile created. User id: " + (String) ((UserProfile) userProfile).getUserId());
 			logger.debug("Attributes name of the user profile: " + userProfile.getUserAttributeNames());
 			logger.debug("Functionalities of the user profile: " + userProfile.getFunctionalities());
 			logger.debug("Roles of the user profile: " + userProfile.getRoles());
@@ -160,6 +163,28 @@ public class UserUtilities {
 		} finally {
 			logger.debug("OUT");
 		}
+	}
+
+	public static String fromUserProfile2JSON(UserProfile profile) {
+		ObjectMapper mapper = new ObjectMapper();
+		String toReturn;
+		try {
+			toReturn = mapper.writeValueAsString(profile);
+		} catch (JsonProcessingException e) {
+			throw new SpagoBIRuntimeException("Error while serializing profile into json object", e);
+		}
+		return toReturn;
+	}
+
+	public static UserProfile fromJSON2UserProfile(String json) {
+		ObjectMapper mapper = new ObjectMapper();
+		UserProfile profile;
+		try {
+			profile = mapper.readValue(json, UserProfile.class);
+		} catch (IOException e) {
+			throw new SpagoBIRuntimeException("Error while deserializing profile from json object", e);
+		}
+		return profile;
 	}
 
 	public static IEngUserProfile getUserProfile(String userId) throws Exception {
@@ -192,6 +217,7 @@ public class UserUtilities {
 					user.setFunctions(readFunctionality(user));
 
 					profile = new UserProfile(user);
+
 				}
 
 				if (profile != null) {
@@ -203,6 +229,7 @@ public class UserUtilities {
 					// put profile in cache
 					cache.put(userId, profile);
 				}
+				logger.debug("profile from get profile" + profile);
 
 				return profile;
 
@@ -219,7 +246,7 @@ public class UserUtilities {
 
 	public static boolean isTechnicalUser(IEngUserProfile profile) {
 		Assert.assertNotNull(profile, "Object in input is null");
-		logger.debug("IN.user unique id = [" + profile.getUserUniqueIdentifier() + "]");
+		logger.debug("IN.user id = [" + ((UserProfile) profile).getUserId() + "]");
 		try {
 			if (profile.isAbleToExecuteAction(SpagoBIConstants.DOCUMENT_MANAGEMENT_ADMIN) // for
 																							// administrators
@@ -242,7 +269,7 @@ public class UserUtilities {
 
 	public static boolean isTechDsManager(IEngUserProfile profile) {
 		Assert.assertNotNull(profile, "Object in input is null");
-		logger.debug("IN.user unique id = [" + profile.getUserUniqueIdentifier() + "]");
+		logger.debug("IN.user id = [" + ((UserProfile) profile).getUserId() + "]");
 		try {
 			if (profile.isAbleToExecuteAction(SpagoBIConstants.DOCUMENT_MANAGEMENT_ADMIN) // for
 																							// administrators
@@ -259,7 +286,7 @@ public class UserUtilities {
 
 	public static boolean isAdministrator(IEngUserProfile profile) {
 		Assert.assertNotNull(profile, "Object in input is null");
-		logger.debug("IN.user unique id = [" + profile.getUserUniqueIdentifier() + "]");
+		logger.debug("IN.user id = [" + ((UserProfile) profile).getUserId() + "]");
 		try {
 			if (profile.isAbleToExecuteAction(SpagoBIConstants.DOCUMENT_MANAGEMENT_ADMIN)) {
 				return true;
@@ -273,7 +300,7 @@ public class UserUtilities {
 
 	public static boolean hasDeveloperRole(IEngUserProfile profile) {
 		Assert.assertNotNull(profile, "Object in input is null");
-		logger.debug("IN.user unique id = [" + profile.getUserUniqueIdentifier() + "]");
+		logger.debug("IN.user id = [" + ((UserProfile) profile).getUserId() + "]");
 		try {
 			IRoleDAO roleDAO = DAOFactory.getRoleDAO();
 			Collection<String> roles = ((UserProfile) profile).getRolesForUse();
@@ -292,7 +319,7 @@ public class UserUtilities {
 
 	public static boolean hasAdministratorRole(IEngUserProfile profile) {
 		Assert.assertNotNull(profile, "Object in input is null");
-		logger.debug("IN.user unique id = [" + profile.getUserUniqueIdentifier() + "]");
+		logger.debug("IN.user id = [" + ((UserProfile) profile).getUserId() + "]");
 		try {
 			IRoleDAO roleDAO = DAOFactory.getRoleDAO();
 			Collection<String> roles = ((UserProfile) profile).getRolesForUse();
@@ -311,7 +338,7 @@ public class UserUtilities {
 
 	public static boolean hasUserRole(IEngUserProfile profile) {
 		Assert.assertNotNull(profile, "Object in input is null");
-		logger.debug("IN.user unique id = [" + profile.getUserUniqueIdentifier() + "]");
+		logger.debug("IN.user id = [" + ((UserProfile) profile).getUserId() + "]");
 		try {
 			IRoleDAO roleDAO = DAOFactory.getRoleDAO();
 			Collection<String> roles = ((UserProfile) profile).getRolesForUse();
@@ -330,7 +357,7 @@ public class UserUtilities {
 
 	public static boolean isTester(IEngUserProfile profile) {
 		Assert.assertNotNull(profile, "Object in input is null");
-		logger.debug("IN.user unique id = [" + profile.getUserUniqueIdentifier() + "]");
+		logger.debug("IN.user id = [" + ((UserProfile) profile).getUserId() + "]");
 		try {
 			if (profile.isAbleToExecuteAction(SpagoBIConstants.DOCUMENT_MANAGEMENT_TEST)) {
 				return true;
@@ -344,7 +371,7 @@ public class UserUtilities {
 
 	public static boolean haveRoleAndAuthorization(IEngUserProfile profile, String Role, String[] authorization) {
 		Assert.assertNotNull(profile, "Object in input is null");
-		logger.debug("IN.user unique id = [" + profile.getUserUniqueIdentifier() + "]");
+		logger.debug("IN.user id = [" + ((UserProfile) profile).getUserId() + "]");
 		ArrayList<String> auth = new ArrayList<>(Arrays.asList(authorization));
 		try {
 			if (((UserProfile) profile).getIsSuperadmin()) {
@@ -566,6 +593,7 @@ public class UserUtilities {
 		superadminFunctionalities.add(SpagoBIConstants.DATASOURCE_MANAGEMENT);
 		superadminFunctionalities.add(SpagoBIConstants.DATASOURCE_READ);
 		superadminFunctionalities.add(SpagoBIConstants.CONFIG_MANAGEMENT);
+		superadminFunctionalities.add(SpagoBIConstants.EXPORTERS_CATALOGUE);
 		superadminFunctionalities.add(SpagoBIConstants.DOMAIN_MANAGEMENT);
 		superadminFunctionalities.add(SpagoBIConstants.LICENSE_MANAGEMENT);
 
@@ -593,6 +621,9 @@ public class UserUtilities {
 			}
 			if (virtualRole.isAbleToSeeSnapshots()) {
 				roleFunctionalities.add(SpagoBIConstants.SEE_SNAPSHOTS_FUNCTIONALITY);
+			}
+			if (virtualRole.isAbleToRunSnapshots()) {
+				roleFunctionalities.add(SpagoBIConstants.RUN_SNAPSHOTS_FUNCTIONALITY);
 			}
 			if (virtualRole.isAbleToSeeViewpoints()) {
 				roleFunctionalities.add(SpagoBIConstants.SEE_VIEWPOINTS_FUNCTIONALITY);
@@ -745,6 +776,7 @@ public class UserUtilities {
 		virtualRole.setIsAbleToSaveSubobjects(false);
 		virtualRole.setIsAbleToSeeSubobjects(false);
 		virtualRole.setIsAbleToSeeSnapshots(false);
+		virtualRole.setIsAbleToRunSnapshots(false);
 		virtualRole.setIsAbleToSeeViewpoints(false);
 		virtualRole.setIsAbleToSeeMetadata(false);
 		virtualRole.setIsAbleToSaveMetadata(false);
@@ -788,6 +820,10 @@ public class UserUtilities {
 					if (anotherRole.isAbleToSeeSnapshots()) {
 						logger.debug("User has role " + roleName + " that is able to see snapshots.");
 						virtualRole.setIsAbleToSeeSnapshots(true);
+					}
+					if (anotherRole.isAbleToRunSnapshots()) {
+						logger.debug("User has role " + roleName + " that is able to run snapshots.");
+						virtualRole.setIsAbleToRunSnapshots(true);
 					}
 					if (anotherRole.isAbleToSeeMetadata()) {
 						logger.debug("User has role " + roleName + " that is able to see metadata.");
@@ -1004,11 +1040,30 @@ public class UserUtilities {
 
 	}
 
+	public static List<String> getCurrentRoleNames(IEngUserProfile profile) throws EMFInternalError {
+		logger.debug("IN");
+		List<String> roleNames = new ArrayList<String>();
+		String defaultRole = null;
+		if (profile instanceof UserProfile) {
+			defaultRole = ((UserProfile) profile).getDefaultRole();
+		}
+		if (defaultRole != null) {
+			roleNames.add(defaultRole);
+		} else {
+			roleNames = (List<String>) profile.getRoles();
+		}
+		logger.debug("OUT");
+		return roleNames;
+	}
+
 	public static Set<Domain> getDataSetCategoriesByUser(IEngUserProfile profile) {
+		logger.debug("IN");
 		IRoleDAO rolesDao = null;
 		Set<Domain> categories = new HashSet<>();
 		try {
-			List<String> roleNames = (List<String>) profile.getRoles();
+			// to get Roles Names check first if a default role is set, otherwise get all
+			List<String> roleNames = getCurrentRoleNames(profile);
+
 			if (!roleNames.isEmpty()) {
 				rolesDao = DAOFactory.getRoleDAO();
 				rolesDao.setUserProfile(profile);
@@ -1026,6 +1081,7 @@ public class UserUtilities {
 					}
 				}
 			}
+			logger.debug("OUT");
 			return categories;
 		} catch (Exception e) {
 			logger.error("Impossible to get role dataset categories for user [" + profile + "]", e);
@@ -1037,7 +1093,7 @@ public class UserUtilities {
 		AccessibilityPreferences preferences = null;
 
 		if (user != null) {
-			String userId = (String) user.getUserUniqueIdentifier();
+			String userId = (String) ((UserProfile) user).getUserId();
 
 			try {
 				it.eng.spagobi.profiling.dao.ISbiAccessibilityPreferencesDAO dao = DAOFactory.getSiAccessibilityPreferencesDAO();
@@ -1045,7 +1101,7 @@ public class UserUtilities {
 				if (ap != null) {
 					preferences = new AccessibilityPreferences();
 					preferences.setId(ap.getId());
-					preferences.setUser((String) user.getUserUniqueIdentifier());
+					preferences.setUser((String) ((UserProfile) user).getUserId());
 					preferences.setEnableUio(ap.isEnableUio());
 					preferences.setEnableRobobraille(ap.isEnableRobobraille());
 					preferences.setEnableGraphSonification(ap.isEnableGraphSonification());
@@ -1065,7 +1121,7 @@ public class UserUtilities {
 
 	public static List<RoleMetaModelCategory> getUserCategories(IEngUserProfile profile) {
 		Assert.assertNotNull(profile, "Object in input is null");
-		logger.debug("IN.user unique id = [" + profile.getUserUniqueIdentifier() + "]");
+		logger.debug("IN.user id = [" + ((UserProfile) profile).getUserId() + "]");
 		List<RoleMetaModelCategory> categories = new ArrayList<>();
 		try {
 			IRoleDAO roleDAO = DAOFactory.getRoleDAO();
@@ -1088,7 +1144,7 @@ public class UserUtilities {
 
 		ArrayList<Role> listRoles = new ArrayList<>();
 
-		logger.debug("IN.user unique id = [" + profile.getUserUniqueIdentifier() + "]");
+		logger.debug("IN.user id = [" + ((UserProfile) profile).getUserId() + "]");
 		try {
 			IRoleDAO roleDAO = DAOFactory.getRoleDAO();
 			Collection<String> roles = ((UserProfile) profile).getRolesForUse();
@@ -1110,7 +1166,7 @@ public class UserUtilities {
 
 		ArrayList<String> listRoles = new ArrayList<>();
 
-		logger.debug("IN.user unique id = [" + profile.getUserUniqueIdentifier() + "]");
+		logger.debug("IN.user id = [" + ((UserProfile) profile).getUserId() + "]");
 		try {
 			IRoleDAO roleDAO = DAOFactory.getRoleDAO();
 			Collection<String> roles = ((UserProfile) profile).getRolesForUse();

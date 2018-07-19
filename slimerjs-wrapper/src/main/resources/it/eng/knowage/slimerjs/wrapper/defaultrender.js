@@ -406,21 +406,11 @@ log("jsExitingWait = " + jsExitingWait);
 var	hmacKey = +system.args[ 11 ];
 log("hmacKey = " + hmacKey);
 
-// this sets a zoom on the page because of the dpi differences between windows and unix
-var setZoom = function (page) {
-	log("[SETZOOM] IN");
-  if (operatingSystem !== "WINDOWS") {
-    try {
-      log('Setting zoom on HTML to 0.75');
-      page.evaluate(function () {
-        document.body.style.zoom = 0.75;
-      });
-    } catch (error) {
-      err('Failed to set zoom on HTML file: ', error);
-      slimer.exit(1);
-    }
-  }
-};
+var	zoomFactor = system.args[ 12 ];
+log("zoomFactor = " + zoomFactor);
+viewportWidth = viewportWidth * zoomFactor;
+viewportHeight = viewportHeight * zoomFactor;
+zoomFactor = zoomFactor * 0.99;
 
 var exit = function(code) {
 	log("Exit from SlimerJS with code: " + code)
@@ -430,23 +420,25 @@ var exit = function(code) {
 // this function renders the page
 var renderPage = function (page) {
 	log("[RENDERPAGE] IN");
-  setZoom(page);
+  page.zoomFactor = zoomFactor;
 
   // render the page
   try {
     log('Rendering PNG to target folder: ' + targetPath);
     var targetFile = targetPath + "_" + page.sheet + ".png";
     log("Rendering PNG as target file: " + targetFile);
-    page.render(targetFile);
+    window.setTimeout(function () {
+    	page.render(targetFile);
+    }, (jsExitingWait / 2) );
   } catch (error) {
     err('Failed to render PNG: ' + error);
     slimer.exit(3);
   }
 
-  setTimeout(exit, jsExitingWait, 0);
+  setTimeout(exit, jsExitingWait * sheets, 0);
 };
 
-var applySettingOnPage = function applySettingOnPage(page, sheet, url) {
+var applySettingOnPage = function(page, sheet, url) {
 	log("[APPLYSETTINGONPAGE] IN");
 	page.sheet = sheet;
 	page.viewportSize = { width: viewportWidth, height: viewportHeight };

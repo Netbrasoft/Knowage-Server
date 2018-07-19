@@ -132,7 +132,7 @@ function getCrossParamsForHeatmap(point,chartConf){
     	
     	params.point.category=chartConf.additionalData.columns[0].value;
     	if(chartConf.chart.xAxisDate){
-    	params.point.name= new Date(point.x);
+    	params.point.name= point.original;
     	}else{
     	params.point.name=	chartConf.additionalData.firstCategory[point.x];
     	}
@@ -255,7 +255,7 @@ function prepareChartConfForTreemap(chartConf,handleCockpitSelection,handleCross
 	var points = [];
 	
 	var counter=0;
-	
+	precision = chartConf.additionalData.precision ?  chartConf.additionalData.precision : ""; 
 	for (var dataset in chartConf.data[0]){
 		level = {
 				id: "id_" + counter,
@@ -266,7 +266,7 @@ function prepareChartConfForTreemap(chartConf,handleCockpitSelection,handleCross
 		points.push(level);
 		func(chartConf.data[0][dataset],dataset, level, dataset);
 	}
-	
+
 	function func(resultData, nameds, dataValue, dataset){
 		var counter=0;
 		for (var resultRecord in resultData){
@@ -278,7 +278,15 @@ function prepareChartConfForTreemap(chartConf,handleCockpitSelection,handleCross
 			}
 
 			if (resultData[resultRecord].value){
-				level.value = Math.round(Number(resultData[resultRecord].value));
+				if(precision==''){
+					if(typeof resultData[resultRecord].value == "string"){
+						level.value = Number(level.value = resultData[resultRecord].value);
+					} else {
+						level.value = resultData[resultRecord].value;
+					}
+				} else {
+					level.value = Number(Number(resultData[resultRecord].value).toFixed(precision));
+				}
 				points.push(level);
 			}
 			else{
@@ -324,12 +332,12 @@ function prepareChartConfForTreemap(chartConf,handleCockpitSelection,handleCross
 		}	
 	}
 	
-	var delitelj = sumaForMax / colors.length; 
+	var divider = sumaForMax / colors.length; 
 	tickPositions1.push(0);
 	var next = 0
 	for (var i = 0; i < colors.length; i++) {
 		
-		next = next + delitelj;
+		next = next + divider;
 		tickPositions1.push(next);
 	}
 
@@ -339,7 +347,7 @@ function prepareChartConfForTreemap(chartConf,handleCockpitSelection,handleCross
 				scaleObject[property][i].scale = scale
 			}
 		}
-		scale = scale+delitelj;
+		scale = scale+divider;
 		tickPositions.push(scale)
 	}
 	for (property in scaleObject) {
@@ -415,13 +423,28 @@ function prepareChartConfForTreemap(chartConf,handleCockpitSelection,handleCross
 		if (chartConf.chart.backgroundColor!=undefined && chartConf.chart.backgroundColor!="")
 			chartObject.backgroundColor = chartConf.chart.backgroundColor;
 	}
+	var tooltipObject={};
+	prefix = chartConf.additionalData.prefixChar ? chartConf.additionalData.prefixChar : "";
+	postfix = chartConf.additionalData.postfixChar ?  chartConf.additionalData.postfixChar : "";
 	
+   	tooltipFormatter= function () {
+		var val = this.point.value.toFixed(precision);
+        return this.point.name +  ': <b>' +
+        prefix + " " +val + " " + postfix;
+	};
+
+	tooltipObject={
+		formatter:tooltipFormatter,
+
+	};
 	/**
 	 * Take drill up button (the "Back" button) setting from the VM.
 	 * @author Danilo Ristovski (danristo, danilo.ristovski@mht.net)
 	 */
     var drillUpButtonSettings = chartConf.series[0].drillUpButton;
-	
+    if(points.length > chartConf.plotOptions.series.turboThreshold){
+		chartConf.emptymessage.text = "Your dataset is returning too much data"
+	}
 	return 	{
 		chart: chartObject,
 		colorAxis: {
@@ -433,6 +456,7 @@ function prepareChartConfForTreemap(chartConf,handleCockpitSelection,handleCross
 		legend:{
 			enabled: false
 		},
+		tooltip: tooltipObject,
 		series:
 		[
          	{
@@ -447,7 +471,7 @@ function prepareChartConfForTreemap(chartConf,handleCockpitSelection,handleCross
 	                    align: drillUpButtonSettings.position.align,
 //	                    x: drillUpButtonSettings.position.x,
 	                    verticalAlign: drillUpButtonSettings.position.verticalAlign,
-	                    y: drillUpButtonSettings.position.y
+//	                    y: drillUpButtonSettings.position.y
 	                },
 	                
 	                theme: 
@@ -476,21 +500,27 @@ function prepareChartConfForTreemap(chartConf,handleCockpitSelection,handleCross
 			layoutAlgorithm: 'squarified',
 			allowDrillToNode: true,
 			dataLabels: {
-				enabled: false
+				enabled: false,
+				
 			},
 			levelIsConstant: false,
 			levels: [{
 				level: 1,
 				dataLabels: {
-					enabled: true
+					enabled: true,
+					formatter: function() {
+						var val = this.point.value.toFixed(precision);
+				        return this.point.name +  ': <b>' +
+				        prefix + " " +val + " " + postfix;
+					}
 				},
 				borderWidth: 6,
 				borderColor: "#FFFFFF",
 			}],
 			data: points.map(function (point) {
                 if (point.colorValue ) { 
-                    if(point.colorValue >= point.scale+ delitelj){
-                    	point.colorValue = point.scale+ delitelj  - 10
+                    if(point.colorValue >= point.scale+ divider){
+                    	point.colorValue = point.scale+ divider  - 6
                     }
                 }
               
@@ -498,20 +528,16 @@ function prepareChartConfForTreemap(chartConf,handleCockpitSelection,handleCross
             }),
 			events:{
 				click: function(event){
-//					console.log(event.point);
 					if(!exportWebApp){
-						 if(chartConf.chart.isCockpit==true){
-					        	if(chartConf.chart.outcomingEventsEnabled){
+						if(chartConf.chart.isCockpit){
+					        if(this.chart.cliccable != undefined ? this.chart.cliccable : true && chartConf.chart.cliccable){
 					        	handleCockpitSelection(event);
-					        	}
-					        }else if(event.point.node.children.length==0){
-								
+					        }
+						 } else if(event.point.node.children.length==0){
 				            	var params=getCrossParamsForTreemap(event.point,chartConf);
 				            	handleCrossNavigationTo(params);
-				            	
-							}
+						 }
 					}
-			       
 				}
 			}
 		}],
@@ -550,7 +576,7 @@ function prepareChartConfForTreemap(chartConf,handleCockpitSelection,handleCross
                 fontFamily: chartConf.emptymessage.style.fontFamily,
                 fontStyle: chartConf.emptymessage.style.fontStyle ? chartConf.emptymessage.style.fontStyle : "none",
 				textDecoration: chartConf.emptymessage.style.textDecoration ? chartConf.emptymessage.style.textDecoration : "none",
-				fontWeight: chartConf.emptymessage.fontWeight ? chartConf.emptymessage.fontWeight : "none"
+				fontWeight: chartConf.emptymessage.style.fontWeight ? chartConf.emptymessage.style.fontWeight : "none"
             }, 
             position: {
             	align:  chartConf.emptymessage.style.textAlign,
@@ -583,7 +609,7 @@ function prepareChartConfForTreemap(chartConf,handleCockpitSelection,handleCross
 
 
 
-function prepareChartConfForHeatmap(chartConf,handleCockpitSelection,handleCrossNavigationTo, exportWebApp) {
+function prepareChartConfForHeatmap(chartConf,handleCockpitSelection,handleCrossNavigationTo,exportWebApp) {
 	var start;
 	 var startDate;
 	 var endDate;
@@ -606,13 +632,16 @@ function prepareChartConfForHeatmap(chartConf,handleCockpitSelection,handleCross
     	}
     	
     	var xValue;
+    	var xValueOriginal;
     	if(chartConf.chart.xAxisDate){
     		xValue=new Date(data[i][chartConf.additionalData.columns[0].value]).getTime();
+    		xValueOriginal =data[i][chartConf.additionalData.columns[0].value];
     	}else{
     		xValue=chartConf.additionalData.firstCategory.indexOf(data[i][chartConf.additionalData.columns[0].value]);
     	}
     	var point={
     		"x":xValue,
+    		"original":xValueOriginal,
     		"y":chartConf.additionalData.storeresult.indexOf(data[i][chartConf.additionalData.columns[1].value]),
     		"value":data[i][chartConf.additionalData.serie.value],
     		"label":data[i][chartConf.additionalData.columns[1].value]
@@ -743,113 +772,156 @@ function prepareChartConfForHeatmap(chartConf,handleCockpitSelection,handleCross
     var xAxisObject={};
     var serieColSize=0;
     var tooltipObject={};
-    if(chartConf.chart.xAxisDate){
-    	xAxisObject={
-                type: 'datetime', // the numbers are given in milliseconds
-                min: Date.UTC(startDate.getUTCFullYear(),startDate.getUTCMonth(),startDate.getUTCDate()),  // gets range from variables 
-                max: Date.UTC(endDate.getUTCFullYear(),endDate.getUTCMonth(),endDate.getUTCDate()),  
-                
-                title:
-            	{
-                	text: (chartConf.xaxis.title.text!=undefined && chartConf.xaxis.title.text!="") ? chartConf.xaxis.title.text : undefined,	
-                	align: chartConf.xaxis.title.align,
-                	
-                	style:
-            		{
-                		color: (chartConf.xaxis.title.style.color!=undefined && chartConf.xaxis.title.style.color!="" && chartConf.xaxis.title.style.color!="transparent") ? chartConf.xaxis.title.style.color : '',	
-        				fontStyle: (chartConf.xaxis.title.style.fontStyle!=undefined && chartConf.xaxis.title.style.fontStyle!="") ? chartConf.xaxis.title.style.fontStyle : '',
-    					textDecoration: (chartConf.xaxis.title.style.textDecoration!=undefined && chartConf.xaxis.title.style.textDecoration!="") ? chartConf.xaxis.title.style.textDecoration : '',
-    					fontSize: (chartConf.xaxis.title.style.fontSize!=undefined && chartConf.xaxis.title.style.fontSize!="") ? chartConf.xaxis.title.style.fontSize : '',
-    					fontFamily:(chartConf.xaxis.title.style.fontFamily!=undefined && chartConf.xaxis.title.style.fontFamily!="") ? chartConf.xaxis.title.style.fontFamily : ''
-            		}
-            	},
-                
-                labels: {
-                    x: 5,
-                    y: 15,
-                    format: '{value:%B %Y}',// long month
-                    rotation: (chartConf.xaxis.labels.rotation!=undefined && chartConf.xaxis.labels.rotation!="") ? chartConf.xaxis.labels.rotation : '',	
-                    align: (chartConf.xaxis.labels.align!=undefined && chartConf.xaxis.labels.align!="") ? chartConf.xaxis.labels.align : undefined,	
-                    style:{
-                    	color: (chartConf.xaxis.labels.style.color!=undefined && chartConf.xaxis.labels.style.color!="" && chartConf.xaxis.labels.style.color!="transparent") ? chartConf.xaxis.labels.style.color : '',
-                        fontStyle:(chartConf.xaxis.labels.style.fontStyle!=undefined && chartConf.xaxis.labels.style.fontStyle!="") ? chartConf.xaxis.labels.style.fontStyle : '',
-                        textDecoration: (chartConf.xaxis.labels.style.textDecoration!=undefined && chartConf.xaxis.labels.style.textDecoration!="") ? chartConf.xaxis.labels.style.textDecoration : '',
-                        fontSize: (chartConf.xaxis.labels.style.fontSize!=undefined && chartConf.xaxis.labels.style.fontSize!="") ? chartConf.xaxis.labels.style.fontSize : '',
-                        fontFamily: (chartConf.xaxis.labels.style.fontFamily!=undefined && chartConf.xaxis.labels.style.fontFamily!="") ? chartConf.xaxis.labels.style.fontFamily : '',
-               	}	
-                },
-                tickInterval:30*24*3600*1000,
-                showLastLabel: true,
-                tickLength: 16
-            };
-    	
-    	serieColSize=24 * 36e5;
+    var checkDateFormat = function (dateFormat) {
+    	var format = "%d-%m-%Y";
+    	switch (dateFormat) {
+		case "minus":
+			format = "%d-%m-%Y";
+			break;
+		case "slash":
+			format = "%d/%m/%Y";
+			break;
+		case "year":
+			format = "%Y";
+			break;
+		case "month":
+			format = "%B %Y";
+			break;
+		case "day":
+			format = "%A, %b %e, %Y";
+			break;
+		case "hour":
+			format = "%A, %b %e, %H";
+			break;
+		case "minute":
+			format = "%A, %b %e, %H:%M";
+			break;
+		case "second":
+			format = "%A, %b %e, %H:%M:%S";
+			break;
+		default:
+			format = "%d-%m-%Y";
+		break;
+		}
+    	return format;
+    }
     
-          tooltipObject={
-        		
-              	headerFormat: '<b>'+chartConf.additionalData.serie.value+'</b><br/>',
-                pointFormat: '{point.x:%e %b, %Y} | {point.label}: <b>{point.value}</b>',
-                  style:{ 
-                  	 color: chartConf.tooltip.style.fontColor,
-                       fontSize: chartConf.tooltip.style.fontSize,
-                       fontFamily: chartConf.tooltip.style.fontFamily
-                  } 
-          };
-          
-    }else{
+	var prefix = chartConf.additionalData.prefixChar ? chartConf.additionalData.prefixChar : "";
+	var postfix = chartConf.additionalData.postfixChar ?  chartConf.additionalData.postfixChar : "";
+	var precision = chartConf.additionalData.precision ?  chartConf.additionalData.precision : "";    
+	
+    if(chartConf.chart.xAxisDate){
+    	var dateF = checkDateFormat(chartConf.chart.dateF);
     	xAxisObject={
-    			type: 'category', 
-    			categories:chartConf.additionalData.firstCategory,
-                title:
-            	{
-                	text: (chartConf.xaxis.title.text!=undefined && chartConf.xaxis.title.text!="") ? chartConf.xaxis.title.text : undefined,	
-                	align: chartConf.xaxis.title.align,
-                	
-                	style:
-            		{
-                		color: (chartConf.xaxis.title.style.color!=undefined && chartConf.xaxis.title.style.color!="" && chartConf.xaxis.title.style.color!="transparent") ? chartConf.xaxis.title.style.color : '',	
-        				fontStyle: (chartConf.xaxis.title.style.fontStyle!=undefined && chartConf.xaxis.title.style.fontStyle!="") ? chartConf.xaxis.title.style.fontStyle : '',
-    					textDecoration: (chartConf.xaxis.title.style.textDecoration!=undefined && chartConf.xaxis.title.style.textDecoration!="") ? chartConf.xaxis.title.style.textDecoration : '',
-    					fontSize: (chartConf.xaxis.title.style.fontSize!=undefined && chartConf.xaxis.title.style.fontSize!="") ? chartConf.xaxis.title.style.fontSize : '',
-    					fontFamily:(chartConf.xaxis.title.style.fontFamily!=undefined && chartConf.xaxis.title.style.fontFamily!="") ? chartConf.xaxis.title.style.fontFamily : ''
-            		}
-            	},
-                
-                labels: {
-               
-                  // x: 5,
-                  // y: 15,
-                    rotation: (chartConf.xaxis.labels.rotation!=undefined && chartConf.xaxis.labels.rotation!="") ? chartConf.xaxis.labels.rotation : '',	
-                    align: (chartConf.xaxis.labels.align!=undefined && chartConf.xaxis.labels.align!="") ? chartConf.xaxis.labels.align : undefined,	
-                    style:{
-                    	color: (chartConf.xaxis.labels.style.color!=undefined && chartConf.xaxis.labels.style.color!="" && chartConf.xaxis.labels.style.color!="transparent") ? chartConf.xaxis.labels.style.color : '',
-                        fontStyle:(chartConf.xaxis.labels.style.fontStyle!=undefined && chartConf.xaxis.labels.style.fontStyle!="") ? chartConf.xaxis.labels.style.fontStyle : '',
-                        textDecoration: (chartConf.xaxis.labels.style.textDecoration!=undefined && chartConf.xaxis.labels.style.textDecoration!="") ? chartConf.xaxis.labels.style.textDecoration : '',
-                        fontSize: (chartConf.xaxis.labels.style.fontSize!=undefined && chartConf.xaxis.labels.style.fontSize!="") ? chartConf.xaxis.labels.style.fontSize : '',
-                        fontFamily: (chartConf.xaxis.labels.style.fontFamily!=undefined && chartConf.xaxis.labels.style.fontFamily!="") ? chartConf.xaxis.labels.style.fontFamily : '',
-               	    }	
-                },
-                
-                 showLastLabel: true,
-//               tickInterval:1,
-                 tickLength: 16
-            };
+            type: 'datetime', // the numbers are given in milliseconds
+            min: Date.UTC(startDate.getUTCFullYear(),startDate.getUTCMonth(),startDate.getUTCDate()),  // gets range from variables 
+            max: Date.UTC(endDate.getUTCFullYear(),endDate.getUTCMonth(),endDate.getUTCDate()),  
+            
+            title:
+        	{
+            	text: (chartConf.xaxis.title.text!=undefined && chartConf.xaxis.title.text!="") ? chartConf.xaxis.title.text : undefined,	
+            	align: chartConf.xaxis.title.align,
+            	
+            	style:
+        		{
+            		color: (chartConf.xaxis.title.style.color!=undefined && chartConf.xaxis.title.style.color!="" && chartConf.xaxis.title.style.color!="transparent") ? chartConf.xaxis.title.style.color : '',	
+    				fontStyle: (chartConf.xaxis.title.style.fontStyle!=undefined && chartConf.xaxis.title.style.fontStyle!="") ? chartConf.xaxis.title.style.fontStyle : '',
+					textDecoration: (chartConf.xaxis.title.style.textDecoration!=undefined && chartConf.xaxis.title.style.textDecoration!="") ? chartConf.xaxis.title.style.textDecoration : '',
+					fontSize: (chartConf.xaxis.title.style.fontSize!=undefined && chartConf.xaxis.title.style.fontSize!="") ? chartConf.xaxis.title.style.fontSize : '',
+					fontFamily:(chartConf.xaxis.title.style.fontFamily!=undefined && chartConf.xaxis.title.style.fontFamily!="") ? chartConf.xaxis.title.style.fontFamily : ''
+        		}
+        	},
+            
+            labels: {
+                x: 5,
+                y: 15,
+                formatter: function() {
+                    return '' + Highcharts.dateFormat(dateF, this.value);
+                },  
+                rotation: (chartConf.xaxis.labels.rotation!=undefined && chartConf.xaxis.labels.rotation!="") ? chartConf.xaxis.labels.rotation : '',	
+                align: (chartConf.xaxis.labels.align!=undefined && chartConf.xaxis.labels.align!="") ? chartConf.xaxis.labels.align : undefined,	
+                style:{
+                	color: (chartConf.xaxis.labels.style.color!=undefined && chartConf.xaxis.labels.style.color!="" && chartConf.xaxis.labels.style.color!="transparent") ? chartConf.xaxis.labels.style.color : '',
+                    fontStyle:(chartConf.xaxis.labels.style.fontStyle!=undefined && chartConf.xaxis.labels.style.fontStyle!="") ? chartConf.xaxis.labels.style.fontStyle : '',
+                    textDecoration: (chartConf.xaxis.labels.style.textDecoration!=undefined && chartConf.xaxis.labels.style.textDecoration!="") ? chartConf.xaxis.labels.style.textDecoration : '',
+                    fontSize: (chartConf.xaxis.labels.style.fontSize!=undefined && chartConf.xaxis.labels.style.fontSize!="") ? chartConf.xaxis.labels.style.fontSize : '',
+                    fontFamily: (chartConf.xaxis.labels.style.fontFamily!=undefined && chartConf.xaxis.labels.style.fontFamily!="") ? chartConf.xaxis.labels.style.fontFamily : '',
+                }	
+            },
+            showLastLabel: true,
+            tickLength: 16
+        };
+    	serieColSize=24 * 36e5;
+    	tooltipFormatter= function () {
+    		var val = this.point.value;   		
+    		val = Highcharts.numberFormat(val,precision );	
+    		var pointDate = Highcharts.dateFormat(dateF, this.point.x)
+            return '<b>'+chartConf.additionalData.serie.value+'</b><br>' + pointDate + '| ' + this.series.yAxis.categories[this.point.y] + ': <b>' +
+            prefix + " " +val + " " + postfix + ' </b> ';
+    	};
+    	tooltipObject={
+    		formatter:tooltipFormatter,
+            style:{ 
+            	color: chartConf.tooltip.style.fontColor,
+            	fontSize: chartConf.tooltip.style.fontSize,
+            	fontFamily: chartConf.tooltip.style.fontFamily
+            } 
+    	};
+          
+    } else {
+    	xAxisObject={
+			type: 'category', 
+			categories:chartConf.additionalData.firstCategory,
+            title:
+        	{
+            	text: (chartConf.xaxis.title.text!=undefined && chartConf.xaxis.title.text!="") ? chartConf.xaxis.title.text : undefined,	
+            	align: chartConf.xaxis.title.align,
+            	
+            	style:
+        		{
+            		color: (chartConf.xaxis.title.style.color!=undefined && chartConf.xaxis.title.style.color!="" && chartConf.xaxis.title.style.color!="transparent") ? chartConf.xaxis.title.style.color : '',	
+    				fontStyle: (chartConf.xaxis.title.style.fontStyle!=undefined && chartConf.xaxis.title.style.fontStyle!="") ? chartConf.xaxis.title.style.fontStyle : '',
+					textDecoration: (chartConf.xaxis.title.style.textDecoration!=undefined && chartConf.xaxis.title.style.textDecoration!="") ? chartConf.xaxis.title.style.textDecoration : '',
+					fontSize: (chartConf.xaxis.title.style.fontSize!=undefined && chartConf.xaxis.title.style.fontSize!="") ? chartConf.xaxis.title.style.fontSize : '',
+					fontFamily:(chartConf.xaxis.title.style.fontFamily!=undefined && chartConf.xaxis.title.style.fontFamily!="") ? chartConf.xaxis.title.style.fontFamily : ''
+        		}
+        	},
+            
+            labels: {
+           
+              // x: 5,
+              // y: 15,
+                rotation: (chartConf.xaxis.labels.rotation!=undefined && chartConf.xaxis.labels.rotation!="") ? chartConf.xaxis.labels.rotation : '',	
+                align: (chartConf.xaxis.labels.align!=undefined && chartConf.xaxis.labels.align!="") ? chartConf.xaxis.labels.align : undefined,	
+                style:{
+                	color: (chartConf.xaxis.labels.style.color!=undefined && chartConf.xaxis.labels.style.color!="" && chartConf.xaxis.labels.style.color!="transparent") ? chartConf.xaxis.labels.style.color : '',
+                    fontStyle:(chartConf.xaxis.labels.style.fontStyle!=undefined && chartConf.xaxis.labels.style.fontStyle!="") ? chartConf.xaxis.labels.style.fontStyle : '',
+                    textDecoration: (chartConf.xaxis.labels.style.textDecoration!=undefined && chartConf.xaxis.labels.style.textDecoration!="") ? chartConf.xaxis.labels.style.textDecoration : '',
+                    fontSize: (chartConf.xaxis.labels.style.fontSize!=undefined && chartConf.xaxis.labels.style.fontSize!="") ? chartConf.xaxis.labels.style.fontSize : '',
+                    fontFamily: (chartConf.xaxis.labels.style.fontFamily!=undefined && chartConf.xaxis.labels.style.fontFamily!="") ? chartConf.xaxis.labels.style.fontFamily : '',
+           	    }	
+            },
+            
+             showLastLabel: true,
+//         	tickInterval:1,
+             tickLength: 16
+    	};
     	serieColSize=1;
     	tooltipFormatter= function () {
-            return '<b>'+chartConf.additionalData.serie.value+'</b><br>' + this.series.xAxis.categories[this.point.x] + ': <b>' +
-            this.point.value + '</b> | ' + this.series.yAxis.categories[this.point.y] + '';
-    };
+    		var val = this.point.value;   		
+    		val = Highcharts.numberFormat(val,precision );	
+            return '<b>'+chartConf.additionalData.serie.value+'</b><br>' + this.series.xAxis.categories[this.point.x] + ' | ' + this.series.yAxis.categories[this.point.y] + ': <b>' +
+            prefix + " " +val + " " + postfix + ' </b>';
+    	};
     
-    tooltipObject={
-    		
-              formatter:tooltipFormatter,
-              style:{ 
-              	 color: chartConf.tooltip.style.fontColor,
-                   fontSize: chartConf.tooltip.style.fontSize,
-                   fontFamily: chartConf.tooltip.style.fontFamily
-              } 
-      };
-    
+    	tooltipObject={
+    		formatter:tooltipFormatter,
+    		style:{ 
+    			color: chartConf.tooltip.style.fontColor,
+    			fontSize: chartConf.tooltip.style.fontSize,
+    			fontFamily: chartConf.tooltip.style.fontFamily
+    		}
+    	};
     }
         
     var toReturn = {
@@ -864,7 +936,7 @@ function prepareChartConfForHeatmap(chartConf,handleCockpitSelection,handleCross
                 fontFamily: chartConf.title.style.fontFamily,
                 fontStyle: chartConf.title.style.fontStyle ? chartConf.title.style.fontStyle : "none",
 				textDecoration: chartConf.title.style.textDecoration ? chartConf.title.style.textDecoration : "none",
-				fontWeight: chartConf.title.fontWeight ? chartConf.title.fontWeight : "none"
+				fontWeight: chartConf.title.style.fontWeight ? chartConf.title.style.fontWeight : "none"
             }
 		},
 		subtitle: {
@@ -876,7 +948,7 @@ function prepareChartConfForHeatmap(chartConf,handleCockpitSelection,handleCross
                 fontFamily: chartConf.subtitle.style.fontFamily,
                 fontStyle: chartConf.subtitle.style.fontStyle ? chartConf.subtitle.style.fontStyle : "none",
 				textDecoration: chartConf.subtitle.style.textDecoration ? chartConf.subtitle.style.textDecoration : "none",
-				fontWeight: chartConf.subtitle.fontWeight ? chartConf.subtitle.fontWeight : "none"
+				fontWeight: chartConf.subtitle.style.fontWeight ? chartConf.subtitle.style.fontWeight : "none"
             }
 		},
 		lang: {
@@ -889,7 +961,7 @@ function prepareChartConfForHeatmap(chartConf,handleCockpitSelection,handleCross
                 fontFamily: chartConf.emptymessage.style.fontFamily,
                 fontStyle: chartConf.emptymessage.style.fontStyle ? chartConf.emptymessage.style.fontStyle : "none",
 				textDecoration: chartConf.emptymessage.style.textDecoration ? chartConf.emptymessage.style.textDecoration : "none",
-				fontWeight: chartConf.emptymessage.fontWeight ? chartConf.emptymessage.fontWeight : "none"
+				fontWeight: chartConf.emptymessage.style.fontWeight ? chartConf.emptymessage.style.fontWeight : "none"
             }, 
             position: {
             	align:  chartConf.emptymessage.style.textAlign,
@@ -959,7 +1031,7 @@ function prepareChartConfForHeatmap(chartConf,handleCockpitSelection,handleCross
          * @author Danilo Ristovski (danristo, danilo.ristovski@mht.net)
          */
         legend: 
-        {
+        {	enabled: chartConf.legend.enabled,
             align: 'right',
             layout: 'vertical',
             verticalAlign: chartConf.legend.style.align,

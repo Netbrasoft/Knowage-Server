@@ -231,9 +231,6 @@
 	<CONFIG label="SPAGOBI_SSO.ACTIVE" name="ACTIVE SSO FLAG"
 		description="ACTIVE SSO FLAG" isActive="true" valueCheck="false"
 		valueType="STRING" category="SECURITY" />
-	<CONFIG label="SPAGOBI_SSO.PASS" name="PASS String"
-		description="Some proxy element use this string to do some security check"
-		isActive="true" valueCheck="PASS" valueType="STRING" category="SECURITY" />
 	<CONFIG label="SPAGOBI_SSO.SECURITY_LOGOUT_URL" name="SECURITY LOGOUT URL"
 		description="" isActive="true"
 		valueCheck="https://athos.engilab.ewebpd.eng.it:1447/cas/logout"
@@ -352,7 +349,7 @@
 		description="" isActive="true" valueCheck="465" valueType="STRING"
 		category="MAIL" />
 	<CONFIG label="MAIL.PROFILES.scheduler.from" name="Scheduler From"
-		description="" isActive="true" valueCheck="spagobi@spagobidomain.com"
+		description="" isActive="true" valueCheck="knowage@knowagedomain.com"
 		valueType="STRING" category="MAIL" />
 	<CONFIG label="MAIL.PROFILES.scheduler.user" name="Scheduler User"
 		description="" isActive="true" valueCheck="" valueType="STRING"
@@ -371,7 +368,7 @@
 		description="" isActive="true" valueCheck="465" valueType="STRING"
 		category="MAIL" />
 	<CONFIG label="MAIL.PROFILES.user.from" name="Scheduler From"
-		description="" isActive="true" valueCheck="spagobi@spagobidomain.com"
+		description="" isActive="true" valueCheck="knowage@knowagedomain.com"
 		valueType="STRING" category="MAIL" />
 	<CONFIG label="MAIL.PROFILES.user.user" name="Scheduler User"
 		description="" isActive="true" valueCheck="" valueType="STRING"
@@ -391,7 +388,7 @@
 		description="" isActive="true" valueCheck="465" valueType="STRING"
 		category="MAIL" />
 	<CONFIG label="MAIL.PROFILES.kpi_alarm.from" name="Scheduler From"
-		description="" isActive="true" valueCheck="spagobi@spagobidomain.com"
+		description="" isActive="true" valueCheck="knowage@knowagedomain.com"
 		valueType="STRING" category="MAIL" />
 	<CONFIG label="MAIL.PROFILES.kpi_alarm.user" name="Scheduler User"
 		description="" isActive="true" valueCheck="" valueType="STRING"
@@ -456,6 +453,10 @@
 	<CONFIG label="SPAGOBI.SECURITY.DEFAULT_ROLE_ON_SIGNUP" name="Default user role name"
 		description="Default user role on signup" isActive="true" valueCheck="user"
 		valueType="STRING" category="SECURITY" />
+	<CONFIG label="SPAGOBI.SECURITY.DEFAULT_TENANT_ON_SIGNUP" name="Default tenant on signup"
+		description="Default tenant on signup" isActive="true" valueCheck="DEFAULT_TENANT"
+		valueType="STRING" category="SECURITY" />
+		
 	<CONFIG label="SPAGOBI.SECURITY.ACTIVE_SIGNUP_FUNCTIONALITY"
 		name="SPAGOBI.SECURITY.ACTIVE_SIGNUP_FUNCTIONALITY" description="Enables the signup functionality for the final user"
 		isActive="false" valueCheck="false" valueType="STRING" category="SECURITY" />
@@ -531,6 +532,15 @@
 		description="The name of the system variable that contains the RESOURCE PATH"
 		isActive="true" valueCheck="KNOWAGE_RESOURCE_PATH_SYSTEMVAR"
 		valueType="STRING" category="GENERIC_CONFIGURATION" />
+		
+	<CONFIG label="KNOWAGE.CUSTOMIZED_DATABASE_FUNCTIONS" name="Customized database functions"
+		description="List of customized functions for DB"
+		isActive="true" valueCheck="" valueType="STRING"
+		category="GENERIC_CONFIGURATION" />
+    <CONFIG label="KNOWAGE.WORKSPACE_SHOW_GRID" name="Show grid view as default in workspace"
+        description="Show grid view as default in workspace"
+        isActive="true" valueCheck="true" valueType="STRING"
+        category="GENERIC_CONFIGURATION" />
 
 </CONFIGS>
 

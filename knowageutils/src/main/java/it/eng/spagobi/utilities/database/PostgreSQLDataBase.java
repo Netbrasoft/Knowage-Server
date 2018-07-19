@@ -17,22 +17,37 @@
  */
 package it.eng.spagobi.utilities.database;
 
-import it.eng.spagobi.tools.datasource.bo.IDataSource;
+import java.sql.Connection;
+import java.sql.SQLException;
 
 import org.apache.log4j.Logger;
+
+import it.eng.spagobi.tools.datasource.bo.IDataSource;
 
 /**
  * @author Andrea Gioia (andrea.gioia@eng.it)
  *
  */
-public class PostgreSQLDataBase extends AbstractDataBase {
+public class PostgreSQLDataBase extends AbstractDataBase implements CacheDataBase, MetaDataBase {
 
 	private static transient Logger logger = Logger.getLogger(PostgreSQLDataBase.class);
 
 	private static int MAX_VARCHAR_VALUE = 10485760;
 
+	private int varcharLength = 255;
+
 	public PostgreSQLDataBase(IDataSource dataSource) {
 		super(dataSource);
+	}
+
+	@Override
+	public int getVarcharLength() {
+		return varcharLength;
+	}
+
+	@Override
+	public void setVarcharLength(int varcharLength) {
+		this.varcharLength = varcharLength;
 	}
 
 	@Override
@@ -57,19 +72,20 @@ public class PostgreSQLDataBase extends AbstractDataBase {
 			toReturn = " NUMERIC ";
 		} else if (javaTypeName.contains("java.lang.Boolean")) {
 			toReturn = " BOOLEAN ";
-		} else if (javaTypeName.contains("java.sql.Time")) {
-			toReturn = " TIME ";
-		} else if (javaTypeName.contains("java.sql.Date")) {
+		} else if (javaTypeName.contains("java.sql.Date") || javaTypeName.contains("java.util.Date")) {
 			toReturn = " DATE ";
 		} else if (javaTypeName.toLowerCase().contains("timestamp")) {
 			toReturn = " TIMESTAMP ";
+		} else if (javaTypeName.contains("java.sql.Time")) {
+			toReturn = " TIME ";
 		} else if (javaTypeName.contains("[B") || javaTypeName.contains("BLOB")) {
 			toReturn = " BYTEA ";
 		} else if ((javaTypeName.contains("java.lang.String") && getVarcharLength() > MAX_VARCHAR_VALUE) || javaTypeName.contains("[C")
-				|| javaTypeName.contains("CLOB")) {
+				|| javaTypeName.contains("CLOB") || javaTypeName.contains("JSON") || javaTypeName.contains("Map") || javaTypeName.contains("List")) {
 			toReturn = " TEXT ";
 		} else {
-			logger.debug("Cannot map java type [" + javaTypeName + "] to a valid database type ");
+			toReturn = " TEXT ";
+			logger.error("Cannot map java type [" + javaTypeName + "] to a valid database type. Set TEXT by default ");
 		}
 
 		return toReturn;
@@ -106,5 +122,15 @@ public class PostgreSQLDataBase extends AbstractDataBase {
 		// " FROM information_schema.tables " +
 		// " where table_name like '"+ tableNamePrefix +"%'";
 		return query;
+	}
+
+	@Override
+	public String getSchema(Connection conn) throws SQLException {
+		return conn.getSchema();
+	}
+
+	@Override
+	public String getCatalog(Connection conn) throws SQLException {
+		return conn.getCatalog();
 	}
 }

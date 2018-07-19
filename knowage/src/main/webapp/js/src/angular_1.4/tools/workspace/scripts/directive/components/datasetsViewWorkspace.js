@@ -39,11 +39,12 @@ angular
 	})
 
 function datasetsController($scope, sbiModule_restServices, sbiModule_translate, $mdDialog, sbiModule_config, $window, $mdSidenav,
-		sbiModule_user, sbiModule_helpOnLine, $qbeViewer, toastr){
+		sbiModule_user, sbiModule_helpOnLine, $qbeViewer, toastr, sbiModule_i18n){
 
 	$scope.maxSizeStr = maxSizeStr;
 
 	$scope.translate = sbiModule_translate;
+	$scope.i18n = sbiModule_i18n;
 
 	$scope.showCkanIntegration = sbiModule_user.functionalities.indexOf("CkanIntegrationFunctionality")>-1;
 
@@ -352,7 +353,8 @@ function datasetsController($scope, sbiModule_restServices, sbiModule_translate,
 
 				$scope.reloadMyDataFn();
 				$scope.selectDataset(undefined);
-
+				$scope.idsOfFederationDefinitionsUsediNFederatedDatasets = [];
+				$scope.getFederatedDatasets(); //suppose the deleted dataste is in a federation we need to refresh the federation in order to refresh the dataste linked to federations
 				/**
 				 * If some dataset is removed from the filtered set of datasets, clear the search input, since all datasets are refreshed.
 				 *  @author Danilo Ristovski (danristo, danilo.ristovski@mht.net)
@@ -571,7 +573,7 @@ function datasetsController($scope, sbiModule_restServices, sbiModule_translate,
 		       + (isTechnicalUser != undefined ? '&isTechnicalUser=' + isTechnicalUser : '');
 
 		 //$window.location.href=url;
-		$qbeViewer.openQbeInterfaceDSet($scope, false, url);
+		$qbeViewer.openQbeInterfaceDSet($scope, false, url, true);
 
     }
 
@@ -598,21 +600,31 @@ function datasetsController($scope, sbiModule_restServices, sbiModule_translate,
         return $scope.currentTab==="myDataSet";
     }
 
-    $scope.exportDataset= function(dataset){
-       var actionName='EXPORT_EXCEL_DATASET_ACTION';
+    $scope.exportDataset= function(dataset,format){
+    	var id=dataset.id;
+       	if(isNaN(id)){
+       		id=id.dsId;
+       	}
 
-       var id=dataset.id;
-       if(isNaN(id)){
-    	   id=id.dsId;
-       }
+       	if(format == 'CSV') {
+       		var url= sbiModule_restServices.getBaseUrl("1.0/datasets/" + id + "/export");
+       		console.info("[EXPORT]: Exporting dataset with id " + id + " to CSV");
 
-       var url= sbiModule_config.adapterPath
-               +'?ACTION_NAME='+actionName
-               +'&SBI_EXECUTION_ID=-1'
-               +'&LIGHT_NAVIGATOR_DISABLED=TRUE'
-               +'&id='+id;
+       		$window.open(url);
+       	} else if (format == 'XLSX') {
+       		var actionName='EXPORT_EXCEL_DATASET_ACTION';
+       		var url= sbiModule_config.adapterPath
+            +'?ACTION_NAME='+actionName
+            +'&SBI_EXECUTION_ID=-1'
+            +'&LIGHT_NAVIGATOR_DISABLED=TRUE'
+            +'&id='+id;
 
-       $window.location.href=url;
+       		console.info("[EXPORT]: Exporting dataset with id " + id + " to XLSX");
+
+       		$window.location.href=url;
+       	} else {
+       		console.info("Format " + format + " not supported");
+       	}
     }
 
     $scope.previewDataset = function(dataset){
@@ -712,7 +724,7 @@ function datasetsController($scope, sbiModule_restServices, sbiModule_translate,
     	config={};
     	config.params=params;
 
-    	sbiModule_restServices.promiseGet("selfservicedataset/values", dataset.label,"",config)
+    	sbiModule_restServices.promiseGet("selfservicedatasetpreview/values", dataset.label,"",config)
 			.then(function(response) {
 
 				var totalItemsInPreviewInit = angular.copy($scope.totalItemsInPreview);
@@ -803,7 +815,7 @@ function datasetsController($scope, sbiModule_restServices, sbiModule_translate,
 	      templateUrl: sbiModule_config.contextName+'/js/src/angular_1.4/tools/workspace/templates/datasetCreateDialogTemplate.html',
 	      clickOutsideToClose: false,
 	      escapeToClose :true,
-	      //fullscreen: true,
+	      fullscreen: false,
 	      locals:{
 	    	 // previewDatasetModel:$scope.previewDatasetModel,
 	         // previewDatasetColumns:$scope.previewDatasetColumns
@@ -835,6 +847,13 @@ function datasetsController($scope, sbiModule_restServices, sbiModule_translate,
     	$scope.ckanDatasetsListInitial=[];
 
     }
+
+    $scope.isAbleToEditQbeDataset = function(selectedDataset) {
+    	if(selectedDataset !== undefined) {
+	    	var toReturn = (selectedDataset.dsTypeCd == 'Federated' || selectedDataset.dsTypeCd == 'Qbe') && sbiModule_user.userName == selectedDataset.owner;
+	    	return toReturn;
+    	}
+    };
 
     $scope.getBackPreviewSet=function(){
 
@@ -1266,6 +1285,14 @@ function datasetsController($scope, sbiModule_restServices, sbiModule_translate,
 	  $scope.isFromDataSetCatalogue = false;
 	  $qbeViewer.openQbeInterfaceDSet($scope, true, url);
     }
+
+
+	if(initialOptionMainMenu){
+		if(initialOptionMainMenu.toLowerCase() == 'datasets'){
+			var selectedMenu = $scope.getMenuFromName('datasets');
+			$scope.leftMenuItemPicked(selectedMenu,true);
+		}
+	}
 
 }
 })();

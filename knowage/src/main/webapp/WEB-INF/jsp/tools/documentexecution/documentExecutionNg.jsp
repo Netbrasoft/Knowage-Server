@@ -2,7 +2,7 @@
 Knowage, Open Source Business Intelligence suite
 Copyright (C) 2016 Engineering Ingegneria Informatica S.p.A.
 
-Knowage is free software: you can redistribute it and/or modify
+Knowage is free software: you can redistribute it and/or modify	
 it under the terms of the GNU Affero General Public License as published by
 the Free Software Foundation, either version 3 of the License, or
  (at your option) any later version.
@@ -44,6 +44,8 @@ String engineName = null;
 String isFromDocumentWidget = null;
 String isForExport = null;
 String cockpitSelections = null;
+String documentType = null;
+boolean isNotOlapDoc = true;
 
 // author: danristo
 String executedFrom = null;
@@ -89,8 +91,14 @@ try{
     
     executingEngine = obj.getEngine();
     engineName = executingEngine.getName();
+    documentType = obj.getBiObjectTypeCode();
     
-    
+   	if(documentType.equals("OLAP")) {
+   		isNotOlapDoc = false;
+   	} else {
+   		isNotOlapDoc = true;
+   	}
+	    
     if(objId != null && !("null".equalsIgnoreCase(objId))) {
         Integer objIdInt = new Integer(objId);
         executionRoleNames = ObjectsAccessVerifier.getCorrectRolesForExecution(objIdInt, userProfile);
@@ -113,6 +121,7 @@ boolean isSuperAdmin = (Boolean)((UserProfile)userProfile).getIsSuperadmin();
         
 // author: danristo
 boolean isAbleToExecuteAction = userProfile.isAbleToExecuteAction(SpagoBIConstants.SEE_SNAPSHOTS_FUNCTIONALITY);
+boolean isAbleToExecuteActionSnapshot = userProfile.isAbleToExecuteAction(SpagoBIConstants.RUN_SNAPSHOTS_FUNCTIONALITY);
 
 %>
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
@@ -126,7 +135,7 @@ if(executionRoleNames.size() > 0) {
           <%-- ---------------------------------------------------------------------- --%>
 <%-- INCLUDE Persist JS                                                     --%>
 <%-- ---------------------------------------------------------------------- --%>
-<script type="text/javascript" src="${pageContext.request.contextPath}/js/lib/persist-0.1.0/persist.js"></script>
+<script type="text/javascript" src="<%=urlBuilder.getResourceLink(request, "js/lib/persist-0.1.0/persist.js")%>"></script>
 <script type="text/javascript">
 	//defining GLOBAL context url for following directives and template usage
 	_CURRENTCONTEXTURL="<%=urlBuilder.getResourceLink(request, "js/src/angular_1.4/tools/documentexecution")%>"
@@ -134,7 +143,7 @@ if(executionRoleNames.size() > 0) {
     
         
         <!-- Styles -->
-        <link rel="stylesheet" type="text/css" href="${pageContext.request.contextPath}/themes/commons/css/customStyle.css"> 
+        <link rel="stylesheet" type="text/css" href="<%=urlBuilder.getResourceLink(request, "themes/commons/css/customStyle.css")%>"> 
         <script type="text/javascript" src="<%=urlBuilder.getResourceLink(request, "js/lib/angular/ngWYSIWYG/wysiwyg.min.js")%>"></script>  
         <link rel="stylesheet" type="text/css" href="<%=urlBuilder.getResourceLink(request, "js/lib/angular/ngWYSIWYG/editor.min.css")%>"> 
         
@@ -144,7 +153,7 @@ if(executionRoleNames.size() > 0) {
 	    <script type="text/javascript" src="<%=urlBuilder.getResourceLink(request, "js/lib/wheelnav/wheelnav.js")%>"></script>
         
         <!--    breadCrumb -->
-        <script type="text/javascript" src="${pageContext.request.contextPath}/js/src/angular_1.4/tools/commons/BreadCrumb.js"></script>
+        <script type="text/javascript" src="<%=urlBuilder.getResourceLink(request, "js/src/angular_1.4/tools/commons/BreadCrumb.js")%>"></script>
         
         <!-- cross navigation -->
         <script type="text/javascript"  src="<%=urlBuilder.getResourceLink(request, "js/src/angular_1.4/tools/commons/cross-navigation/crossNavigationDirective.js")%>"></script>
@@ -173,6 +182,7 @@ if(executionRoleNames.size() > 0) {
             var isAdmin = <%=isAdmin%>;
             var isSuperAdmin = <%=isSuperAdmin%>;
             var isAbleToExecuteAction = <%=isAbleToExecuteAction%>;
+			var isNotOlapDoc = <%=isNotOlapDoc%>;
         </script>
     
         <div  layout-fill ng-hide="hideProgressCircular.status" style="z-index: 10000; position: absolute; background-color: rgba(0, 0, 0, 0.21);">
@@ -190,7 +200,7 @@ if(executionRoleNames.size() > 0) {
             <md-sidenav id="sidenavOri" class="md-sidenav-right md-whiteframe-4dp topsidenav" 
                     ng-if="'<%=obj.getParametersRegion() %>' == 'north'" md-component-id="parametersPanelSideNav" 
                     layout="column" md-is-locked-open="showParametersPanel.status" 
-                    ng-include="'${pageContext.request.contextPath}/js/src/angular_1.4/tools/documentexecution/utils/sidenavTemplate/sidenavVertContent.jsp'">
+                    ng-include="'<%=urlBuilder.getResourceLink(request, "js/src/angular_1.4/tools/documentexecution/utils/sidenavTemplate/sidenavVertContent.jsp")%>'">
             </md-sidenav>
     <% 
     
@@ -211,7 +221,7 @@ if(executionRoleNames.size() > 0) {
                     </md-button>
                     <span>&nbsp;&nbsp;</span>
                     <h2 class="md-flex" ng-hide="::crossNavigationScope.isNavigationInProgress()">
-                        {{executionInstance.OBJECT_NAME}}
+                        {{i18n.getI18n(executionInstance.OBJECT_NAME)}}
                     </h2>
                     <cross-navigation cross-navigation-helper="crossNavigationScope.crossNavigationHelper" flex>
                         <cross-navigation-bread-crumb id="clonedCrossBreadcrumb"> </cross-navigation-bread-crumb>
@@ -388,6 +398,24 @@ if(executionRoleNames.size() > 0) {
                                 </div> 
                                 
                                 <!-- SHORTCUTS: end -->
+
+                                 <md-menu-item class="md-indent">
+                                    <md-icon class="fa fa-share"></md-icon>
+                                    <md-button aria-label="{{translate.load('sbi.execution.executionpage.toolbar.annotate')}}" 
+                                    		   class="toolbar-button-custom"
+                                               ng-click="copyLinkHTML(false)">{{translate.load('sbi.execution.executionpage.toolbar.copyLink')}}
+                                    </md-button>
+                                </md-menu-item>
+                                
+                                                                
+                                 <md-menu-item class="md-indent">
+                                    <md-icon class="fa fa-share"></md-icon>
+                                    <md-button aria-label="{{translate.load('sbi.execution.executionpage.toolbar.annotate')}}" 
+                                    		   class="toolbar-button-custom"
+                                               ng-click="copyLinkHTML(true)">{{translate.load('sbi.execution.executionpage.toolbar.embedHTML')}}
+                                    </md-button>
+                                </md-menu-item>
+
                                 
                             </md-menu-content>
                         </md-menu>
@@ -410,12 +438,13 @@ if(executionRoleNames.size() > 0) {
             <div layout="row" flex="grow">
                 <!-- "ng-show" is used instead of "ng-if" (or "ng-switch") in order to prevent the iframe reloading -->
                 <md-content id="documentFrameContainer" layout="column" flex ng-show="currentView.status == 'DOCUMENT'">  
-                    <div layout="row" flex layout-align="center center"
-                            ng-hide="execProperties.executionInstance.IS_FOR_EXPORT || urlViewPointService.frameLoaded">
+                      <div layout="row" flex layout-align="center center"
+                            ng-hide="execProperties.executionInstance.IS_FOR_EXPORT || urlViewPointService.frameLoaded 
+                            || browser.name == 'internet explorer'">
                         <md-progress-circular md-mode="indeterminate" md-diameter="70" ></md-progress-circular>
                     </div>
                     <iframe class="noBorder" id="documentFrame" name="documentFrame" ng-src="{{execProperties.documentUrl}}" iframe-onload="iframeOnload()"
-                        iframe-set-dimensions-onload flex ng-show="urlViewPointService.frameLoaded">
+                        iframe-set-dimensions-onload flex ng-show="urlViewPointService.frameLoaded || browser.name == 'internet explorer'">
                     </iframe>
                 </md-content>
                                         
@@ -466,6 +495,7 @@ if(executionRoleNames.size() > 0) {
                         'OBJECT_LABEL' : '<%= request.getParameter("OBJECT_LABEL") %>',
                         'EDIT_MODE' : '<%= request.getParameter("EDIT_MODE") %>',
                         'OBJECT_NAME' : '<%= obj.getName() %>',
+                        'REFRESH_SECONDS' : <%= obj.getRefreshSeconds().intValue() %>,
                         'OBJECT_TYPE_CODE' : '',
                         'isFromCross' : <%=isFromCross%>,
                         'isPossibleToComeBackToRolePage' : false,
@@ -625,6 +655,8 @@ if(executionRoleNames.size() > 0) {
                 src="<%=urlBuilder.getResourceLink(request, "js/src/angular_1.4/tools/documentexecution/documentExecutionNote.js")%>"></script>
         <script type="text/javascript" 
                 src="<%=urlBuilder.getResourceLink(request, "js/src/angular_1.4/tools/documentexecution/documentExecutionRank.js")%>"></script>
+        <script type="text/javascript" 
+                src="<%=urlBuilder.getResourceLink(request, "js/src/angular_1.4/tools/documentexecution/publicExecutionUrl/publicExecutionUrl.js")%>"></script>
         
         
     </body>

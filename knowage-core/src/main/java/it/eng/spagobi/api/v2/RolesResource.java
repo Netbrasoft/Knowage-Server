@@ -17,6 +17,28 @@
  */
 package it.eng.spagobi.api.v2;
 
+import java.net.URI;
+import java.net.URLEncoder;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.List;
+
+import javax.validation.Valid;
+import javax.ws.rs.Consumes;
+import javax.ws.rs.DELETE;
+import javax.ws.rs.GET;
+import javax.ws.rs.POST;
+import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
+import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
+
 import it.eng.spago.security.IEngUserProfile;
 import it.eng.spagobi.api.AbstractSpagoBIResource;
 import it.eng.spagobi.commons.bo.Domain;
@@ -35,29 +57,6 @@ import it.eng.spagobi.services.rest.annotations.ManageAuthorization;
 import it.eng.spagobi.services.rest.annotations.UserConstraint;
 import it.eng.spagobi.tools.dataset.constants.DataSetConstants;
 import it.eng.spagobi.utilities.exceptions.SpagoBIRestServiceException;
-
-import java.net.URI;
-import java.net.URLEncoder;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Iterator;
-import java.util.List;
-
-import javax.validation.Valid;
-import javax.ws.rs.Consumes;
-import javax.ws.rs.DELETE;
-import javax.ws.rs.GET;
-import javax.ws.rs.POST;
-import javax.ws.rs.PUT;
-import javax.ws.rs.Path;
-import javax.ws.rs.PathParam;
-import javax.ws.rs.Produces;
-import javax.ws.rs.QueryParam;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
-
-import org.json.JSONArray;
-import org.json.JSONObject;
 
 @Path("/2.0/roles")
 @ManageAuthorization
@@ -168,8 +167,6 @@ public class RolesResource extends AbstractSpagoBIResource {
 		}
 	}
 
-
-
 	@SuppressWarnings({ "unchecked", "unchecked" })
 	@GET
 	@Path("/ds_categories")
@@ -183,29 +180,29 @@ public class RolesResource extends AbstractSpagoBIResource {
 			UserProfile up = getUserProfile();
 			Collection<String> roles = up.getRoles();
 
-				List<Domain> array = DAOFactory.getDomainDAO().loadListDomainsByType(DataSetConstants.CATEGORY_DOMAIN_TYPE);
-				if (UserUtilities.isAdministrator(up)) {
-					resp = array;
+			List<Domain> array = DAOFactory.getDomainDAO().loadListDomainsByType(DataSetConstants.CATEGORY_DOMAIN_TYPE);
+			if (UserUtilities.isAdministrator(up)) {
+				resp = array;
 
-				}else{
-					for (Iterator iterator = roles.iterator(); iterator.hasNext();) {
-						String role = (String) iterator.next();
-						rolesDao = DAOFactory.getRoleDAO();
-						rolesDao.setUserProfile(getUserProfile());
-						ds.addAll(rolesDao.getDataSetCategoriesForRole(role));
-					}
-					for (RoleMetaModelCategory r : ds) {
-						for (Domain dom : array) {
-							if (r.getCategoryId().equals(dom.getValueId())) {
-								resp.add(dom);
-							}
+			} else {
+				for (Iterator iterator = roles.iterator(); iterator.hasNext();) {
+					String role = (String) iterator.next();
+					rolesDao = DAOFactory.getRoleDAO();
+					rolesDao.setUserProfile(getUserProfile());
+					ds.addAll(rolesDao.getDataSetCategoriesForRole(role));
+				}
+				for (RoleMetaModelCategory r : ds) {
+					for (Domain dom : array) {
+						if (r.getCategoryId().equals(dom.getValueId())) {
+							resp.add(dom);
 						}
 					}
 				}
+			}
 
 			return DomainCRUD.translate(resp, null).toString();
 		} catch (Exception e) {
-			logger.error("Error loading the list of dataset categories associated to user",  e);
+			logger.error("Error loading the list of dataset categories associated to user", e);
 			throw new SpagoBIRestServiceException("Error loading the list of dataset categories associated to user", buildLocaleFromSession(), e);
 		}
 	}
@@ -267,7 +264,7 @@ public class RolesResource extends AbstractSpagoBIResource {
 		}
 	}
 
-	@PUT
+	@POST
 	@Path("/{id}")
 	@UserConstraint(functionalities = { SpagoBIConstants.PROFILE_MANAGEMENT })
 	@Consumes(MediaType.APPLICATION_JSON)
@@ -352,7 +349,7 @@ public class RolesResource extends AbstractSpagoBIResource {
 		role.setDescription(bo.getDescription());
 		role.setRoleTypeCD(bo.getRoleTypeCD());
 		role.setRoleTypeID(bo.getRoleTypeID());
-
+		role.setIsPublic(bo.getIsPublic());
 		role.setIsAbleToSaveIntoPersonalFolder(bo.isAbleToSaveIntoPersonalFolder());
 		role.setIsAbleToEnableDatasetPersistence(bo.isAbleToEnableDatasetPersistence());
 		role.setIsAbleToEnableFederatedDataset(bo.isAbleToEnableFederatedDataset());
@@ -365,6 +362,7 @@ public class RolesResource extends AbstractSpagoBIResource {
 		role.setIsAbleToSeeSubobjects(bo.isAbleToSeeSubobjects());
 		role.setIsAbleToSeeViewpoints(bo.isAbleToSeeViewpoints());
 		role.setIsAbleToSeeSnapshots(bo.isAbleToSeeSnapshots());
+		role.setIsAbleToRunSnapshots(bo.isAbleToRunSnapshots());
 		role.setIsAbleToSeeNotes(bo.isAbleToSeeNotes());
 		role.setIsAbleToSendMail(bo.isAbleToSendMail());
 		role.setIsAbleToSaveRememberMe(bo.isAbleToSaveRememberMe());

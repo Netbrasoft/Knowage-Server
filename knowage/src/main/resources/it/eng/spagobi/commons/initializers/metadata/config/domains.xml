@@ -39,9 +39,7 @@
 	<DOMAIN valueCd="NETWORK" valueNm="sbidomains.nm.network"
 		domainCd="BIOBJ_TYPE" domainNm="BI Object types" valueDs="sbidomains.ds.network" />
 	<DOMAIN valueCd="DOSSIER" valueNm="sbidomains.nm.dossier"
-		domainCd="BIOBJ_TYPE" domainNm="Accessible Html" valueDs="sbidomains.ds.dossier" />			
-	<DOMAIN valueCd="ACCESSIBLE_HTML" valueNm="Accessible Html"
-		domainCd="BIOBJ_TYPE" domainNm="BI Object types" valueDs="Accessible Html" />		
+		domainCd="BIOBJ_TYPE" domainNm="BI Object types" valueDs="sbidomains.ds.dossier" />			
 	<DOMAIN valueCd="BOOL" valueNm="sbidomains.nm.bool" domainCd="VALUE_TYPE"
 		domainNm="Input value types to check" valueDs="sbidomains.ds.bool" />
 	<DOMAIN valueCd="SINGLE" valueNm="sbidomains.nm.single"
@@ -123,8 +121,6 @@
 	<DOMAIN valueCd="COMBOBOX" valueNm="sbidomains.nm.combobox"
 		domainCd="SELECTION_TYPE" domainNm="Selection modality of parameter values"
 		valueDs="sbidomains.ds.combobox" />
-	<DOMAIN valueCd="-1" valueNm="sbidomains.nm.default" domainCd="DIALECT_HIB"
-		domainNm="Predefined hibernate dialect" valueDs="sbidomains.ds.default" />
 	<DOMAIN valueCd="org.hibernate.dialect.OracleDialect" valueNm="sbidomains.nm.oracle"
 		domainCd="DIALECT_HIB" domainNm="Predefined hibernate dialect"
 		valueDs="sbidomains.ds.oracle" />
@@ -137,18 +133,12 @@
 	<DOMAIN valueCd="org.hibernate.dialect.SQLServerDialect"
 		valueNm="sbidomains.nm.sqlserver" domainCd="DIALECT_HIB"
 		domainNm="Predefined hibernate dialect" valueDs="sbidomains.ds.sqlserver" />
-	<DOMAIN valueCd="org.hibernate.dialect.HSQLDialect" valueNm="sbidomains.nm.hsql"
-		domainCd="DIALECT_HIB" domainNm="Predefined hibernate dialect"
-		valueDs="sbidomains.ds.hsql" />
 	<DOMAIN valueCd="org.hibernate.dialect.MySQLInnoDBDialect"
 		valueNm="sbidomains.nm.mysql" domainCd="DIALECT_HIB" domainNm="Predefined hibernate dialect"
 		valueDs="sbidomains.ds.mysql" />
 	<DOMAIN valueCd="org.hibernate.dialect.PostgreSQLDialect"
 		valueNm="sbidomains.nm.postgresql" domainCd="DIALECT_HIB"
 		domainNm="Predefined hibernate dialect" valueDs="sbidomains.ds.postgresql" />
-	<DOMAIN valueCd="org.hibernate.dialect.neo4j"
-		valueNm="sbidomains.nm.neo4j" domainCd="DIALECT_HIB"
-		domainNm="Predefined hibernate dialect" valueDs="sbidomains.ds.neo4j" />
 	<DOMAIN valueCd="org.hibernate.dialect.cassandra"
 		valueNm="sbidomains.nm.cassandra" domainCd="DIALECT_HIB"
 		domainNm="Predefined hibernate dialect" valueDs="sbidomains.ds.cassandra" />
@@ -158,22 +148,20 @@
 	<DOMAIN valueCd="org.hibernate.dialect.impala"
 		valueNm="sbidomains.nm.impala" domainCd="DIALECT_HIB"
 		domainNm="Predefined hibernate dialect" valueDs="sbidomains.ds.impala" />
-	<DOMAIN valueCd="org.hibernate.dialect.drill"
-		valueNm="sbidomains.nm.drill" domainCd="DIALECT_HIB"
-		domainNm="Predefined hibernate dialect" valueDs="sbidomains.ds.drill" />
-	<DOMAIN valueCd="org.hibernate.dialect.IngresDialect" valueNm="sbidomains.nm.ingres"
-		domainCd="DIALECT_HIB" domainNm="Predefined hibernate dialect"
-		valueDs="sbidomains.ds.ingres" />
-	<DOMAIN valueCd="VoltDBDialect" valueNm="sbidomains.nm.voltdb"
-		domainCd="DIALECT_HIB" domainNm="VoltDB dialect" valueDs="sbidomains.ds.voltdb" />
 	<DOMAIN valueCd="MongoDialect" valueNm="sbidomains.nm.mongo"
 		domainCd="DIALECT_HIB" domainNm="MongoDB dialect" valueDs="sbidomains.ds.mongo" />
-	<DOMAIN valueCd="hbase" valueNm="sbidomains.nm.hbase" domainCd="DIALECT_HIB"
-		domainNm="HBQL HBase dialect" valueDs="sbidomains.ds.hbase" />
 	<DOMAIN valueCd="hive" valueNm="sbidomains.nm.hive" domainCd="DIALECT_HIB"
 		domainNm="HQL Hive dialect" valueDs="sbidomains.ds.hive" />
+	<DOMAIN valueCd="org.hibernate.dialect.MySQLDialect" valueNm="sbidomains.nm.hive2" domainCd="DIALECT_HIB"
+		domainNm="HQL Hive2 dialect" valueDs="sbidomains.ds.hive2" />
 	<DOMAIN valueCd="orient" valueNm="sbidomains.nm.orient"
 		domainCd="DIALECT_HIB" domainNm="OrientDB dialect" valueDs="sbidomains.ds.orient" />
+	<DOMAIN valueCd="org.hibernate.dialect.TeradataDialect"
+		valueNm="sbidomains.nm.teradata" domainCd="DIALECT_HIB"
+		domainNm="sbidomains.nm.teradata" valueDs="sbidomains.ds.teradata" />
+	<DOMAIN valueCd="org.hibernate.dialect.VerticaDialect"
+		valueNm="sbidomains.nm.vertica" domainCd="DIALECT_HIB"
+		domainNm="sbidomains.nm.vertica" valueDs="sbidomains.ds.vertica" />
 	<DOMAIN valueCd="RANGE" valueNm="sbidomains.nm.range" domainCd="THRESHOLD_TYPE"
 		domainNm="Threshold Type" valueDs="sbidomains.ds.range" />
 	<!-- 
@@ -337,6 +325,10 @@
 		domainNm="Data Set Type" valueDs="SbiCkanDataSet" />
 	<DOMAIN valueCd="Federated" valueNm="SbiFederatedDataSet" domainCd="DATA_SET_TYPE"
 		domainNm="Data Set Type" valueDs="SbiFederatedDataSet" />
+		
+	<DOMAIN valueCd="SPARQL" valueNm="SbiSPARQLDataSet" domainCd="DATA_SET_TYPE"
+		domainNm="Data Set Type" valueDs="SbiSPARQLDataSet" />
+		
 	<DOMAIN valueCd="Default Dataset Category" valueNm="Default Dataset Category" domainCd="CATEGORY_TYPE"
 		domainNm="Category Type" valueDs="Default Dataset Category" />
 	<DOMAIN valueCd="DEVELOPMENT" valueNm="sbidomains.permissiononfolder.nm.dev"
@@ -373,6 +365,8 @@
 		domainNm="Data Set Metadata Value" valueDs="Data Set Metadata Value" />
 	<DOMAIN valueCd="Double" valueNm="Double" domainCd="DS_META_VALUE"
 		domainNm="Data Set Metadata Value" valueDs="Data Set Metadata Value" />
+	<DOMAIN valueCd="Date" valueNm="Date" domainCd="DS_META_VALUE"
+		domainNm="Data Set Metadata Value" valueDs="Data Set Metadata Value" />		
 	<DOMAIN valueCd="Default Model Category" valueNm="Default Model Category"
 		domainCd="BM_CATEGORY" domainNm="Category Meta Model" valueDs="Default Model Category" />
 
@@ -465,6 +459,8 @@
 		domainCd="TEMPORAL_LEVEL" domainNm="TemporalLevel" valueDs="Temporal hierarchy level" />
 	
 	<DOMAIN valueCd="REST" valueNm="SbiRESTDataSet" domainCd="DATA_SET_TYPE" domainNm="Data Set Type" valueDs="SbiRESTDataSet"/>
+	
+	<DOMAIN valueCd="Solr" valueNm="SbiSolrDataSet" domainCd="DATA_SET_TYPE" domainNm="Data Set Type" valueDs="SbiSolrDataSet"/>
 	
 	<DOMAIN valueCd="MEASURE" valueNm="sbidomains.nm.measure"
 		domainCd="KPI_RULEOUTPUT_TYPE" domainNm="KPI Rule Output types" valueDs="sbidomains.ds.measure" />
@@ -560,6 +556,9 @@
 			
 	<DOMAIN valueCd="APDF" valueNm="APDF"
 		domainCd="EXPORT_TYPE" domainNm="Exporters types" valueDs="Export type" />				
+		
+	<DOMAIN valueCd="Default Layer Category" valueNm="Default Layer Category" domainCd="GEO_CATEGORY"
+		domainNm="Layer Category" valueDs="Default Layer Category" />
 			
 
 			

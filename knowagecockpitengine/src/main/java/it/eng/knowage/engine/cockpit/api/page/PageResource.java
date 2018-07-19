@@ -18,6 +18,8 @@
 package it.eng.knowage.engine.cockpit.api.page;
 
 import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
+import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -48,6 +50,10 @@ import it.eng.knowage.slimerjs.wrapper.beans.CustomHeaders;
 import it.eng.knowage.slimerjs.wrapper.beans.RenderOptions;
 import it.eng.knowage.slimerjs.wrapper.beans.ViewportDimensions;
 import it.eng.knowage.slimerjs.wrapper.enums.RenderFormat;
+import it.eng.spagobi.commons.SingletonConfig;
+import it.eng.spagobi.commons.constants.SpagoBIConstants;
+import it.eng.spagobi.commons.utilities.GeneralUtilities;
+import it.eng.spagobi.commons.utilities.SpagoBIUtilities;
 import it.eng.spagobi.utilities.engines.EngineConstants;
 import it.eng.spagobi.utilities.engines.SpagoBIEngineServiceExceptionHandler;
 import it.eng.spagobi.utilities.exceptions.SpagoBIRuntimeException;
@@ -62,12 +68,12 @@ public class PageResource extends AbstractCockpitEngineResource {
 
 	private static final String OUTPUT_TYPE = "outputType";
 	private static final String PDF_PAGE_ORIENTATION = "pdfPageOrientation";
-	private static final String PDF_ZOOM = "pdfZoom";
+	private static final String PDF_ZOOM_FACTOR = "pdfZoomFactor";
 	private static final String PDF_WIDTH = "pdfWidth";
 	private static final String PDF_HEIGHT = "pdfHeight";
 	private static final String PDF_WAIT_TIME = "pdfWaitTime";
 	static private final List<String> PDF_PARAMETERS = Arrays
-			.asList(new String[] { OUTPUT_TYPE, PDF_WIDTH, PDF_HEIGHT, PDF_WAIT_TIME, PDF_ZOOM, PDF_PAGE_ORIENTATION });
+			.asList(new String[] { OUTPUT_TYPE, PDF_WIDTH, PDF_HEIGHT, PDF_WAIT_TIME, PDF_ZOOM_FACTOR, PDF_PAGE_ORIENTATION });
 	static private final List<String> JPG_PARAMETERS = Arrays.asList(new String[] { OUTPUT_TYPE });
 
 	static private Map<String, JSONObject> pages;
@@ -117,6 +123,15 @@ public class PageResource extends AbstractCockpitEngineResource {
 		CockpitEngineInstance engineInstance;
 		String dispatchUrl = null;
 
+		if (logger.isDebugEnabled()) {
+			Enumeration<String> parameterNames = request.getParameterNames();
+			while (parameterNames.hasMoreElements()) {
+				String name = parameterNames.nextElement();
+				String[] parameterValues = request.getParameterValues(name);
+				logger.debug(name + " = " + Arrays.asList(parameterValues));
+			}
+		}
+
 		try {
 			// To deploy into JBOSSEAP64 is needed a StandardWrapper, instead of RestEasy Wrapper
 			// HttpServletRequest request = ResteasyProviderFactory.getContextData(HttpServletRequest.class);
@@ -134,11 +149,11 @@ public class PageResource extends AbstractCockpitEngineResource {
 
 			if ("execute".equals(pageName)) {
 				String outputType = request.getParameter(OUTPUT_TYPE);
-				if ("xls".equals(outputType) || "xlsx".equals(outputType)) {
+				if ("xls".equalsIgnoreCase(outputType) || "xlsx".equalsIgnoreCase(outputType)) {
 					request.setAttribute("template", getIOManager().getTemplateAsString());
 					dispatchUrl = "/WEB-INF/jsp/ngCockpitExportExcel.jsp";
 					response.setContentType(MediaType.APPLICATION_OCTET_STREAM);
-				} else if ("pdf".equals(outputType)) {
+				} else if ("pdf".equalsIgnoreCase(outputType)) {
 					String requestURL = getRequestUrlForPdfExport(request);
 					request.setAttribute("requestURL", requestURL);
 
@@ -147,7 +162,7 @@ public class PageResource extends AbstractCockpitEngineResource {
 
 					dispatchUrl = "/WEB-INF/jsp/ngCockpitExportPdf.jsp";
 					response.setContentType(MediaType.APPLICATION_OCTET_STREAM);
-				} else if ("JPG".equals(outputType)) {
+				} else if ("JPG".equalsIgnoreCase(outputType)) {
 					String requestURL = getRequestUrlForJpgExport(request);
 					request.setAttribute("requestURL", requestURL);
 
@@ -177,16 +192,6 @@ public class PageResource extends AbstractCockpitEngineResource {
 				// error
 				dispatchUrl = "/WEB-INF/jsp/error.jsp";
 			}
-
-			/**
-			 * Setting the encoding type to the response object, so the Cockpit engine when calling the rendering of the chart (chart.jsp) can display the real
-			 * content of the chart template. If this is not set, specific Italian letters, such as ù and à are going to be displayed as black squared question
-			 * marks - they will not be displayed as they are specified by the user.
-			 *
-			 * @author Danilo Ristovski (danristo, danilo.ristovski@mht.net)
-			 */
-			response.setContentType("text/html");
-			response.setCharacterEncoding("UTF-8");
 
 			request.getRequestDispatcher(dispatchUrl).forward(request, response);
 		} catch (Exception e) {
@@ -231,21 +236,50 @@ public class PageResource extends AbstractCockpitEngineResource {
 		String encodedUserId = Base64.encode(userId.getBytes("UTF-8"));
 		Map<String, String> headers = new HashMap<String, String>(1);
 		headers.put("Authorization", "Direct " + encodedUserId);
+
+		RenderOptions renderOptions = RenderOptions.DEFAULT;
+
 		CustomHeaders customHeaders = new CustomHeaders(headers);
+		renderOptions = renderOptions.withCustomHeaders(customHeaders);
 
-		int pdfWidth = Integer.valueOf(request.getParameter(PDF_WIDTH));
-		int pdfHeight = Integer.valueOf(request.getParameter(PDF_HEIGHT));
-		ViewportDimensions dimensions = new ViewportDimensions(pdfWidth, pdfHeight);
+		ViewportDimensions dimensions = renderOptions.getDimensions();
 
-		long pdfRenderingWaitTime = 1000 * Long.valueOf(request.getParameter(PDF_WAIT_TIME));
+		int pdfWidth = Integer.valueOf(dimensions.getWidth());
+		String parPdfWidth = request.getParameter(PDF_WIDTH);
+		if (parPdfWidth != null) {
+			pdfWidth = Integer.valueOf(parPdfWidth);
+		}
 
-		RenderOptions renderOptions = RenderOptions.DEFAULT.withCustomHeaders(customHeaders).withDimensions(dimensions)
-				.withJavaScriptExecutionDetails(pdfRenderingWaitTime, 5000L);
+		int pdfHeight = Integer.valueOf(dimensions.getHeight());
+		String parPdfHeight = request.getParameter(PDF_HEIGHT);
+		if (parPdfHeight != null) {
+			pdfHeight = Integer.valueOf(parPdfHeight);
+		}
+
+		dimensions = new ViewportDimensions(pdfWidth, pdfHeight);
+		renderOptions = renderOptions.withDimensions(dimensions);
+
+		String parPdfRenderingWaitTime = request.getParameter(PDF_WAIT_TIME);
+		if (parPdfRenderingWaitTime != null) {
+			long pdfRenderingWaitTime = 1000 * Long.valueOf(parPdfRenderingWaitTime);
+			renderOptions = renderOptions.withJavaScriptExecutionDetails(pdfRenderingWaitTime, 5000L);
+		}
+
+		String parPdfZoomFactor = request.getParameter(PDF_ZOOM_FACTOR);
+		if (parPdfZoomFactor != null) {
+			Double pdfZoomFactor = Double.valueOf(parPdfZoomFactor);
+			renderOptions = renderOptions.withZoomFactor(pdfZoomFactor);
+		}
+
 		return renderOptions;
 	}
 
-	private String getRequestUrlForPdfExport(HttpServletRequest request) {
-		StringBuilder sb = new StringBuilder(request.getRequestURL().toString());
+	private String getRequestUrlForPdfExport(HttpServletRequest request) throws UnsupportedEncodingException {
+		String requestURL = request.getRequestURL().toString();
+		String hostURL = GeneralUtilities.getSpagoBiHost();
+		String serviceURL = getServiceHostUrl();
+
+		StringBuilder sb = new StringBuilder(requestURL.replace(hostURL, serviceURL));
 		String sep = "?";
 		Map<String, String[]> parameterMap = request.getParameterMap();
 		for (String parameter : parameterMap.keySet()) {
@@ -253,15 +287,25 @@ public class PageResource extends AbstractCockpitEngineResource {
 				String[] values = parameterMap.get(parameter);
 				if (values != null && values.length > 0) {
 					sb.append(sep);
-					sb.append(parameter);
+					sb.append(URLEncoder.encode(parameter, "UTF-8"));
 					sb.append("=");
-					sb.append(values[0]);
+					if (parameter.equals(SpagoBIConstants.SBI_HOST)) {
+						sb.append(URLEncoder.encode(getServiceHostUrl(), "UTF-8"));
+					} else {
+						sb.append(URLEncoder.encode(values[0], "UTF-8"));
+					}
 					sep = "&";
 				}
 			}
 		}
 		sb.append("&export=true");
 		return sb.toString();
+	}
+
+	public String getServiceHostUrl() {
+		String serviceURL = SpagoBIUtilities.readJndiResource(SingletonConfig.getInstance().getConfigValue("SPAGOBI.SPAGOBI_SERVICE_JNDI"));
+		serviceURL = serviceURL.substring(0, serviceURL.lastIndexOf('/'));
+		return serviceURL;
 	}
 
 	@GET

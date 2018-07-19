@@ -19,7 +19,6 @@ package it.eng.spagobi.engines.whatif.api;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
 import java.io.OutputStream;
@@ -53,7 +52,6 @@ import org.apache.poi.xssf.usermodel.XSSFCell;
 import org.apache.poi.xssf.usermodel.XSSFRow;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
-
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.olap4j.Cell;
@@ -62,6 +60,8 @@ import org.olap4j.CellSetAxis;
 import org.olap4j.OlapDataSource;
 import org.olap4j.OlapException;
 import org.pivot4j.PivotModel;
+import org.pivot4j.ui.collector.NonInternalPropertyCollector;
+import org.pivot4j.ui.collector.PropertyCollector;
 import org.pivot4j.ui.fop.FopExporter;
 import org.pivot4j.ui.poi.ExcelExporter;
 import org.pivot4j.ui.table.TableRenderer;
@@ -76,6 +76,7 @@ import it.eng.spagobi.engines.whatif.WhatIfEngineInstance;
 import it.eng.spagobi.engines.whatif.common.AbstractWhatIfEngineService;
 import it.eng.spagobi.engines.whatif.exception.WhatIfPersistingTransformationException;
 import it.eng.spagobi.engines.whatif.export.ExportConfig;
+import it.eng.spagobi.engines.whatif.model.ModelConfig;
 import it.eng.spagobi.engines.whatif.model.SpagoBICellSetWrapper;
 import it.eng.spagobi.engines.whatif.model.SpagoBICellWrapper;
 import it.eng.spagobi.engines.whatif.model.SpagoBIPivotModel;
@@ -92,8 +93,10 @@ import it.eng.spagobi.engines.whatif.parser.parser;
 import it.eng.spagobi.engines.whatif.version.VersionManager;
 import it.eng.spagobi.services.rest.annotations.ManageAuthorization;
 import it.eng.spagobi.tools.datasource.bo.IDataSource;
+import it.eng.spagobi.utilities.assertion.Assert;
 import it.eng.spagobi.utilities.engines.SpagoBIEngineException;
 import it.eng.spagobi.utilities.engines.SpagoBIEngineRuntimeException;
+import it.eng.spagobi.utilities.engines.SpagoBIEngineServiceException;
 import it.eng.spagobi.utilities.exceptions.SpagoBIEngineRestServiceRuntimeException;
 import it.eng.spagobi.utilities.exceptions.SpagoBIRuntimeException;
 import it.eng.spagobi.utilities.exceptions.SpagoBIServiceException;
@@ -129,8 +132,7 @@ public class ModelResource extends AbstractWhatIfEngineService {
 	}
 
 	/**
-	 * Executes the mdx query. If the mdx is null it executes the query of the
-	 * model
+	 * Executes the mdx query. If the mdx is null it executes the query of the model
 	 *
 	 * @param mdx
 	 *            the query to execute
@@ -140,7 +142,7 @@ public class ModelResource extends AbstractWhatIfEngineService {
 	@POST
 	@Path("/")
 	@Produces("text/html; charset=UTF-8")
-	
+
 	public String setMdx() throws OlapException {
 		logger.debug("IN");
 		String table = "";
@@ -180,7 +182,7 @@ public class ModelResource extends AbstractWhatIfEngineService {
 	@POST
 	@Path("/setValue/{ordinal}")
 	@Produces("text/html; charset=UTF-8")
-	
+
 	public String setValue(@PathParam("ordinal") int ordinal) {
 		logger.debug("IN : ordinal = [" + ordinal + "]");
 		logOperation("Set value");
@@ -240,7 +242,7 @@ public class ModelResource extends AbstractWhatIfEngineService {
 	@POST
 	@Path("/persistTransformations")
 	@Produces("text/html; charset=UTF-8")
-	
+
 	public String persistTransformations() {
 		logger.debug("IN");
 		logOperation("Save");
@@ -311,7 +313,7 @@ public class ModelResource extends AbstractWhatIfEngineService {
 	@POST
 	@Path("/saveAs")
 	@Produces("text/html; charset=UTF-8")
-	
+
 	public String increaseVersion() {
 		logger.debug("IN");
 		logOperation("Save As");
@@ -359,7 +361,7 @@ public class ModelResource extends AbstractWhatIfEngineService {
 	@POST
 	@Path("/undo")
 	@Produces("text/html; charset=UTF-8")
-	
+
 	public String undo() {
 		logger.debug("IN");
 		WhatIfEngineInstance ei = getWhatIfEngineInstance();
@@ -396,9 +398,7 @@ public class ModelResource extends AbstractWhatIfEngineService {
 	}
 
 	/**
-	 * Exports the actual model in a xls format.. Since it takes the actual
-	 * model, it takes also the pending transformations (what you see it's what
-	 * you get)
+	 * Exports the actual model in a xls format.. Since it takes the actual model, it takes also the pending transformations (what you see it's what you get)
 	 *
 	 * @return the response with the file embedded
 	 */
@@ -409,6 +409,7 @@ public class ModelResource extends AbstractWhatIfEngineService {
 
 		WhatIfEngineInstance ei = getWhatIfEngineInstance();
 		SpagoBIPivotModel model = (SpagoBIPivotModel) ei.getPivotModel();
+		ModelConfig modelConfig = ei.getModelConfig();
 
 		ByteArrayOutputStream out = new ByteArrayOutputStream();
 
@@ -423,6 +424,9 @@ public class ModelResource extends AbstractWhatIfEngineService {
 
 		// adds the calculated fields before rendering the model
 		model.applyCal();
+
+		applyConfiguration(modelConfig, model, render);
+		render.setPropertyCollector(new NonInternalPropertyCollector());
 		render.render(model, exporter);
 
 		// restore the query without calculated fields
@@ -440,7 +444,7 @@ public class ModelResource extends AbstractWhatIfEngineService {
 
 		WhatIfEngineInstance ei = getWhatIfEngineInstance();
 		SpagoBIPivotModel model = (SpagoBIPivotModel) ei.getPivotModel();
-
+		ModelConfig modelConfig = ei.getModelConfig();
 		ByteArrayOutputStream out = new ByteArrayOutputStream();
 
 		FopExporter exporter = new FopExporter(out);
@@ -457,7 +461,7 @@ public class ModelResource extends AbstractWhatIfEngineService {
 
 		// adds the calculated fields before rendering the model
 		model.applyCal();
-
+		applyConfiguration(modelConfig, model, render);
 		render.render(model, exporter);
 
 		// restore the query without calculated fields
@@ -469,9 +473,7 @@ public class ModelResource extends AbstractWhatIfEngineService {
 	}
 
 	/**
-	 * Exports the actual model in a xls format.. Since it takes the actual
-	 * model, it takes also the pendingg transformations (what you see it's what
-	 * you get)
+	 * Exports the actual model in a xls format.. Since it takes the actual model, it takes also the pendingg transformations (what you see it's what you get)
 	 *
 	 * @return the response with the file embedded
 	 */
@@ -515,14 +517,14 @@ public class ModelResource extends AbstractWhatIfEngineService {
 	public void excelFillExample(@Context ServletContext context) throws IOException, Exception {
 
 		File result = exportExcelForMerging();
-
+		String EXCELL_TEMPLATE_FILE_NAME = "export_dataset_template.xlsm";
 		OutputStream out = null;
-
-		URL resourceLocation = Thread.currentThread().getContextClassLoader().getResource("it/eng/spagobi/engines/whatif/model/export_dataset_template.xlsm");
-		FileInputStream fileInputStream1 = new FileInputStream(new File(resourceLocation.toURI().getPath()));
-		FileInputStream fileInputStream2 = new FileInputStream(result);
-
 		try {
+			URL resourceLocation = Thread.currentThread().getContextClassLoader().getResource(EXCELL_TEMPLATE_FILE_NAME);
+			logger.debug("Resource is: " + resourceLocation);
+			Assert.assertNotNull(resourceLocation, "Could not find " + EXCELL_TEMPLATE_FILE_NAME + " in java resources");
+			FileInputStream fileInputStream1 = new FileInputStream(new File(resourceLocation.toURI().getPath()));
+			FileInputStream fileInputStream2 = new FileInputStream(result);
 
 			XSSFWorkbook workbook = new XSSFWorkbook(fileInputStream1);
 			HSSFWorkbook exportedOlapWorkbook = new HSSFWorkbook(fileInputStream2);
@@ -545,10 +547,8 @@ public class ModelResource extends AbstractWhatIfEngineService {
 				throw new SpagoBIServiceException("test", "Impossible to write output file xls error", e);
 			}
 
-		} catch (FileNotFoundException e) {
-			logger.error("File not found");
-		} catch (IOException e) {
-			logger.error("Impossible to write to file");
+		} catch (Exception e) {
+			throw new SpagoBIEngineServiceException(getClass().getName(), "Error while downloading edit excel file", e);
 		}
 
 	}
@@ -720,5 +720,63 @@ public class ModelResource extends AbstractWhatIfEngineService {
 		defaultAlgorithm.setCellValue("Proportional");
 
 		return workbook;
+	}
+
+	private void applyConfiguration(ModelConfig modelConfig, SpagoBIPivotModel model, TableRenderer render) {
+		applyConfiguration(modelConfig, render);
+		applyConfiguration(modelConfig, model);
+	}
+
+	private void applyConfiguration(ModelConfig modelConfig, TableRenderer renderer) {
+
+		applyShowParentMembersConfiguration(modelConfig, renderer);
+		applyHideSpansConfiguration(modelConfig, renderer);
+		applyShowPropertyConfiguration(modelConfig, renderer);
+
+	}
+
+	private void applyShowPropertyConfiguration(ModelConfig modelConfig, TableRenderer renderer) {
+		Boolean showProperties = modelConfig.getShowProperties();
+		PropertyCollector propertyCollector = showProperties ? new NonInternalPropertyCollector() : null;
+		renderer.setPropertyCollector(propertyCollector);
+	}
+
+	private void applyHideSpansConfiguration(ModelConfig modelConfig, TableRenderer renderer) {
+		Boolean hideSpans = modelConfig.getHideSpans();
+		renderer.setHideSpans(hideSpans);
+	}
+
+	private void applyShowParentMembersConfiguration(ModelConfig modelConfig, TableRenderer renderer) {
+		Boolean showParentMembers = modelConfig.getShowParentMembers();
+		renderer.setShowParentMembers(showParentMembers);
+	}
+
+	private void applyConfiguration(ModelConfig modelConfig, SpagoBIPivotModel model) {
+		applySupperssEmptyConfiguration(modelConfig, model);
+		applySortConfiguration(modelConfig, model);
+
+	}
+
+	private void applySortConfiguration(ModelConfig modelConfig, SpagoBIPivotModel model) {
+		Boolean sortingEnabled = modelConfig.getSortingEnabled();
+		String sortingPositionUniqeName = modelConfig.getSortingPositionUniqueName();
+		int axisToSort = modelConfig.getAxisToSort();
+		int axis = modelConfig.getAxis();
+		String sortMode = modelConfig.getSortMode();
+		if (shouldSort(sortingEnabled, sortingPositionUniqeName)) {
+
+			model.sortModel(axisToSort, axis, sortingPositionUniqeName, sortMode);
+
+		}
+
+	}
+
+	private void applySupperssEmptyConfiguration(ModelConfig modelConfig, SpagoBIPivotModel model) {
+		Boolean suppressEmpty = modelConfig.getSuppressEmpty();
+		model.setNonEmpty(suppressEmpty);
+	}
+
+	private boolean shouldSort(boolean sortingEnabled, String sortingPositionUniqeName) {
+		return sortingEnabled && sortingPositionUniqeName != null;
 	}
 }

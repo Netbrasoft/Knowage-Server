@@ -1,7 +1,7 @@
 /**
  * Knowage, Open Source Business Intelligence suite
  * Copyright (C) 2016 Engineering Ingegneria Informatica S.p.A.
- * 
+ *
  * Knowage is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -11,40 +11,41 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU Affero General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 angular.module('chartRendererModule')
 
-.directive('chartRenderer',function(chartInitializerRetriver,jsonChartTemplate,highchartsDrilldownHelper,sbiModule_config){
-	
+.directive('chartRenderer',function(chartInitializerRetriver,jsonChartTemplate,highchartsDrilldownHelper,sbiModule_config, sbiModule_i18n, ChartUpdateService){
+
 	return{
 		restrict:'E',
 		template:'<div ></div>',
 		scope:{
-			
+
 			chartLibNamesConfig:'=',
 			jsonData:'=',
 			chartTemplate:'=',
 			datasetLabel:'=',
 			widgetData:'=',
 			updateble:'=',
+			drillable:'=',
 			lib:'=',
 			onClickSeries:'='
 		},
-		
+
 		link:function(scope,element){
-			
-				
+
+
 				var handleCockpitSelection = scope.onClickSeries;
 
 				//var handleDrilldown = function (e) {};
-				
+
 				//var handleDrillup = function () {};
-				
+
 				var getChartExecutionLib = function(chartTemplate){
-					
+
 					var jsonTemp = angular.fromJson(chartTemplate);
 					if(jsonTemp!=undefined){
 						if(!jsonTemp.hasOwnProperty("CHART")){
@@ -52,131 +53,203 @@ angular.module('chartRendererModule')
 						}
 						var chartType = jsonTemp.CHART.type.toLowerCase();
 						return scope.chartLibNamesConfig[chartType];
-					}	
-					
+					}
+
 				}
-				
+
 				scope.chartConf;
 				scope.chartTemplate;
 				scope.chartInitializer;
 
-				scope.renderChart = function(chartConf){
-					if(scope.chartConf){			
+				scope.renderChart = function(chartConf, jsonData,selectionsAndParams){
+					var locale = sbiModule_config.curr_language + "-" + sbiModule_config.curr_country;
+					if(scope.chartConf){
 						scope.chartInitializer.initChartLibrary(element[0],	'drillup', sbiModule_config.dec, sbiModule_config.thous);
-						scope.chartInitializer.renderChart(scope.chartConf,element[0],handleCockpitSelection);		
+						if(scope.chartTemplate.CHART.COLORPALETTE.COLORCopy){
+							scope.chartTemplate.CHART.COLORPALETTE.COLOR = angular.copy(scope.chartTemplate.CHART.COLORPALETTE.COLORCopy)
+							delete scope.chartTemplate.CHART.COLORPALETTE.COLORCopy
+						}
+						
+						if(scope.chartTemplate.CHART.groupSeriesCateg && scope.chartConf.series.length > 0){
+							scope.chartConf.colorsCopy = angular.copy(scope.chartConf.colors);
+							if(scope.colorMap){
+								if(Object.keys(scope.colorMap).length<=scope.chartConf.series.length){
+									scope.colorMap = {};
+									for (var i = 0; i < scope.chartConf.series.length; i++) {
+										scope.colorMap[scope.chartConf.series[i].name] = scope.chartConf.colors[i];
+									}
+								}
+								scope.chartConf.colors = angular.copy(scope.chartConf.colorsCopy);
+								if(scope.colorMap.hasOwnProperty(scope.chartConf.series[0].name)) {
+									scope.chartConf.colors[0]=scope.colorMap[chartConf.series[0].name];
+								}
+							} else {
+								scope.colorMap = {};
+								for (var i = 0; i < scope.chartConf.series.length; i++) {
+									scope.colorMap[scope.chartConf.series[i].name] = scope.chartConf.colors[i];
+								}
+							}
+							
+						}
+						
+						var renderObject = {};
+						renderObject.chartConf = scope.chartConf;
+						renderObject.element = element[0];
+						renderObject.handleCockpitSelection = handleCockpitSelection;
+						renderObject.locale = locale;
+						renderObject.widgetData = scope.widgetData;
+						renderObject.chartTemplate = scope.chartTemplate.CHART;
+						if(selectionsAndParams){
+							renderObject.selectionsAndParams = selectionsAndParams;								
+						}
+
+						if(chartConf.plotOptions && chartConf.series && chartConf.series[0] && chartConf.series[0].data && chartConf.series[0].data.length > chartConf.plotOptions.series.turboThreshold){
+							chartConf.lang.noData = "Your dataset is returning too much data"
+						}
+						scope.chartInitializer.renderChart(renderObject, jsonData);
 					}
 				}
-					
-				scope.loadChart = function(chartTemplate,datesetLabel,jsonData){
+
+				scope.loadChart = function(chartTemplate,datesetLabel,jsonData,isRealtime,nature,dataAndChartConf,selectionsAndParams){
 						if(scope.widgetData){
-							jsonChartTemplate.readChartTemplateForCockpit(chartTemplate,false,datesetLabel,jsonData)
-							.then(function(data){
-								
-								scope.chartConf = eval("(" + data + ")");
-							
-								scope.renderChart(scope.chartConf);											
-								
-							});
+							if(isRealtime && nature){
+								jsonChartTemplate.readChartTemplateForCockpit(chartTemplate,false,jsonData)
+								.then(function(data){
+									scope.chartConf = eval("(" + data + ")");
+									scope.renderChart(scope.chartConf, jsonData,selectionsAndParams);
+								})
+							}
+							else {
+								scope.chartConf = eval("(" + dataAndChartConf.chartConf + ")");
+								scope.renderChart(scope.chartConf, jsonData,selectionsAndParams);
+							}
+
 						}else{
+							if(chartTemplate.CHART.type == "SCATTER" || chartTemplate.CHART.type == "BAR" || chartTemplate.CHART.type == "LINE"){
+						    	  for (var i = 0; i < chartTemplate.CHART.VALUES.SERIE.length; i++) {
+						    		  for (var j = 0; j < chartTemplate.CHART.AXES_LIST.AXIS.length; j++) {
+											if(chartTemplate.CHART.VALUES.SERIE[i].axis == chartTemplate.CHART.AXES_LIST.AXIS[j].alias  && chartTemplate.CHART.AXES_LIST.AXIS[j].LABELS){
+												chartTemplate.CHART.VALUES.SERIE[i].scaleFactor = chartTemplate.CHART.AXES_LIST.AXIS[j].LABELS.scaleFactor
+											}
+							    	  }
+						    	  }
+							}
 							jsonChartTemplate.readChartTemplate(chartTemplate,false,datesetLabel,jsonData)
 							.then(function(data){
-								
 								scope.chartConf = eval("(" + data + ")");
-							
-								scope.renderChart(scope.chartConf);											
-								
+								scope.renderChart(scope.chartConf, jsonData);
 							});
 						}
 				}
-				
-				scope.updateChart = function(widgetData,data){			
-					var updateWidgetData = angular.copy(widgetData);			
-					updateWidgetData.jsonData = data;		
+
+				scope.updateChart = function(widgetData,data){
+					var updateWidgetData = angular.copy(widgetData);
+					updateWidgetData.jsonData = data;
 					scope.chartInitializer.updateData(updateWidgetData);
-					
+
 				}
 
-			scope.$on('refresh',function(event,data,isRealtime){		
+			scope.$on('refresh',function(event,data,isRealtime,changedChartType,chartConf,selectionsAndParams){
 				if(scope.updateble){
-					if(scope.chartInitializer != undefined && scope.chartInitializer.updateData){			
-						scope.updateChart(scope.widgetData,data);			
+					var dataForSending = isRealtime ? data : eval("(" + data.jsonData + ")");
+					if(scope.chartInitializer != undefined && scope.chartInitializer.updateData){
+						scope.updateChart(scope.widgetData,dataForSending);
 					}else{
-						var transformedData = data;
+						var transformedData = dataForSending;
 						if(isRealtime){
-							transformedData = scope.chartInitializer.transformeData(scope.widgetData,data);
+							if(scope.chartInitializer.transformeData){
+								transformedData = scope.chartInitializer.transformeData(scope.widgetData,dataForSending);
+							}
 						}
-						scope.loadChart(scope.chartTemplate,scope.datasetLabel,transformedData);
+						scope.loadChart(scope.chartTemplate,scope.datasetLabel,transformedData,isRealtime, true,chartConf,selectionsAndParams);
 					}
 				}
 			})
-			
-			scope.$on('init',function(event,data){
-				
+
+			scope.$on('changeChartType',function(){
+				scope.chartTemplate =  ChartUpdateService.getTemplate( scope.chartTemplate);
+				scope.$emit('changedChartType',scope.chartTemplate);
+			})
+
+			scope.$on('init',function(event,data, isRealtime,changedChartType,chartConf,selectionsAndParams){
+
 				var lib = getChartExecutionLib(scope.chartTemplate);
 				if(lib){
 					scope.noLib = false;
 					scope.chartInitializer = chartInitializerRetriver.getChartInitializer(lib);
-					scope.loadChart(scope.chartTemplate,scope.datasetLabel,data);
-					
+					/*var template = scope.chartTemplate;
+					if(changedChartType){
+						template = ChartUpdateService.getTemplate(template);
+					}*/
+					scope.loadChart(scope.chartTemplate,scope.datasetLabel,data,isRealtime,false,chartConf,selectionsAndParams);
+
 				}else{
 					element[0].innerHTML = "no library implementation";
 				}
-				
-				
+
+
+			})
+
+			scope.$on('filters',function(event,data,isRealtime,changedChartType,chartConf,selectionsAndParams){
+
+
+				scope.loadChart(scope.chartTemplate,scope.datasetLabel,data,isRealtime, true,chartConf,selectionsAndParams);
+
+			})
+
+			scope.$on('selections',function(event,data,isRealtime,changedChartType,chartConf,selectionsAndParams){
+
+
+				scope.loadChart(scope.chartTemplate,scope.datasetLabel,data,isRealtime, true,chartConf,selectionsAndParams);
+
+			})
+
+			scope.$on('resize',function(event,data,isRealtime,changedChartType,chartConf,selectionsAndParams){
+
+
+				scope.renderChart(scope.chartConf,data,selectionsAndParams);
+
+			})
+
+			scope.$on('fullExpand',function(event,data,isRealtime,changedChartType,chartConf,selectionsAndParams){
+
+
+				scope.renderChart(scope.chartConf,data,selectionsAndParams);
+
+			})
+
+			scope.$on('gridster-resized',function(event,data,isRealtime,changedChartType,chartConf,selectionsAndParams){
+
+
+				scope.renderChart(scope.chartConf,data,selectionsAndParams);
+
 			})
 			
-			scope.$on('filters',function(event,data){
-				
-				
-				scope.loadChart(scope.chartTemplate,scope.datasetLabel,data);
-				
-			})
-			
-			scope.$on('selections',function(event,data){
-				
-				
-				scope.loadChart(scope.chartTemplate,scope.datasetLabel,data);
-				
-			})
-			
-			scope.$on('resize',function(event,data){
-				
-				
-				scope.renderChart(scope.chartConf);
-				
-			})
-			
-			scope.$on('fullExpand',function(event,data){
-				
-				
-				scope.renderChart(scope.chartConf);
-				
-			})
-			
-			scope.$on('gridster-resized',function(event,data){
-				
-				
-				scope.renderChart(scope.chartConf);
-				
+			scope.$on('drillClick',function(event,data){
+
+				scope.chartInitializer.chart.drillable = data.drillable;
+				scope.chartInitializer.chart.cliccable = data.cliccable;
 			})
 			
 			if(!scope.widgetData){
 				var lib = getChartExecutionLib(scope.chartTemplate);
 				if(lib){
-					
-					scope.chartInitializer = chartInitializerRetriver.getChartInitializer(lib);
-					
-					scope.loadChart(scope.chartTemplate,scope.datasetLabel,undefined);
-					
+
+					// when sbiModule_i18n is initialized (i.e. i18n messages are loaded), the chart initialization can start
+					sbiModule_i18n.loadI18nMap().then(function() {
+						scope.chartInitializer = chartInitializerRetriver.getChartInitializer(lib);
+						scope.loadChart(scope.chartTemplate,scope.datasetLabel,undefined);
+					});
+
 				}else{
 					element[0].innerHTML = "no library implementation";
 				}
-				
+
 			}
-			
-			
-			
+
+
+
 		}
 	}
-	
+
 })

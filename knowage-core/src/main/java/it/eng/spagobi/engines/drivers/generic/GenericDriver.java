@@ -17,6 +17,18 @@
  */
 package it.eng.spagobi.engines.drivers.generic;
 
+import java.util.ArrayList;
+import java.util.Hashtable;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+
+import org.apache.log4j.Logger;
+import org.json.JSONException;
+import org.json.JSONObject;
+import org.json.simple.JSONArray;
+
 import it.eng.spago.base.SourceBean;
 import it.eng.spago.configuration.ConfigSingleton;
 import it.eng.spago.error.EMFUserError;
@@ -29,6 +41,7 @@ import it.eng.spagobi.analiticalmodel.functionalitytree.bo.LowFunctionality;
 import it.eng.spagobi.analiticalmodel.functionalitytree.dao.ILowFunctionalityDAO;
 import it.eng.spagobi.behaviouralmodel.analyticaldriver.bo.BIObjectParameter;
 import it.eng.spagobi.commons.SingletonConfig;
+import it.eng.spagobi.commons.bo.UserProfile;
 import it.eng.spagobi.commons.dao.DAOFactory;
 import it.eng.spagobi.commons.utilities.ParameterValuesEncoder;
 import it.eng.spagobi.commons.utilities.PortletUtilities;
@@ -41,16 +54,6 @@ import it.eng.spagobi.engines.drivers.EngineURL;
 import it.eng.spagobi.engines.drivers.IEngineDriver;
 import it.eng.spagobi.engines.drivers.exceptions.InvalidOperationRequest;
 import it.eng.spagobi.utilities.exceptions.SpagoBIRuntimeException;
-
-import java.util.ArrayList;
-import java.util.Hashtable;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-
-import org.apache.log4j.Logger;
-import org.json.JSONException;
 
 /**
  * Driver Implementation (IEngineDriver Interface) for Qbe External Engine.
@@ -300,24 +303,40 @@ public class GenericDriver extends AbstractDriver implements IEngineDriver {
 
 		List<OutputParameter> outputParameters = biobj.getOutputParameters();
 
-		if (outputParameters != null) {
-			int i = 0;
-			for (Iterator iterator = outputParameters.iterator(); iterator.hasNext();) {
-				OutputParameter outputParameter = (OutputParameter) iterator.next();
+		try {
 
-				String parName = outputParameter.getName();
+			if (outputParameters != null) {
+				int i = 0;
+				JSONArray jsonArray = new JSONArray();
+				for (Iterator iterator = outputParameters.iterator(); iterator.hasNext();) {
+					OutputParameter outputParameter = (OutputParameter) iterator.next();
 
-				if (i == 0) {
-					outputParametersString = parName;
-				} else {
-					outputParametersString += "," + parName;
+					String parName = outputParameter.getName();
+					String type = outputParameter.getType().getValueName();
+					JSONObject obj = new JSONObject();
+					obj.put("name", parName);
+					obj.put("type", type);
+					jsonArray.add(obj);
+
+					// if (i == 0) {
+					// outputParametersString = parName;
+					// } else {
+					// outputParametersString += "," + parName;
+					// }
+					// i++;
 				}
-				i++;
+
+				pars.put(DOCUMENT_OUTPUT_PARAMETERS, jsonArray.toString());
+
+				// if (!outputParametersString.equals("")) {
+				// pars.put(DOCUMENT_OUTPUT_PARAMETERS, outputParametersString);
+				// logger.debug("Output parameters String " + outputParametersString);
+				// }
 			}
-			if (!outputParametersString.equals("")) {
-				pars.put(DOCUMENT_OUTPUT_PARAMETERS, outputParametersString);
-				logger.debug("Output parameters String " + outputParametersString);
-			}
+
+		} catch (Exception e) {
+			logger.error("Error in json serilization", e);
+			throw new SpagoBIRuntimeException(e);
 		}
 		logger.debug("OUT");
 		return pars;
@@ -394,7 +413,7 @@ public class GenericDriver extends AbstractDriver implements IEngineDriver {
 
 	private List<String> getCommunities(IEngUserProfile profile) throws EMFUserError {
 		List<String> toReturn = new ArrayList();
-		List<SbiCommunity> communities = DAOFactory.getCommunityDAO().loadSbiCommunityByUser(profile.getUserUniqueIdentifier().toString());
+		List<SbiCommunity> communities = DAOFactory.getCommunityDAO().loadSbiCommunityByUser(((UserProfile) profile).getUserId().toString());
 		if (communities != null) {
 			for (int i = 0; i < communities.size(); i++) {
 				SbiCommunity community = communities.get(i);

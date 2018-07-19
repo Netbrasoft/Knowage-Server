@@ -29,6 +29,7 @@ import it.eng.spagobi.commons.bo.UserProfile;
 import it.eng.spagobi.commons.constants.SpagoBIConstants;
 import it.eng.spagobi.services.dataset.bo.SpagoBiDataSet;
 import it.eng.spagobi.services.datasource.bo.SpagoBiDataSource;
+import it.eng.spagobi.tools.dataset.cache.query.DatabaseDialect;
 import it.eng.spagobi.tools.dataset.common.behaviour.IDataSetBehaviour;
 import it.eng.spagobi.tools.dataset.common.datastore.IDataStore;
 import it.eng.spagobi.tools.dataset.common.datastore.IDataStoreFilter;
@@ -961,4 +962,34 @@ public abstract class AbstractDataSet implements IDataSet {
 	public boolean isRealtime() {
 		return false;
 	}
+
+	@Override
+	public boolean isCachingSupported() {
+		return !isPersisted() && !isFlatDataset() && !isRealtime();
+	}
+
+	@Override
+	public DatasetEvaluationStrategy getEvaluationStrategy(boolean isNearRealtime) {
+		DatasetEvaluationStrategy strategy;
+
+		if (isRealtime()) {
+			strategy = DatasetEvaluationStrategy.REALTIME;
+		} else if (isPersisted()) {
+			strategy = DatasetEvaluationStrategy.PERSISTED;
+		} else if (isFlatDataset()) {
+			strategy = DatasetEvaluationStrategy.FLAT;
+		} else {
+			IDataSource dataSource = getDataSource();
+			DatabaseDialect dialect = dataSource != null ? DatabaseDialect.get(dataSource.getHibDialectClass()) : null;
+			boolean inLineViewSupported = dialect != null ? dialect.isInLineViewSupported() : false;
+			if (isNearRealtime && inLineViewSupported && !hasDataStoreTransformer()) {
+				strategy = DatasetEvaluationStrategy.INLINE_VIEW;
+			} else {
+				strategy = DatasetEvaluationStrategy.CACHED;
+			}
+		}
+
+		return strategy;
+	}
+
 }

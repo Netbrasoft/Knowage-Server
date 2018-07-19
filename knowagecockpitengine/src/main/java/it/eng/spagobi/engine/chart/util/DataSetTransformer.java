@@ -26,6 +26,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -35,15 +36,16 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import edu.emory.mathcs.backport.java.util.Collections;
+import it.eng.spagobi.utilities.exceptions.SpagoBIServiceException;
 
 public class DataSetTransformer {
 
 	public void print(Object object) {
 
-		/*System.out.println("-----------------------");
-		System.out.println(object);
-		System.out.println(object.getClass().toString());
-		System.out.println("-----------------------");*/
+		/*
+		 * System.out.println("-----------------------"); System.out.println(object); System.out.println(object.getClass().toString());
+		 * System.out.println("-----------------------");
+		 */
 
 	}
 
@@ -323,7 +325,7 @@ public class DataSetTransformer {
 
 				} else {
 
-					String serieValueForXOfRowAndColumn = (String) (record.get(columnsMapper.get(serie + "_" + aggregationType)));
+					String serieValueForXOfRowAndColumn = (record.get(columnsMapper.get(serie + "_" + aggregationType))).toString();
 					submapWithNewColumn.put(currentColumn, Float.parseFloat(serieValueForXOfRowAndColumn));
 				}
 
@@ -338,7 +340,7 @@ public class DataSetTransformer {
 
 				} else {
 
-					String serieValueForXOfRowAndColumn = (String) record.get(columnsMapper.get(serie + "_" + aggregationType));
+					String serieValueForXOfRowAndColumn = (record.get(columnsMapper.get(serie + "_" + aggregationType))).toString();
 					availableDataMapOfMaps.get(currentRow).put(currentColumn, Float.parseFloat(serieValueForXOfRowAndColumn));
 
 				}
@@ -731,7 +733,8 @@ public class DataSetTransformer {
 			String groupSeriesCateg) throws JSONException {
 		boolean isCockpit = Boolean.parseBoolean(isCockpitEngine);
 		boolean groupSeriesBool = Boolean.parseBoolean(groupSeries);
-		boolean groupSeriesCategBool = Boolean.parseBoolean(groupSeriesCateg);
+		ArrayList<Object> categories = new ArrayList<>();
+
 		LinkedHashMap<String, ArrayList<JSONObject>> map = new LinkedHashMap<String, ArrayList<JSONObject>>();
 		String primCat;
 		String secCat;
@@ -746,7 +749,6 @@ public class DataSetTransformer {
 				secCat = "column_1";
 				seria = "column_3";
 			}
-
 		} else {
 			if (groupSeriesBool) {
 				primCat = "column_2";
@@ -754,31 +756,41 @@ public class DataSetTransformer {
 				seria = "column_1";
 
 			} else {
-
 				primCat = "column_1";
 				secCat = "column_3";
 				seria = "column_2";
 
 			}
 		}
+
 		for (Object singleObject : dataRows) {
-			if (!map.containsKey(((Map) singleObject).get(seria))) {
-				ArrayList<JSONObject> newListOfOrderColumnItems = new ArrayList<JSONObject>();
-				JSONObject jo = new JSONObject();
-				jo.put("y", ((Map) singleObject).get(secCat));
-				jo.put("name", ((Map) singleObject).get(primCat));
+			categories.add(((Map) singleObject).get(primCat));
+		}
 
-				newListOfOrderColumnItems.add(jo);
-				map.put((String) ((Map) singleObject).get(seria), newListOfOrderColumnItems);
-			} else {
-				ArrayList oldArrayList = map.get(((Map) singleObject).get(seria));
+		Set<Object> categoriesSet = new LinkedHashSet<>(categories);
+		Object[] categoriesList = categoriesSet.toArray(new Object[categoriesSet.size()]);
 
-				JSONObject jo = new JSONObject();
-				jo.put("y", ((Map) singleObject).get(secCat));
-				jo.put("name", ((Map) singleObject).get(primCat));
-				oldArrayList.add(jo);
-				map.put((String) ((Map) singleObject).get(seria), oldArrayList);
+		Map<Object, Integer> categoriesListIndexMap = new HashMap<Object, Integer>();
+		for (int i = 0; i < categoriesList.length; i++) {
+			categoriesListIndexMap.put(categoriesList[i], i);
+		}
+
+		for (Object singleObject : dataRows) {
+			ArrayList<JSONObject> newListOfOrderColumnItems = map.get(((Map) singleObject).get(seria).toString());
+			if (newListOfOrderColumnItems == null) {
+				newListOfOrderColumnItems = new ArrayList<JSONObject>();
+				for (int i = 0; i < categoriesList.length; i++) {
+					Object category = categoriesList[i];
+					JSONObject jo = new JSONObject();
+					jo.put("name", category);
+					jo.put("y", "");
+					newListOfOrderColumnItems.add(jo);
+				}
+				map.put(((Map) singleObject).get(seria).toString(), newListOfOrderColumnItems);
 			}
+
+			JSONObject jo = newListOfOrderColumnItems.get(categoriesListIndexMap.get(((Map) singleObject).get(primCat)));
+			jo.put("y", ((Map) singleObject).get(secCat));
 		}
 
 		return map;
@@ -799,18 +811,22 @@ public class DataSetTransformer {
 	 *
 	 */
 
-	public LinkedHashMap<String, Set<ArrayList<String>>> prepareDataForScater(List<Object> dataRows, String columnCategorie, String isCockpitEngine,
+	public LinkedHashMap<String, Set<ArrayList<Object>>> prepareDataForScater(List<Object> dataRows, String columnCategorie, String isCockpitEngine,
 			String columnSerie) throws JSONException {
-		LinkedHashMap<String, Set<ArrayList<String>>> map = new LinkedHashMap<>();
+		LinkedHashMap<String, Set<ArrayList<Object>>> map = new LinkedHashMap<>();
 		boolean isCockpit = Boolean.parseBoolean(isCockpitEngine);
 		Map<String, Integer> mapOfIndex = new HashMap<>();
 		String columnX = !isCockpit ? "column_1" : "column_2";
 		for (Object singleObject : dataRows) {
 			Map mapObject = (Map) singleObject;
 			if (!map.containsKey(mapObject.get(columnCategorie))) {
-				Set<ArrayList<String>> a = new HashSet<>();
-				ArrayList<String> t = new ArrayList<>();
-				t.add(map.entrySet().size() + "");
+				Set<ArrayList<Object>> a = new HashSet<>();
+				ArrayList<Object> t = new ArrayList<>();
+				if (Number.class.isAssignableFrom(mapObject.get(columnCategorie).getClass())) {
+					t.add(mapObject.get(columnCategorie));
+				} else {
+					t.add("'" + mapObject.get(columnCategorie) + "'");
+				}
 				if (columnSerie == null) {
 					t.add(getStringOrNull(mapObject.get(columnX)));
 				} else {
@@ -822,15 +838,19 @@ public class DataSetTransformer {
 				map.put(getStringOrNull(mapObject.get(columnCategorie)), a);
 			} else {
 				if (mapOfIndex.containsKey(mapObject.get(columnCategorie))) {
-					ArrayList<String> a = new ArrayList<>();
-					a.add(mapOfIndex.get(mapObject.get(columnCategorie)) + "");
+					ArrayList<Object> a = new ArrayList<>();
+					if (Number.class.isAssignableFrom(mapObject.get(columnCategorie).getClass())) {
+						a.add(mapOfIndex.get(mapObject.get(columnCategorie)));
+					} else {
+						a.add(mapOfIndex.get("'" + mapObject.get(columnCategorie) + "'"));
+					}
 					if (columnSerie == null) {
 						a.add(getStringOrNull(mapObject.get(columnX)));
 					} else {
 						a.add(getStringOrNull(mapObject.get(columnSerie)));
 					}
 
-					Set<ArrayList<String>> valueOfMap = map.get(mapObject.get(columnCategorie));
+					Set<ArrayList<Object>> valueOfMap = map.get(mapObject.get(columnCategorie));
 					valueOfMap.add(a);
 				}
 			}
@@ -841,20 +861,70 @@ public class DataSetTransformer {
 
 	}
 
+	public ArrayList<JSONObject> getXAxisMap(LinkedHashMap<String, String> category, String categoryDate) {
+		ArrayList<JSONObject> xAxisMap = new ArrayList<>();
+		String groupBys = category.get("groupby");
+		String[] gbys = groupBys.split(", ");
+
+		try {
+			int id = 0;
+			JSONObject xAxis = new JSONObject();
+			xAxis.put("id", id);
+			if (category.get("name").equals(categoryDate)) {
+				xAxis.put("type", "datetime");
+				id++;
+			} else {
+				xAxis.put("type", "category");
+				id++;
+			}
+			xAxis.put("name", category.get("name").replaceAll("\\s", ""));
+			xAxisMap.add(xAxis);
+			for (int i = 0; i < gbys.length; i++) {
+				if (!gbys[i].equals("")) {
+					JSONObject xAxis1 = new JSONObject();
+					xAxis1.put("id", id);
+					if (gbys[i].equals(categoryDate)) {
+						xAxis1.put("type", "datetime");
+						id++;
+					} else {
+						xAxis1.put("type", "category");
+						id++;
+					}
+					xAxis1.put("name", gbys[i].replaceAll("\\s", ""));
+					xAxisMap.add(xAxis1);
+				}
+
+			}
+		} catch (JSONException e) {
+			throw new SpagoBIServiceException("Error while creating xaxis map", e.getMessage(), e);
+		}
+
+		return xAxisMap;
+	}
+
 	public LinkedHashMap<String, LinkedHashMap> seriesMapTransformedMethod(LinkedHashMap<String, LinkedHashMap> serieMap) throws JSONException {
 		LinkedHashMap<String, LinkedHashMap> newSerieMap = new LinkedHashMap<>();
-
+		String serieName = "";
+		int counter = 1;
 		for (Map.Entry<String, LinkedHashMap> entry : serieMap.entrySet()) {
 
 			String key = entry.getKey();
 			LinkedHashMap value = entry.getValue();
 			if (value.get("type").equals("arearangelow") || value.get("type").equals("arearangehigh")) {
+				if (counter == 1) {
+					serieName += value.get("column") + " / ";
+					counter += 1;
+				} else {
+					serieName += value.get("column") + " ";
+				}
 				value.put("type", "arearange");
+
+				value.put("column", serieName);
+				value.put("name", serieName);
 				key = "common";
 
-				if (!newSerieMap.containsKey(key)) {
-					newSerieMap.put(key, value);
-				}
+				newSerieMap.put(key, value);
+
 			} else {
 				newSerieMap.put(key, value);
 			}
@@ -862,6 +932,17 @@ public class DataSetTransformer {
 		}
 		return newSerieMap;
 
+	}
+
+	public String seriesRangeName(LinkedHashMap<String, LinkedHashMap> serieMap) throws JSONException {
+		String serieName = "";
+		for (Map.Entry<String, LinkedHashMap> entry : serieMap.entrySet()) {
+			LinkedHashMap value = entry.getValue();
+			if (value.get("type").equals("arearangelow") || value.get("type").equals("arearangehigh")) {
+				serieName += value.get("column") + " ";
+			}
+		}
+		return serieName;
 	}
 
 	/**
@@ -891,7 +972,7 @@ public class DataSetTransformer {
 
 			if (!al.contains(series.get(i))) {
 
-				al.add(series.get(i) + "_" + groupings.get(i));
+				al.add(series.get(i) + "_" + groupings.get(i).toLowerCase());
 				JSONObject jo = new JSONObject();
 				jo.put((new Integer(j).toString()), series.get(i));
 				jo.put("prefix", prefix.get(i));
@@ -988,7 +1069,7 @@ public class DataSetTransformer {
 
 		for (int i = 0; i < series.size(); i++) {
 
-			Object serie = series.get(i) + "_" + groupings.get(i);
+			Object serie = series.get(i) + "_" + groupings.get(i).toLowerCase();
 
 			listColumns.add(mapper.get(serie));
 
@@ -1252,6 +1333,26 @@ public class DataSetTransformer {
 
 	public String getStringOrNull(Object item) {
 		return item != null ? item.toString() : null;
+	}
+
+	String[] arrayOfGroupingFunction = { "NONE", "SUM", "MIN", "MAX", "AVG", "COUNT_DISTINCT", "COUNT" };
+
+	public String setGroupingFunctionToLowerCase(String value) {
+		String returnedValue = "";
+		for (int i = 0; i < arrayOfGroupingFunction.length; i++) {
+			if (value.contains("_" + arrayOfGroupingFunction[i])) {
+				returnedValue = value.replace("_" + arrayOfGroupingFunction[i], "_" + arrayOfGroupingFunction[i].toLowerCase());
+				break;
+			}
+
+		}
+		if (returnedValue != "")
+			return returnedValue;
+		else
+			return value;
+		/*
+		 * if (value.contains("_SUM")) return value.toLowerCase(); else return value;
+		 */
 	}
 
 }

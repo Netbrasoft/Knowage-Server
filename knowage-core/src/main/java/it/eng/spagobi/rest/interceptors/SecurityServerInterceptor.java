@@ -103,6 +103,7 @@ public class SecurityServerInterceptor extends AbstractSecurityServerInterceptor
 				if (spagoBIUserProfile != null) {
 					profile = (UserProfile) UserUtilities.getUserProfile(spagoBIUserProfile.getUniqueIdentifier());
 				}
+
 				servletRequest.getSession().setAttribute(IEngUserProfile.ENG_USER_PROFILE, profile);
 
 			}
@@ -122,21 +123,22 @@ public class SecurityServerInterceptor extends AbstractSecurityServerInterceptor
 
 		if (engProfile != null) {
 			// verify if the profile stored in session is still valid
-			String userId = null;
-			try {
-				userId = getUserIdentifier();
-			} catch (Exception e) {
-				logger.debug("User identifier not found");
-			}
-			if (userId != null && userId.equals(engProfile.getUserUniqueIdentifier().toString()) == false) {
-				logger.debug("User is authenticated but the profile store in session need to be updated");
-				engProfile = this.getUserProfileFromUserId();
-			} else {
-				logger.debug("User is authenticated and his profile is already stored in session");
-			}
+			// String userId = null;
+			// try {
+			// userId = getUserIdentifier();
+			// } catch (Exception e) {
+			// logger.debug("User identifier not found");
+			// }
+			// if (userId != null && userId.equals(engProfile.getUserUniqueIdentifier().toString()) == false) {
+			// logger.debug("User is authenticated but the profile store in session need to be updated");
+			// engProfile = this.getUserProfileFromUserId();
+			// } else {
+			// logger.debug("User is authenticated and his profile is already stored in session");
+			// }
 
 		} else {
 			engProfile = this.getUserProfileFromUserId();
+
 			if (engProfile != null) {
 				logger.debug("User is authenticated but his profile is not already stored in session");
 			} else {
@@ -152,7 +154,6 @@ public class SecurityServerInterceptor extends AbstractSecurityServerInterceptor
 		try {
 			return GeneralUtilities.createNewUserProfile(userId);
 		} catch (Exception e) {
-			logger.error("Error while creating user profile with user id = [" + userId + "]", e);
 			throw new SpagoBIRuntimeException("Error while creating user profile with user id = [" + userId + "]", e);
 		}
 	}

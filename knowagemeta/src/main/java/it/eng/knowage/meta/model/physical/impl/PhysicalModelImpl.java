@@ -17,19 +17,6 @@
  */
 package it.eng.knowage.meta.model.physical.impl;
 
-import it.eng.knowage.meta.initializer.properties.PhysicalModelPropertiesFromFileInitializer;
-import it.eng.knowage.meta.model.Model;
-import it.eng.knowage.meta.model.ModelPackage;
-import it.eng.knowage.meta.model.ModelProperty;
-import it.eng.knowage.meta.model.ModelPropertyType;
-import it.eng.knowage.meta.model.impl.ModelObjectImpl;
-import it.eng.knowage.meta.model.physical.PhysicalForeignKey;
-import it.eng.knowage.meta.model.physical.PhysicalModel;
-import it.eng.knowage.meta.model.physical.PhysicalModelPackage;
-import it.eng.knowage.meta.model.physical.PhysicalPrimaryKey;
-import it.eng.knowage.meta.model.physical.PhysicalTable;
-import it.eng.spagobi.tools.datasource.bo.DataSource;
-
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -50,6 +37,22 @@ import org.eclipse.emf.ecore.util.EcoreUtil;
 import org.eclipse.emf.ecore.util.InternalEList;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+
+import it.eng.knowage.meta.initializer.properties.PhysicalModelPropertiesFromFileInitializer;
+import it.eng.knowage.meta.model.Model;
+import it.eng.knowage.meta.model.ModelPackage;
+import it.eng.knowage.meta.model.ModelProperty;
+import it.eng.knowage.meta.model.ModelPropertyType;
+import it.eng.knowage.meta.model.impl.ModelObjectImpl;
+import it.eng.knowage.meta.model.physical.PhysicalForeignKey;
+import it.eng.knowage.meta.model.physical.PhysicalModel;
+import it.eng.knowage.meta.model.physical.PhysicalModelPackage;
+import it.eng.knowage.meta.model.physical.PhysicalPrimaryKey;
+import it.eng.knowage.meta.model.physical.PhysicalTable;
+import it.eng.spagobi.tools.datasource.bo.DataSourceFactory;
+import it.eng.spagobi.tools.datasource.bo.IDataSource;
+import it.eng.spagobi.tools.datasource.bo.JDBCDataSourcePoolConfiguration;
+import it.eng.spagobi.tools.datasource.bo.deserializer.JDBCDataSourcePoolConfigurationJSONDeserializer;
 
 /**
  * <!-- begin-user-doc --> An implementation of the model object '<em><b>Physical Model</b></em>'. <!-- end-user-doc -->
@@ -612,17 +615,30 @@ public class PhysicalModelImpl extends ModelObjectImpl implements PhysicalModel 
 	}
 
 	@Override
-	public DataSource getDataSource() throws ClassNotFoundException, NamingException, SQLException {
+	public IDataSource getDataSource() throws ClassNotFoundException, NamingException, SQLException {
 
-		DataSource dataSource = new DataSource();
+		IDataSource dataSource = DataSourceFactory.getDataSource();
 		dataSource.setLabel(getPropertyValueOrNull(PhysicalModelPropertiesFromFileInitializer.CONNECTION_NAME));
 		dataSource.setJndi(getPropertyValueOrNull(PhysicalModelPropertiesFromFileInitializer.CONNECTION_JNDI_NAME));
 		dataSource.setUrlConnection(getPropertyValueOrNull(PhysicalModelPropertiesFromFileInitializer.CONNECTION_URL));
 		dataSource.setDriver(getPropertyValueOrNull(PhysicalModelPropertiesFromFileInitializer.CONNECTION_DRIVER));
 		dataSource.setUser(getPropertyValueOrNull(PhysicalModelPropertiesFromFileInitializer.CONNECTION_USERNAME));
 		dataSource.setPwd(getPropertyValueOrNull(PhysicalModelPropertiesFromFileInitializer.CONNECTION_PASSWORD));
+		
+		String property = getPropertyValueOrNull(PhysicalModelPropertiesFromFileInitializer.CONNECTION_JDBC_POOL_CONFIG);
+		if (property != null && !property.equals("")) {
+			JDBCDataSourcePoolConfiguration JdbcPoolConfig = (JDBCDataSourcePoolConfiguration) new JDBCDataSourcePoolConfigurationJSONDeserializer()
+					.deserialize(property);
+			dataSource.setJdbcPoolConfiguration(JdbcPoolConfig);
+		} else if (property == null) {
+			String jndi = getPropertyValueOrNull(PhysicalModelPropertiesFromFileInitializer.CONNECTION_JNDI_NAME);
+			if (jndi == null || jndi.equals("")) {
+				JDBCDataSourcePoolConfiguration jdbcConfig = new JDBCDataSourcePoolConfiguration();
+				dataSource.setJdbcPoolConfiguration(jdbcConfig);
+			}
+		}
+		
 		dataSource.setHibDialectClass("");
-		dataSource.setHibDialectName("");
 		return dataSource;
 	}
 

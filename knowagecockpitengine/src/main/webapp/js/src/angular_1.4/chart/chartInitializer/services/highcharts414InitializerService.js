@@ -24,7 +24,31 @@ angular.module('chartInitializer')
 	this.chart = null;
 	var chartConfConf = null;
 
-	this.renderChart = function(chartConf,element,handleCockpitSelection,exportWebApp){
+	this.renderChart = function(renderObj, jsonData){
+		
+		var chartConf = renderObj.chartConf;
+		if(chartConf.chart.additionalData && chartConf.chart.additionalData.dateTime && chartConf.chart.additionalData.datetype!="string"){
+			for (var i = 0; i < chartConf.series.length; i++) {
+				var seria = chartConf.series[i];
+				for (var j = 0; j < seria.data.length; j++) {
+					var dat = seria.data[j];
+					if(dat.datetype!="simpledate"){
+						var dateSplit = dat.name.replace('/', ":").replace('/', ":").replace(' ', ":").replace('.', ":").split(":");
+						dat.x = (new Date(dateSplit[2], dateSplit[1]-1, dateSplit[0], dateSplit[3], dateSplit[4], dateSplit[5], dateSplit[6])).getTime();
+					} else {
+						var dateSplit = dat.name.replace('/', ":").replace('/', ":").split(":");
+						dat.x = (new Date(dateSplit[2], dateSplit[1]-1, dateSplit[0])).getTime();
+					}
+				}
+			}	
+		}
+		
+		var element = renderObj.element;
+		var handleCockpitSelection = renderObj.handleCockpitSelection;
+		var exportWebApp = renderObj.exportWebApp;
+		var widgetData = renderObj.widgetData;
+		var selectionsAndParams = renderObj.selectionsAndParams;
+
 		chartConfConf = chartConf;
 		if(!exportWebApp) {
 			adjustChartSize(element,chartConf);
@@ -38,6 +62,7 @@ angular.module('chartInitializer')
 				return  renderTreemap(chartConf,handleCockpitSelection, this.handleCrossNavigationTo,exportWebApp );
 			} else {
 				this.chart = renderTreemap(chartConf,handleCockpitSelection, this.handleCrossNavigationTo);
+				this.chart.drillable = chartConf.chart.drillable
 			}
 		}
 		else if (chartType == 'heatmap')
@@ -52,6 +77,19 @@ angular.module('chartInitializer')
 		{
 			if (chartType == 'scatter') delete this.updateData;
 			this.chart =  new Highcharts.Chart(chartConf);
+			this.chart.widgetData = widgetData;
+			if(jsonData){
+				if(jsonData.jsonData){
+					this.chart.jsonData = JSON.parse(jsonData.jsonData);
+				}else{
+					this.chart.jsonData = jsonData;
+				}
+
+			}
+			if(selectionsAndParams){
+				this.chart.selectionsAndParams = selectionsAndParams;
+			}
+
 			//return chart;
 
 		}
@@ -87,7 +125,6 @@ angular.module('chartInitializer')
 						+ '/highcharts-export-web/'
 			},
 			lang : {
-				drillUpText : drillUpText,
 				decimalPoint : decimalPoint,
 				thousandsSep : thousandsSep
 			},
@@ -95,7 +132,7 @@ angular.module('chartInitializer')
 				drillUpButton:{
 					 position:
 		                {
-		                   align: "center"
+		                   align: "left"
 		                },
 
 			}
@@ -274,7 +311,7 @@ angular.module('chartInitializer')
          			GROUPING_VALUE:groupingCategoryValue,
          			stringParameters:null
 				};
-				parent.execExternalCrossNavigation(navData,JSON.parse(driverParams), null, currentDocumentLabel )
+				parent.execExternalCrossNavigation(navData,null, null, currentDocumentLabel )
 			}
 
 		}
@@ -282,7 +319,15 @@ angular.module('chartInitializer')
 
 
 	this.handleDrilldown = function(e){
+		var drillable = this.drillable != undefined ? 
+				this.drillable : (this.options.chart.additionalData.isCockpit ?
+						this.options.chart.additionalData.drillable: this.options.chart.additionalData.drillableChart);
+		if(!drillable){
+			console.log("chart is not drillable")
+			return;		
+		}
 		var chart = this;
+		if(!chart.breadcrumb)chart.breadcrumb=[];
 
 		if (!e.seriesOptions)
 		{
@@ -299,46 +344,85 @@ angular.module('chartInitializer')
 			*/
 			if (isNaN(e.category))
 			{
-
-
 				chart.showLoading('Loading...');
 
+					var params = {};
+					if(chart.jsonData ){
+						params.jsonMetaData = chart.jsonData.metaData;
+					}
+					if(chart.widgetData ){
+						params.widgetData = chart.widgetData;
+						var column = chart.widgetData.chartTemplate.CHART.VALUES.CATEGORY.column;
+					}
 
-				highchartsDrilldownHelper.drilldown(e.point.name, e.point.series.name);
+					var drillValue = e.point.name;
 
+					var highchartsDrilldownHelperDone = false;
+					if(chart.jsonData ){
+						params.jsonMetaData = chart.jsonData.metaData;
+						try {
+							var fields = chart.jsonData.metaData.fields;
+							for(var i=0; i<fields.length;i++){
+								var aField = fields[i];
+								if(aField.header && aField.header==column){
+									if(aField.type=="date"){
+										highchartsDrilldownHelper.drilldown(drillValue, e.point.series.name, chart.breadcrumb, aField.dateFormatJava);
+										highchartsDrilldownHelperDone = true;
+									}
+								}
+							}
+						}catch(e){
+							console.log(e);
+						}
+					}
 
-					jsonChartTemplate.drilldownHighchart(JSON.stringify(highchartsDrilldownHelper.breadcrumb))
+					if(!highchartsDrilldownHelperDone){
+						highchartsDrilldownHelper.drilldown(e.point.name, e.point.series.name, chart.breadcrumb);
+					}
+
+					params.breadcrumb = JSON.stringify(chart.breadcrumb);
+					var forQueryParam= "";
+					if(chart.selectionsAndParams && chart.selectionsAndParams.parameters){
+						params.parameters = getParametersAsString(chart.selectionsAndParams.parameters);
+					}
+					if(chart.selectionsAndParams && chart.selectionsAndParams.selections){
+						params.selections = chart.selectionsAndParams.selections;
+					}
+					if(chart.selectionsAndParams && chart.selectionsAndParams.aggregations){
+						params.aggregations = chart.selectionsAndParams.aggregations;
+					}
+					if(chart.selectionsAndParams && chart.selectionsAndParams.par){
+						forQueryParam = chart.selectionsAndParams.par;
+					}
+					jsonChartTemplate.drilldownHighchart(params,forQueryParam)
 					.then(function(series){
 
 						if(chart.options.drilledCategories.length==0){
-				        	   chart.options.drilledCategories.push(chart.xAxis[0].axisTitle.textStr);
+							chart.options.drilledCategories.push(chart.xAxis[0].userOptions.title.text);
+						}
 
-				           }
+						chart.options.drilledCategories.push(series.category);
+						var xAxisTitle={
+							text:series.category
+			            };
+			            var yAxisTitle={
+			            		text:series.serieName
+			            };
+			            if(chart.xAxis[0].userOptions.title.customTitle==false){
+			            	chart.xAxis[0].setTitle(xAxisTitle);
+			            }
+			            if(chart.options.chart.type!="pie" && chart.yAxis[0].userOptions.title.custom==false){
+			            	chart.yAxis[0].setTitle(yAxisTitle);
+			            }
 
-				           chart.options.drilledCategories.push(series.category);
-				            var xAxisTitle={
-				            	text:series.category
-				            };
-				            var yAxisTitle={
-				            		text:series.serieName
-				            };
-				            if(chart.xAxis[0].userOptions.title.customTitle==false){
-				            chart.xAxis[0].setTitle(xAxisTitle);
-				            }
-				            if(chart.yAxis[0].userOptions.title.custom==false){
-				            chart.yAxis[0].setTitle(yAxisTitle);
-				            }
+			            chart.addSeriesAsDrilldown(e.point, series);
 
-				            chart.addSeriesAsDrilldown(e.point, series);
+			            var backText="Back to: <b>"+chart.options.drilledCategories[chart.options.drilledCategories.length-2]+"</b>";
 
-				            var backText="Back to: <b>"+chart.options.drilledCategories[chart.options.drilledCategories.length-2]+"</b>";
+			            chart.drillUpButton.textSetter(backText);
 
-				            chart.drillUpButton.textSetter(backText);
-
-							chart.hideLoading();
-
+						chart.hideLoading();
 					});
-
 			}
 		}
 	}
@@ -347,33 +431,30 @@ angular.module('chartInitializer')
 	this.handleDrillup = function(){
 
 		var chart=this;
-
-		// sets the title on x axis
-
+		var axisTitle = chart.options.drilledCategories[chart.options.drilledCategories.length-2];
 		chart.options.drilledCategories.pop();
-		titleText=chart.options.drilledCategories[chart.options.drilledCategories.length-1];
-		var backText=chart.options.drilledCategories[chart.options.drilledCategories.length-2];
+		titleText=chart.options.drilledCategories[chart.options.drilledCategories.length-2] ? chart.options.drilledCategories[chart.options.drilledCategories.length-2] : chart.options.drilledCategories[0];
+		var backText=titleText;
 		chart.drillUpButton.textSetter("Back to: <b>"+backText+"</b>");
         //  chart.redraw();
 		var xAxisTitle={
-            	text:titleText
-            };
-		    if(chart.xAxis[0].userOptions.title.customTitle==false){
-            chart.xAxis[0].setTitle(xAxisTitle);
-		    }
-
+            	text:axisTitle
+		};
+		if(chart.xAxis[0].userOptions.title.customTitle==false){
+        	chart.xAxis[0].setTitle(xAxisTitle);
+		}
 		var yAxisTitle={
 				text: ' '
 		};
 
 
-       if(chart.drilldownLevels.length==0 && chart.yAxis[0].userOptions.title.custom==false){
+       if(chart.drilldownLevels.length==0 && chart.options.chart.type!="pie" && chart.yAxis[0].userOptions.title.custom==false){
     	   chart.yAxis[0].setTitle(yAxisTitle);
        }
 
     	// TODO: commented by: danristo (EXT -> ANGULAR)
 		//Sbi.chart.viewer.HighchartsDrilldownHelper.drillup();
-       highchartsDrilldownHelper.drillup();
+       highchartsDrilldownHelper.drillup(chart.breadcrumb);
 
 	}
 
@@ -516,7 +597,23 @@ angular.module('chartInitializer')
 			chartConf.chart.width = container.clientWidth*(chartConf.chart.width/100);
 		}
 	}
+	var getParametersAsString = function(parameters){
+		var delim = "";
+		var output = "{";
+		for (var parameter in parameters) {
+			if (parameters.hasOwnProperty(parameter)){
+				if (parameters[parameter] == null || parameters[parameter] == undefined) {
+					output += delim + "\"" + parameter + "\":null";
+				}else{
+					output += delim + "\"" + parameter + "\":" + JSON.stringify(parameters[parameter]).replace("[","").replace("]","").replace("\",\"",",");
+				}
+			}
+			delim = ",";
+		}
+		output += "}";
 
+		return output;
+	}
 
 
 

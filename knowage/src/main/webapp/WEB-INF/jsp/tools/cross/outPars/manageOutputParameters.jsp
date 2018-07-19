@@ -17,7 +17,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 --%>
 
 
-<!-- include file="/WEB-INF/jsp/commons/portlet_base.jsp" --> 
 <%@page import="it.eng.spagobi.commons.constants.ObjectsTreeConstants"%>
 <%@page import="it.eng.spagobi.analiticalmodel.document.bo.BIObject"%>
 <%@page import="it.eng.spagobi.analiticalmodel.document.service.DetailBIObjectModule"%>
@@ -60,10 +59,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <head>
 <%@include file="/WEB-INF/jsp/commons/angular/angularImport.jsp"%>
 
-<link rel="stylesheet" type="text/css"	href="${pageContext.request.contextPath}/themes/commons/css/customStyle.css"> 
-<%-- <link rel="stylesheet" type="text/css" href="${pageContext.request.contextPath}/themes/glossary/css/generalStyle.css"> --%>
-<link rel="stylesheet" type="text/css" href="${pageContext.request.contextPath}/themes/sbi_default/css/crossnavigation/cross-definition.css">
-<script type="text/javascript" src="${pageContext.request.contextPath}/js/src/angular_1.4/tools/cross/outpars/ManageOutputParameters.js"></script>
+<link rel="stylesheet" type="text/css"	href="<%=urlBuilder.getResourceLink(request, "themes/commons/css/customStyle.css")%>"> 
+<%-- <link rel="stylesheet" type="text/css" href="<%=urlBuilder.getResourceLink(request, "themes/glossary/css/generalStyle.css")%>"> --%>
+<link rel="stylesheet" type="text/css" href="<%=urlBuilder.getResourceLink(request, "themes/sbi_default/css/crossnavigation/cross-definition.css")%>">
+<script type="text/javascript" src="<%=urlBuilder.getResourceLink(request, "js/src/angular_1.4/tools/cross/outpars/ManageOutputParameters.js")%>"></script>
 <script>
 var objectId = <%=objectId%>;
 </script>
@@ -101,7 +100,7 @@ var objectId = <%=objectId%>;
 					
 <!-- 					TO-DO add required flug to select. issure on version 1.1.0 rc5  -->
 						<md-select ng-model="ctrl.detail.type" ng-model-options="{trackBy: '$value.valueId'}" >
-				        	<md-option ng-repeat="l in ctrl.typeList" ng-value=l> {{l.translatedValueName}} </md-option>
+				        	<md-option ng-repeat="l in ctrl.typeList | filter: {valueCd:'!DATE_RANGE'}" ng-value=l> {{l.translatedValueName}} </md-option>
 				        </md-select>
 					</md-input-container>
 					<md-input-container ng-if="ctrl.detail.type && ctrl.detail.type.valueCd=='DATE'"> <label>{{translate.load("sbi.outputparameter.format");}}</label> 
@@ -111,7 +110,7 @@ var objectId = <%=objectId%>;
 				        </md-select>
 					</md-input-container>
 					<md-input-container ng-if="ctrl.detail.formatObj && ctrl.detail.formatObj.valueCd=='CUSTOM'"> <label>{{::ctrl.detail.formatObj.translatedValueName}}</label> 
-						<input maxlength="20" type="text" ng-model="ctrl.detail.formatValue">
+						<input maxlength="30" type="text" ng-model="ctrl.detail.formatValue">
 					</md-input-container>
 				</div>
 			</form>

@@ -92,12 +92,15 @@ import it.eng.spagobi.commons.dao.IBinContentDAO;
 import it.eng.spagobi.commons.serializer.SerializationException;
 import it.eng.spagobi.commons.utilities.DateRangeDAOUtilities;
 import it.eng.spagobi.commons.utilities.GeneralUtilities;
+import it.eng.spagobi.commons.utilities.ObjectsAccessVerifier;
 import it.eng.spagobi.commons.utilities.SpagoBIUtilities;
 import it.eng.spagobi.commons.utilities.StringUtilities;
 import it.eng.spagobi.commons.utilities.messages.IMessageBuilder;
 import it.eng.spagobi.commons.utilities.messages.MessageBuilderFactory;
+import it.eng.spagobi.profiling.PublicProfile;
 import it.eng.spagobi.services.rest.annotations.ManageAuthorization;
 import it.eng.spagobi.services.rest.annotations.UserConstraint;
+import it.eng.spagobi.services.security.bo.SpagoBIUserProfile;
 import it.eng.spagobi.tools.objmetadata.bo.ObjMetacontent;
 import it.eng.spagobi.tools.objmetadata.dao.IObjMetacontentDAO;
 import it.eng.spagobi.utilities.assertion.Assert;
@@ -693,9 +696,13 @@ public class DocumentExecutionResource extends AbstractSpagoBIResource {
 				parameterAsMap.put("driverDefaultValue", valueList);
 			}
 
-			if (showParameterLov) {
-				parametersArrayList.add(parameterAsMap);
+			if (!showParameterLov) {
+				parameterAsMap.put("showOnPanel", "false");
+			} else {
+				parameterAsMap.put("showOnPanel", "true");
 			}
+			parametersArrayList.add(parameterAsMap);
+
 		}
 		for (int z = 0; z < parametersArrayList.size(); z++) {
 
@@ -715,8 +722,10 @@ public class DocumentExecutionResource extends AbstractSpagoBIResource {
 
 		if (parameters.size() > 0) {
 			resultAsMap.put("filterStatus", parametersArrayList);
+
 		} else {
 			resultAsMap.put("filterStatus", new ArrayList<>());
+
 		}
 
 		resultAsMap.put("isReadyForExecution", isReadyForExecution(parameters));
@@ -732,7 +741,7 @@ public class DocumentExecutionResource extends AbstractSpagoBIResource {
 		while (keys.hasNext()) {
 			String key = (String) keys.next();
 			Object valueObj = requestValParams.get(key);
-			if (valueObj instanceof String) {
+			if (valueObj instanceof Number) {
 				String value = String.valueOf(valueObj);
 				// if (!value.equals("%7B%3B%7B") && !value.equalsIgnoreCase("%")) {
 				if (!value.equals("") && !value.equalsIgnoreCase("%")) {
@@ -740,12 +749,20 @@ public class DocumentExecutionResource extends AbstractSpagoBIResource {
 				} else {
 					toReturn.put(key, value); // uses the original value for list and %
 				}
-			}
-			if (valueObj instanceof JSONArray) {
+			} else if (valueObj instanceof String) {
+				String value = String.valueOf(valueObj);
+				// if (!value.equals("%7B%3B%7B") && !value.equalsIgnoreCase("%")) {
+				if (!value.equals("") && !value.equalsIgnoreCase("%")) {
+					toReturn.put(key, URLDecoder.decode(value, "UTF-8"));
+				} else {
+					toReturn.put(key, value); // uses the original value for list and %
+				}
+			} else if (valueObj instanceof JSONArray) {
 				JSONArray valuesLst = (JSONArray) valueObj;
 				JSONArray ValuesLstDecoded = new JSONArray();
 				for (int v = 0; v < valuesLst.length(); v++) {
-					String value = (String) valuesLst.get(v);
+					// String value = (String) valuesLst.get(v);
+					String value = (valuesLst.get(v) != null) ? String.valueOf(valuesLst.get(v)) : "";
 					if (!value.equals("") && !value.equalsIgnoreCase("%")) {
 						ValuesLstDecoded.put(URLDecoder.decode(value, "UTF-8"));
 					} else {
@@ -1029,6 +1046,56 @@ public class DocumentExecutionResource extends AbstractSpagoBIResource {
 
 		logger.debug("OUT");
 		return Response.ok(toBeReturned).build();
+	}
+
+	/**
+	 * @return the list of values when input parameter (urlName) is correlated to another
+	 */
+	@POST
+	@Path("/canHavePublicExecutionUrl")
+	@Produces(MediaType.APPLICATION_JSON + "; charset=UTF-8")
+	public Response canHavePublicExecutionUrl(@Context HttpServletRequest req) {
+		logger.debug("IN");
+
+		Boolean toReturn = false;
+		Boolean noPublicRoleError = false;
+		JSONObject results = new JSONObject();
+		try {
+			BIObject biObj;
+			UserProfile currentProfile = getUserProfile();
+			String tenant = currentProfile.getOrganization();
+
+			JSONObject requestVal = RestUtilities.readBodyAsJSONObject(req);
+			String label = requestVal.getString("label");
+
+			biObj = DAOFactory.getBIObjectDAO().loadBIObjectByLabel(label);
+			if (biObj != null) {
+				SpagoBIUserProfile publicProfile = PublicProfile.createPublicUserProfile(PublicProfile.PUBLIC_USER_PREFIX + tenant);
+
+				if (publicProfile == null) {
+					noPublicRoleError = true;
+					toReturn = false;
+				} else {
+					UserProfile publicUserProfile = new UserProfile(publicProfile);
+					boolean canExec = ObjectsAccessVerifier.canExec(biObj, publicUserProfile);
+					toReturn = canExec;
+				}
+
+				results.put("isPublic", toReturn);
+				results.put("noPublicRoleError", noPublicRoleError);
+
+			} else {
+				logger.error("Object with label " + label + " not found");
+				throw new SpagoBIRuntimeException("Object with label " + label + " not found");
+			}
+		} catch (Exception e) {
+			logger.error("Exception when testing public execution possibility", e);
+			throw new SpagoBIRuntimeException("Exception when testing public execution possibility", e);
+		}
+
+		logger.debug("OUT");
+
+		return Response.ok(results.toString()).build();
 	}
 
 	/*

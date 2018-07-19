@@ -1,66 +1,91 @@
 <angular-list-detail ng-controller="metaModelCreationBusinessController">
 	<list label="translate.load('sbi.meta.businessclass')+'/'+translate.load('sbi.meta.businessview')" layout="column"> 
-		 <span ng-if="meta.businessModels.length>0">
-			<component-tree id="bcmTree"  style="margin:0px" 
-					ng-model="meta.businessModels"
-					highlights-selected-item="true"   
-					subnode-key="columns" 
-					click-function="selectBusinessModel(node)"
-					hide-progress=true
-					not-hide-on-load = true
-					is-folder-fn="businessModel_isFolder(node)"
-					folder-icon-fn="businesslModel_getlevelIcon(node)"
-					open-folder-icon-fn="businesslModel_getlevelIcon(node)"
-					interceptor="businessModelTreeInterceptor"
-					static-tree=true
-					expand-on-click=false
-					tree-root-name="translate.load('sbi.meta.businessclass')"
-				></component-tree>
-		</span>
-	<span ng-if="meta.businessViews.length>0">
-		<component-tree id="bvmTree"  style="margin:0px" 
-				ng-model="meta.businessViews"
-				highlights-selected-item="true"   
-				subnode-key="columns" 
-				hide-progress=true
-				interceptor="businessViewTreeInterceptor"
-				static-tree=true
-				not-hide-on-load = true
-				expand-on-click=false
-				click-function="selectBusinessModel(node)"
-				is-folder-fn="businessModel_isFolder(node)"
-				folder-icon-fn="businesslModel_getlevelIcon(node)"
-				open-folder-icon-fn="businesslModel_getlevelIcon(node)"
-				tree-root-name="translate.load('sbi.meta.businessview')"
-			></component-tree>
-		</span>	
+		 <md-content class="noMargin" >
+		 	<!-- BUSINESS CLASSES -->
+		 	
+			<div class="metaModelBusinessList" ng-if="meta.businessModels.length>0">
+				<md-subheader>{{translate.load('sbi.meta.businessclass')}}</md-subheader>
+		   		<div class="md-dense" ng-repeat="bm in meta.businessModels" >
+			   		<div class="selectable" ng-click="selectBusinessModel(bm)" layout="row" layout-align="start center" ng-class="{'selected':bm == selectedBusinessModel}">
+			   			<span class="businessListName"><md-icon md-font-icon="{{::businesslModel_getlevelIcon(bm)}}"></md-icon> {{bm.name}}</span>
+				   		<span flex></span>
+				     	<span class="businessListProperties">{{bm.columns.length}} properties</span>
+				     	<md-button class="md-icon-button md-icon-button-32" ng-click="openBusinessModel(bm,$event)">
+				     		<md-icon md-font-icon="fa fa-chevron-down"></md-icon>
+				     	</md-button>
+			   		</div>
+			     	<md-divider ng-if="!$last"></md-divider>
+					<div ng-if="openedItems.indexOf(bm.uniqueName) !== -1">
+						<md-card>
+							<md-card-content class="noPadding">
+								<ul>
+					  		<li ng-repeat-start="col in bm.columns" class="selectable" ng-click="selectBusinessModel(col)" ng-class="{'selected':col == selectedBusinessModel}">
+					  			<md-icon md-font-icon="{{::businesslModel_getlevelIcon(col)}}"></md-icon>
+					  			<span>{{col.name}}</span>
+					  		</li>
+					  		<md-divider ng-repeat-end ng-if="!$last"></md-divider>
+					  	</ul>
+							</md-card-content>
+						</md-card>
+						<md-divider></md-divider>
+					</div>
+			   	</div>
+		   	</div>
+	      	
+	      	
+	      	<div class="metaModelBusinessList" ng-if="meta.businessViews.length>0">
+	      		<md-subheader>{{translate.load('sbi.meta.businessview')}}</md-subheader>
+		      <div class="md-dense" ng-repeat="bv in meta.businessViews" >
+		      	<div class="selectable" ng-click="selectBusinessModel(bv)" layout="row" layout-align="start center" ng-class="{'selected':bv == selectedBusinessModel}">
+		      		<span class="businessListName"><md-icon md-font-icon="{{::businesslModel_getlevelIcon(bv)}}"></md-icon> {{bv.name}}</span>
+		      		<span flex></span>
+		        	<span class="businessListProperties">{{bv.columns.length}} properties</span>
+		        	<md-button class="md-icon-button md-icon-button-32" ng-click="openBusinessModel(bv,$event)">
+		        		<md-icon md-font-icon="fa fa-chevron-down"></md-icon>
+		        	</md-button>
+		      	</div>
+		        <md-divider ng-if="!$last"></md-divider>
+		        <div ng-if="openedItems.indexOf(bv.uniqueName) !== -1">
+		        	<md-card>
+		        		<md-card-content class="noPadding">
+		        			<ul>
+				        		<li ng-repeat-start="col in bv.columns" class="selectable" ng-click="selectBusinessModel(col)" ng-class="{'selected':col == selectedBusinessModel}">
+				        			<md-icon md-font-icon="{{::businesslModel_getlevelIcon(col)}}"></md-icon>
+				        			<span>{{col.name}}</span>
+				        		</li>
+				        		<md-divider ng-repeat-end ng-if="!$last"></md-divider>
+				        	</ul>
+		        		</md-card-content>
+		        	</md-card>
+		        	<md-divider></md-divider>
+		        </div>
+		      </div>
+	      	</div>
+		  </md-content>
 	</list>
 	
 	
 	
 	<extra-list-button>
 		<md-menu>
-			<md-button aria-label="Create" class="md-fab" ng-click="$mdOpenMenu($event)">
-			  <md-icon md-menu-origin  md-font-icon="fa fa-bars" class="md-primary"></md-icon>
+			<md-button aria-label="Create" ng-click="$mdOpenMenu($event)">
+			  {{translate.load('sbi.general.add')}}
 			</md-button>
 			<md-menu-content width="4">
 			  <md-menu-item>
 			    <md-button ng-click="addBusinessModel()">
-			      <md-icon md-font-icon="fa fa-plus" md-menu-align-target></md-icon>
 			    	 {{translate.load('sbi.meta.new.businessclass')}}
 			    </md-button>
 			  </md-menu-item>
 			  
 			<md-menu-item ng-if="meta.businessModels.length>0">
 			  <md-button ng-click="addBusinessView()">
-			    <md-icon md-font-icon="fa fa-plus" md-menu-align-target></md-icon>
 					 {{translate.load('sbi.meta.new.businessview')}}
 			  </md-button>
 			</md-menu-item>
 			
 			</md-menu-content>
-	</md-menu>
-		
+		</md-menu>
 	</extra-list-button>
 	
 	
@@ -79,44 +104,55 @@
 						<md-input-container ng-if="selectedBusinessModel.physicalTable!=undefined" >
 							<label>{{translate.load("sbi.meta.table.physical")}}</label>
 							 <input ng-model="meta.physicalModels[selectedBusinessModel.physicalTable.physicalTableIndex].name" disabled>
+							 
 						</md-input-container>
 					</expander-box>	
+					
 				
 					<expander-box layout-margin layout="column" expanded="true" label="catProp" background-color="transparent" color="black" ng-repeat="catProp in currentBusinessModelParameterCategories | filterByMainCategory">
-						<md-input-container ng-repeat="prop in selectedBusinessModel.properties | filterByCategory:catProp"
-						ng-class=" {'md-icon-right' : (prop.value.value=='temporal dimension' || prop.value.value=='time dimension')  }"
-						ng-init="prop.value.value= (prop.value.value==undefined || prop.value.value==null) ? prop.value.propertyType.defaultValue : prop.value.value">
-							<label>{{prop.value.propertyType.name}}</label>
-							<md-select ng-model="prop.value.value" ng-if="prop.value.propertyType.admissibleValues.length!=0">
-								<md-option ng-repeat="admissibleValue in prop.value.propertyType.admissibleValues | filterByProductType:prop " value="{{admissibleValue}}" >
-									{{admissibleValue}}
-								</md-option>
-							</md-select>
-							
-							<input ng-if="prop.value.propertyType.admissibleValues.length==0 
-							&& prop.key!='structural.attribute' 
-							&& prop.key!='behavioural.notEnabledRoles'" ng-model="prop.value.value">
-							
-							<!--profile attributes visibility -->
-							<md-select ng-model="prop.value.value" ng-if="prop.key=='structural.attribute'" >
-								<md-option  ng-repeat="admissibleValue in sbiModule_config.profileAttributes  " value="{{admissibleValue}}" >
-									{{admissibleValue}}
-								</md-option>
-							</md-select>
-							
-							<!--profile role visibility -->
-						 
-							<md-select ng-model="tmpRoleVisibility" ng-if="prop.key=='behavioural.notEnabledRoles'" multiple 
-							ng-init="tmpRoleVisibility=[];initRoleVisibility(tmpRoleVisibility,prop.value.value)" md-on-close="buildRoleVisibility(tmpRoleVisibility,prop.value)">
-								<md-option  ng-repeat="role in sbiModule_config.avaiableRoles" value="{{role}}" >
-									{{role}}
-								</md-option>
-							</md-select>
-							
-							<!-- edit temporal hierarchy button -->
-							<md-icon ng-if="prop.value.value=='temporal dimension'" ng-click="editTemporalHierarchy()" md-font-icon=" fa fa-sitemap" ></md-icon>
-							<md-icon ng-if="prop.value.value=='time dimension'" ng-click="editTemporalHierarchy()" md-font-icon=" fa fa-sitemap" ></md-icon>
-						</md-input-container>
+						<div layout="row" ng-repeat="prop in selectedBusinessModel.properties | filterByCategory:catProp" layout-align="start center">
+							<md-input-container class="md-block" flex
+							ng-class=" {'md-icon-right' : (getPropertyAttributes(prop).value=='temporal dimension' || getPropertyAttributes(prop).value=='time dimension')  }"
+							ng-init="getPropertyAttributes(prop).value= (getPropertyAttributes(prop).value==undefined || getPropertyAttributes(prop).value==null) ? getPropertyAttributes(prop).propertyType.defaultValue : getPropertyAttributes(prop).value">
+								<label>{{getPropertyAttributes(prop).propertyType.name}}</label>
+								<md-select ng-model="getPropertyAttributes(prop).value" ng-if="getPropertyAttributes(prop).propertyType.admissibleValues.length!=0">
+									<md-option ng-repeat="admissibleValue in getPropertyAttributes(prop).propertyType.admissibleValues | filterByProductType:prop " value="{{admissibleValue}}" >
+										{{admissibleValue}}
+									</md-option>
+								</md-select>
+								
+								<input ng-if="getPropertyAttributes(prop).propertyType.admissibleValues.length==0 
+								&& getPropertyKey(prop)!='structural.attribute' 
+								&& getPropertyKey(prop)!='behavioural.notEnabledRoles'" ng-model="getPropertyAttributes(prop).value" ng-disabled="getPropertyKey(prop)=='physical.physicaltable'">
+								<!--profile attributes visibility -->
+								<md-select ng-model="getPropertyAttributes(prop).value" ng-if="getPropertyKey(prop)=='structural.attribute'" >	
+									<md-option value=""></md-option>						
+									<md-option  ng-repeat="admissibleValue in sbiModule_config.profileAttributes  " value="{{admissibleValue}}" >
+										{{admissibleValue}}
+									</md-option>
+								</md-select>
+								
+								<!--profile role visibility -->
+								<md-select ng-model="tmpRoleVisibility" ng-if="getPropertyKey(prop)=='behavioural.notEnabledRoles'" multiple 
+								 ng-init="tmpRoleVisibility=[];initRoleVisibility(tmpRoleVisibility,getPropertyAttributes(prop).value)"  
+								 md-on-close="buildRoleVisibility(tmpRoleVisibility,getPropertyAttributes(prop))">		
+									<md-option  ng-repeat="role in sbiModule_config.avaiableRoles track by $index" value="{{role}}" >
+										{{role}}
+									</md-option>
+								</md-select>
+								<!-- physical column name -->
+							</md-input-container>
+						<!-- edit temporal hierarchy button -->
+							<md-button class="md-icon-button" ng-if="getPropertyAttributes(prop).value=='temporal dimension' || getPropertyAttributes(prop).value=='time dimension'" ng-click="editTemporalHierarchy()">
+								<md-tooltip>{{translate.load('sbi.meta.manage.temporal.hierarchy')}}</md-tooltip>
+								<md-icon md-font-icon=" fa fa-sitemap" ></md-icon>
+							</md-button>
+
+							<md-input-container class="md-block" flex ng-if="(selectedBusinessModel['physicalColumn']!=undefined) && (catProp=='physical')">
+								<label >{{translate.load("sbi.meta.column.physical")}}</label>
+							 	<input ng-if="(selectedBusinessModel['physicalColumn']!=undefined) && (catProp=='physical')" ng-model="selectedBusinessModel['physicalColumn'].name" disabled>
+							</md-input-container>
+						</div>
 					</expander-box>
 				</md-content>
 			</md-tab>
@@ -234,7 +270,6 @@
 	</detail>
 	<extra-button ng-if="selectedBusinessModel.name!=undefined">
 		<md-button ng-if="selectedBusinessModel.columns!=undefined" ng-click="deleteCurrentBusiness()">
-				<md-icon md-font-icon="fa fa-trash" class=""></md-icon>
 				{{translate.load('sbi.generic.delete')}}
 		</md-button>
 	</extra-button>

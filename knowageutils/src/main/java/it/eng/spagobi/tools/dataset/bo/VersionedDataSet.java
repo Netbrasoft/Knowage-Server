@@ -17,6 +17,13 @@
  */
 package it.eng.spagobi.tools.dataset.bo;
 
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
+
+import org.apache.log4j.Logger;
+
+import it.eng.spagobi.commons.bo.UserProfile;
 import it.eng.spagobi.services.dataset.bo.SpagoBiDataSet;
 import it.eng.spagobi.tools.dataset.common.behaviour.IDataSetBehaviour;
 import it.eng.spagobi.tools.dataset.common.datastore.IDataStore;
@@ -28,12 +35,6 @@ import it.eng.spagobi.tools.dataset.federation.FederationDefinition;
 import it.eng.spagobi.tools.dataset.persist.IDataSetTableDescriptor;
 import it.eng.spagobi.tools.dataset.utils.DataSetUtilities;
 import it.eng.spagobi.tools.datasource.bo.IDataSource;
-
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
-
-import org.apache.log4j.Logger;
 
 /**
  * @author Antonella Giachino (antonella.giachino@eng.it)
@@ -493,6 +494,13 @@ public class VersionedDataSet implements IDataSet {
 	}
 
 	@Override
+	public void setUserProfile(UserProfile profile) {
+		if (wrappedDataset instanceof AbstractDataSet) {
+			((AbstractDataSet) wrappedDataset).setUserProfile(profile);
+		}
+	}
+
+	@Override
 	public IDataSetTableDescriptor persist(String tableName, IDataSource dataSource) {
 		return wrappedDataset.persist(tableName, dataSource);
 	}
@@ -677,5 +685,20 @@ public class VersionedDataSet implements IDataSet {
 		}
 
 		return retVal;
+	}
+
+	@Override
+	public boolean isCachingSupported() {
+		return wrappedDataset.isCachingSupported();
+	}
+
+	@Override
+	public DatasetEvaluationStrategy getEvaluationStrategy(boolean isNearRealtime) {
+		return wrappedDataset.getEvaluationStrategy(isNearRealtime);
+	}
+
+	@Override
+	public String toString() {
+		return wrappedDataset.toString();
 	}
 }

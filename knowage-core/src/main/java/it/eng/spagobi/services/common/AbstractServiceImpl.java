@@ -1,7 +1,7 @@
 /*
  * Knowage, Open Source Business Intelligence suite
  * Copyright (C) 2016 Engineering Ingegneria Informatica S.p.A.
- * 
+ *
  * Knowage is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -11,25 +11,25 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU Affero General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 package it.eng.spagobi.services.common;
 
+import org.apache.log4j.LogMF;
+import org.apache.log4j.Logger;
+
 import it.eng.spago.security.IEngUserProfile;
-import it.eng.spagobi.commons.SingletonConfig;
 import it.eng.spagobi.commons.bo.UserProfile;
-import it.eng.spagobi.commons.utilities.GeneralUtilities;
 import it.eng.spagobi.commons.utilities.UserUtilities;
+import it.eng.spagobi.profiling.PublicProfile;
+import it.eng.spagobi.services.security.bo.SpagoBIUserProfile;
 import it.eng.spagobi.services.security.exceptions.SecurityException;
 import it.eng.spagobi.tenant.Tenant;
 import it.eng.spagobi.tenant.TenantManager;
 import it.eng.spagobi.utilities.assertion.Assert;
 import it.eng.spagobi.utilities.exceptions.SpagoBIRuntimeException;
-
-import org.apache.log4j.LogMF;
-import org.apache.log4j.Logger;
 
 /**
  * Abstract class for all Service Implementation
@@ -37,10 +37,6 @@ import org.apache.log4j.Logger;
 public abstract class AbstractServiceImpl {
 
 	static private Logger logger = Logger.getLogger(AbstractServiceImpl.class);
-
-	private String pass = null;
-	
-	private String userId = null;
 
 	/**
 	 * Instantiates a new abstract service impl.
@@ -50,42 +46,29 @@ public abstract class AbstractServiceImpl {
 	}
 
 	private void init() {
-		logger.debug("IN");
-		pass = SingletonConfig.getInstance().getConfigValue("SPAGOBI_SSO.PASS");
-
 	}
 
 	/**
 	 * check the ticket used for verify the user authentication
-	 * 
+	 *
 	 * @param ticket
 	 *            String
 	 * @return String
 	 * @throws SecurityException
 	 */
-	protected void validateTicket(String ticket, String userId)
-			throws SecurityException {
+	protected void validateTicket(String ticket, String userId) throws SecurityException {
 		logger.debug("IN");
-		if (ticket == null) {
-			logger.warn("Ticket is NULL");
-			throw new SecurityException("Ticket is NULL");
-		}
-		if (userId == null) {
-			logger.warn("UserID is NULL");
-			throw new SecurityException("Ticket is NULL");
-		}
-		if (ticket.equals(pass)) {
-			logger.debug("JUMP che ticket validation");
-		} else {
-			SsoServiceInterface proxyService = SsoServiceFactory
-					.createProxyService();
-			proxyService.validateTicket(ticket, userId);
-		}
+
+		Assert.assertNotNull(ticket, "Ticket is null!");
+		Assert.assertNotNull(userId, "User id is null!");
+
+		SsoServiceInterface proxyService = SsoServiceFactory.createProxyService();
+		proxyService.validateTicket(ticket, userId);
 
 		logger.debug("OUT");
 
 	}
-	
+
 	protected void setTenantByUserProfile(IEngUserProfile profile) {
 		logger.debug("IN");
 		try {
@@ -102,25 +85,26 @@ public abstract class AbstractServiceImpl {
 			logger.debug("OUT");
 		}
 	}
-	
+
 	protected void unsetTenant() {
 		TenantManager.unset();
 	}
 
-	protected IEngUserProfile setTenantByUserId(String userId) {
+	protected IEngUserProfile setTenantByUserId(String jwtToken) {
 		logger.debug("IN");
 		try {
-			if (UserProfile.isSchedulerUser(userId)) {
-				UserProfile scheduler = UserProfile.createSchedulerUserProfile(userId);
+			if (UserProfile.isSchedulerUser(jwtToken)) {
+				UserProfile scheduler = UserProfile.createSchedulerUserProfile(jwtToken);
 				this.setTenantByUserProfile(scheduler);
 				return scheduler;
+			} else if (PublicProfile.isPublicUser(jwtToken)) {
+				String userId = JWTSsoService.jwtToken2userId(jwtToken);
+				SpagoBIUserProfile pub = PublicProfile.createPublicUserProfile(userId);
+				UserProfile publicProfile = new UserProfile(pub);
+				this.setTenantByUserProfile(publicProfile);
+				return publicProfile;
 			}
-			if (UserProfile.isWorkflowUser(userId)) {
-				UserProfile workflow = UserProfile.createWorkflowUserProfile(userId);
-				this.setTenantByUserProfile(workflow);
-				return workflow;
-			}
-			IEngUserProfile profile = UserUtilities.getUserProfile(userId);
+			IEngUserProfile profile = UserUtilities.getUserProfile(jwtToken);
 			this.setTenantByUserProfile(profile);
 			return profile;
 		} catch (Exception e) {
@@ -131,5 +115,4 @@ public abstract class AbstractServiceImpl {
 		}
 	}
 
-	
 }

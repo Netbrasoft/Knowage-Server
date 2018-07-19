@@ -18,11 +18,12 @@
 
 package it.eng.spagobi.tools.dataset.graph.associativity.utils;
 
-import it.eng.spagobi.tools.dataset.graph.EdgeGroup;
-
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+
+import it.eng.spagobi.tools.dataset.graph.EdgeGroup;
+import it.eng.spagobi.tools.dataset.graph.Tuple;
 
 /**
  * @author Alessandro Portosa (alessandro.portosa@eng.it)
@@ -33,7 +34,7 @@ public class AssociativeLogicResult {
 
 	private final Map<String, Set<EdgeGroup>> datasetToEdgeGroup = new HashMap<>();
 	private final Map<EdgeGroup, Set<String>> edgeGroupToDataset = new HashMap<>();
-	private final HashMap<EdgeGroup, Set<String>> edgeGroupValues = new HashMap<>();
+	private final Map<EdgeGroup, Set<Tuple>> edgeGroupValues = new HashMap<>();
 
 	public Map<String, Set<EdgeGroup>> getDatasetToEdgeGroup() {
 		return datasetToEdgeGroup;
@@ -43,8 +44,25 @@ public class AssociativeLogicResult {
 		return edgeGroupToDataset;
 	}
 
-	public HashMap<EdgeGroup, Set<String>> getEdgeGroupValues() {
+	public Map<EdgeGroup, Set<Tuple>> getEdgeGroupValues() {
 		return edgeGroupValues;
 	}
 
+	public void clearValues(EdgeGroup group) {
+		if (edgeGroupValues.containsKey(group)) {
+			edgeGroupValues.get(group).clear();
+		}
+	}
+
+	public void addValues(EdgeGroup group, Set<Tuple> values) {
+		if (!edgeGroupValues.containsKey(group)) {
+			edgeGroupValues.put(group, values);
+		} else {
+			edgeGroupValues.get(group).addAll(values);
+		}
+	}
+
+	public Set<String> getDatasets(EdgeGroup group) {
+		return edgeGroupToDataset.get(group);
+	}
 }

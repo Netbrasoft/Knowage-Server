@@ -1,5 +1,5 @@
 /*
- * Knowage, Open Source Business Intelligence suite
+* Knowage, Open Source Business Intelligence suite
  * Copyright (C) 2016 Engineering Ingegneria Informatica S.p.A.
 
  * Knowage is free software: you can redistribute it and/or modify
@@ -23,7 +23,6 @@ import java.io.FileNotFoundException;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -31,7 +30,6 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -43,16 +41,16 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.log4j.LogMF;
 import org.apache.log4j.Logger;
 import org.json.JSONArray;
-import org.json.JSONException;
 import org.json.JSONObject;
 
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.io.UnsafeInput;
+import com.jamonapi.Monitor;
+import com.jamonapi.MonitorFactory;
 
 import commonj.work.Work;
 import commonj.work.WorkException;
 import commonj.work.WorkItem;
-import edu.emory.mathcs.backport.java.util.Arrays;
 import gnu.trove.set.hash.TLongHashSet;
 import it.eng.spago.base.SourceBean;
 import it.eng.spago.error.EMFUserError;
@@ -65,6 +63,7 @@ import it.eng.spagobi.commons.bo.UserProfile;
 import it.eng.spagobi.commons.dao.DAOFactory;
 import it.eng.spagobi.commons.dao.IDomainDAO;
 import it.eng.spagobi.commons.dao.IRoleDAO;
+import it.eng.spagobi.commons.metadata.SbiDomains;
 import it.eng.spagobi.commons.utilities.GeneralUtilities;
 import it.eng.spagobi.commons.utilities.SpagoBIUtilities;
 import it.eng.spagobi.commons.utilities.StringUtilities;
@@ -72,19 +71,24 @@ import it.eng.spagobi.commons.utilities.UserUtilities;
 import it.eng.spagobi.tools.dataset.association.DistinctValuesCalculateWork;
 import it.eng.spagobi.tools.dataset.association.DistinctValuesClearWork;
 import it.eng.spagobi.tools.dataset.bo.AbstractJDBCDataset;
+import it.eng.spagobi.tools.dataset.bo.DatasetEvaluationStrategy;
 import it.eng.spagobi.tools.dataset.bo.IDataSet;
-import it.eng.spagobi.tools.dataset.bo.JDBCDataSet;
-import it.eng.spagobi.tools.dataset.bo.VersionedDataSet;
 import it.eng.spagobi.tools.dataset.cache.CacheException;
-import it.eng.spagobi.tools.dataset.cache.FilterCriteria;
-import it.eng.spagobi.tools.dataset.cache.GroupCriteria;
-import it.eng.spagobi.tools.dataset.cache.InLineViewBuilder;
-import it.eng.spagobi.tools.dataset.cache.Operand;
-import it.eng.spagobi.tools.dataset.cache.ProjectionCriteria;
-import it.eng.spagobi.tools.dataset.cache.SelectBuilder;
+import it.eng.spagobi.tools.dataset.cache.ICache;
 import it.eng.spagobi.tools.dataset.cache.SpagoBICacheManager;
 import it.eng.spagobi.tools.dataset.cache.impl.sqldbcache.SQLDBCache;
-import it.eng.spagobi.tools.dataset.cache.impl.sqldbcache.work.SQLDBCacheWriteWork;
+import it.eng.spagobi.tools.dataset.cache.query.PreparedStatementData;
+import it.eng.spagobi.tools.dataset.cache.query.SelectQuery;
+import it.eng.spagobi.tools.dataset.cache.query.item.AndFilter;
+import it.eng.spagobi.tools.dataset.cache.query.item.Filter;
+import it.eng.spagobi.tools.dataset.cache.query.item.NullaryFilter;
+import it.eng.spagobi.tools.dataset.cache.query.item.OrFilter;
+import it.eng.spagobi.tools.dataset.cache.query.item.Projection;
+import it.eng.spagobi.tools.dataset.cache.query.item.SimpleFilter;
+import it.eng.spagobi.tools.dataset.cache.query.item.SimpleFilterOperator;
+import it.eng.spagobi.tools.dataset.cache.query.item.SingleProjectionSimpleFilter;
+import it.eng.spagobi.tools.dataset.cache.query.item.Sorting;
+import it.eng.spagobi.tools.dataset.cache.query.item.UnaryFilter;
 import it.eng.spagobi.tools.dataset.common.behaviour.QuerableBehaviour;
 import it.eng.spagobi.tools.dataset.common.datastore.DataStore;
 import it.eng.spagobi.tools.dataset.common.datastore.Field;
@@ -111,10 +115,10 @@ import it.eng.spagobi.utilities.Helper;
 import it.eng.spagobi.utilities.assertion.Assert;
 import it.eng.spagobi.utilities.cache.CacheItem;
 import it.eng.spagobi.utilities.database.AbstractDataBase;
-import it.eng.spagobi.utilities.database.temporarytable.TemporaryTableManager;
+import it.eng.spagobi.utilities.database.DataBaseException;
+import it.eng.spagobi.utilities.database.DataBaseFactory;
 import it.eng.spagobi.utilities.exceptions.SpagoBIRuntimeException;
 import it.eng.spagobi.utilities.groovy.GroovySandbox;
-import it.eng.spagobi.utilities.sql.SqlUtils;
 import it.eng.spagobi.utilities.threadmanager.WorkManager;
 import it.eng.spagobi.utilities.trove.TLongHashSetSerializer;
 
@@ -124,6 +128,7 @@ import it.eng.spagobi.utilities.trove.TLongHashSetSerializer;
  * calling directly the DAO.
  *
  * @author gavardi, gioia
+ *
  */
 
 public class DatasetManagementAPI {
@@ -163,10 +168,6 @@ public class DatasetManagementAPI {
 	// ==============================================================================
 	public UserProfile getUserProfile() {
 		return userProfile;
-	}
-
-	public String getUserId() {
-		return getUserProfile().getUserUniqueIdentifier().toString();
 	}
 
 	public void setUserProfile(UserProfile userProfile) {
@@ -233,7 +234,22 @@ public class DatasetManagementAPI {
 			}
 
 			if (DataSetUtilities.isExecutableByUser(dataSet, getUserProfile()) == false) {
-				throw new RuntimeException("User [" + getUserId() + "] cannot access to dataset [" + label + "]");
+				Integer dsCategoryId = dataSet.getCategoryId();
+				// check categories of dataset
+				Set<Domain> categoryList = UserUtilities.getDataSetCategoriesByUser(getUserProfile());
+				if (categoryList != null && categoryList.size() > 0) {
+
+					SbiDomains[] categoryArray = new SbiDomains[categoryList.size()];
+					int i = 0;
+					for (Iterator iterator = categoryList.iterator(); iterator.hasNext();) {
+						Domain domain = (Domain) iterator.next();
+						Integer domainId = domain.getValueId();
+						if (dsCategoryId.equals(domainId))
+							return dataSet;
+					}
+				}
+				// just if dataset hasn't a category available for the user gives an error
+				throw new RuntimeException("User [" + getUserProfile().getUserId() + "] cannot access to dataset [" + label + "]");
 			}
 			return dataSet;
 		} catch (Throwable t) {
@@ -352,16 +368,12 @@ public class DatasetManagementAPI {
 		return tableName;
 	}
 
-	public IDataStore getDataStore(String label, int offset, int fetchSize, int maxRowCount, boolean isNearRealtime, Map<String, String> parametersValues,
-			List<GroupCriteria> groups, List<FilterCriteria> filters, List<FilterCriteria> filtersForMetaModel, List<FilterCriteria> havings,
-			List<FilterCriteria> havingsForMetaModel, List<ProjectionCriteria> projections, List<ProjectionCriteria> summaryRowProjections) {
+	public IDataStore getDataStore(IDataSet dataSet, boolean isNearRealtime, Map<String, String> parametersValues, List<Projection> projections, Filter filter,
+			List<Projection> groups, List<Sorting> sortings, List<Projection> summaryRowProjections, int offset, int fetchSize, int maxRowCount) {
+		String errorMessage = "An unexpected error occured while executing method";
 
-		String message = "An unexpected error occured while executing method";
+		Monitor totalTiming = MonitorFactory.start("Knowage.DatasetManagementAPI.getDataStore");
 		try {
-			logger.debug("Loading dataset with label [" + label + "]");
-			IDataSet dataSet = getDataSetDAO().loadDataSetByLabel(label);
-			Assert.assertNotNull(dataSet, "Impossible to load dataset with label [" + label + "]");
-
 			setDataSetParameters(dataSet, parametersValues);
 
 			// force resolution of parameters
@@ -372,94 +384,104 @@ public class DatasetManagementAPI {
 
 			IDataStore dataStore = null;
 
-			if (dataSet.isPersisted()) {
+			DatasetEvaluationStrategy evaluationStrategy = dataSet.getEvaluationStrategy(isNearRealtime);
+			if (DatasetEvaluationStrategy.PERSISTED.equals(evaluationStrategy)) {
 				logger.debug("Querying persisted dataset");
-				dataStore = queryPersistedDataset(groups, filters, havings, projections, summaryRowProjections, dataSet, offset, fetchSize, maxRowCount);
+				dataStore = queryPersistedDataset(dataSet, projections, filter, groups, sortings, summaryRowProjections, offset, fetchSize, maxRowCount);
 				dataStore.setCacheDate(getPersistedDate(dataSet));
-			} else if (dataSet.isFlatDataset()) {
+			} else if (DatasetEvaluationStrategy.FLAT.equals(evaluationStrategy)) {
 				logger.debug("Querying flat dataset");
-				dataStore = queryFlatDataset(groups, filters, havings, projections, summaryRowProjections, dataSet, offset, fetchSize, maxRowCount);
+				dataStore = queryFlatDataset(dataSet, projections, filter, groups, sortings, summaryRowProjections, offset, fetchSize, maxRowCount);
 				dataStore.setCacheDate(new Date());
 			} else {
-				boolean isJDBCDataSet = isJDBCDataSet(dataSet);
-				boolean isBigDataDialect = SqlUtils.isBigDataDialect(dataSet.getDataSource() != null ? dataSet.getDataSource().getHibDialectName() : "");
-				if (isNearRealtime && isJDBCDataSet && !isBigDataDialect && !dataSet.hasDataStoreTransformer()) {
+				if (DatasetEvaluationStrategy.INLINE_VIEW.equals(evaluationStrategy)) {
 					logger.debug("Querying near realtime/JDBC dataset");
-					dataStore = queryJDBCDataset(groups, filters, havings, projections, summaryRowProjections, dataSet, offset, fetchSize, maxRowCount);
+					Monitor timing = MonitorFactory.start("Knowage.DatasetManagementAPI.getDataStore:inLineView");
+					dataStore = queryJDBCDataset(dataSet, projections, filter, groups, sortings, summaryRowProjections, offset, fetchSize, maxRowCount);
+					timing.stop();
 					dataStore.setCacheDate(new Date());
-				} else if (isNearRealtime || dataSet.isRealtime()) {
-					logger.debug("Querying near realtime dataset");
-					dataStore = queryNearRealtimeDataset(groups, filtersForMetaModel, havingsForMetaModel, projections, summaryRowProjections, dataSet, offset,
-							fetchSize, maxRowCount);
+				} else if (DatasetEvaluationStrategy.REALTIME.equals(evaluationStrategy)) {
+					logger.debug("Querying realtime dataset");
+					dataStore = queryRealtimeDataset(dataSet, projections, filter, groups, sortings, summaryRowProjections, offset, fetchSize, maxRowCount);
 					dataStore.setCacheDate(new Date());
-
 				} else {
 					logger.debug("Querying dataset in cache");
 					SQLDBCache cache = (SQLDBCache) SpagoBICacheManager.getCache();
 					cache.setUserProfile(userProfile);
 
-					IDataStore cachedResultSet = cache.get(dataSet, groups, filters, havings, projections, summaryRowProjections, offset, fetchSize,
-							maxRowCount);
+					Monitor totalCacheTiming = MonitorFactory.start("Knowage.DatasetManagementAPI.getDataStore:totalCache");
 
+					IDataStore cachedResultSet = cache.get(dataSet, projections, filter, groups, sortings, summaryRowProjections, offset, fetchSize,
+							maxRowCount);
 					if (cachedResultSet == null) {
 						logger.debug("Dataset not in cache");
-						if (isJDBCDataSet && !isBigDataDialect && !dataSet.hasDataStoreTransformer()) {
-							logger.debug("Copying JDBC dataset in cache using its iterator");
-							cache.put(dataSet);
-						} else {
-							logger.debug("Copying dataset in cache by loading the whole set of data in memory");
-							dataSet.loadData();
-							if (dataSet.getDataStore().getMetaData().getFieldCount() == 0) {
-								// update only datasource's metadata from dataset if for some strange cause it hasn't got fields
-								logger.debug("Update datastore's metadata with dataset's metadata for nodata found...");
-								dataStore = new DataStore();
-								IMetaData metadata = dataSet.getMetadata();
-								metadata.setProperty("resultNumber", 0);
-								dataStore.setMetaData(metadata);
-								adjustMetadata((DataStore) dataStore, dataSet, null);
-								return dataStore;
-							}
-							cache.put(dataSet, dataSet.getDataStore());
+
+						Monitor timing = MonitorFactory.start("Knowage.DatasetManagementAPI.getDataStore:putInCache");
+						putDataSetInCache(dataSet, cache);
+						timing.stop();
+
+						if (dataSet.getDataStore() != null && dataSet.getDataStore().getMetaData().getFieldCount() == 0) {
+							// update only datasource's metadata from dataset if for some strange cause it hasn't got fields
+							logger.debug("Update datastore's metadata with dataset's metadata for nodata found...");
+							return getEmptyDataStore(dataSet);
 						}
-						// getting data from cache...
-						dataStore = cache.get(dataSet, groups, filters, havings, projections, summaryRowProjections, offset, fetchSize, maxRowCount);
+
+						timing = MonitorFactory.start("Knowage.DatasetManagementAPI.getDataStore:getFromCache");
+						dataStore = cache.get(dataSet, projections, filter, groups, sortings, summaryRowProjections, offset, fetchSize, maxRowCount);
+						timing.stop();
 						if (dataStore == null) {
-							throw new CacheException(message);
+							throw new CacheException(errorMessage);
 						}
 						adjustMetadata((DataStore) dataStore, dataSet, null);
 						dataSet.decode(dataStore);
 
 						// if result was not cached put refresh date as now
 						dataStore.setCacheDate(new Date());
-
 					} else {
 						dataStore = cachedResultSet;
-						/*
-						 * since the datastore, at this point, is a JDBC datastore, it does not contain information about measures/attributes, fields' name and
-						 * alias... therefore we adjust its metadata
-						 */
 						adjustMetadata((DataStore) dataStore, dataSet, null);
 						dataSet.decode(dataStore);
 					}
+					totalCacheTiming.stop();
 				}
 			}
+
 			return dataStore;
 
 		} catch (Throwable t) {
-			logger.error(message, t);
-			throw new RuntimeException(message, t);
+			logger.error(errorMessage, t);
+			throw new RuntimeException(errorMessage, t);
 		} finally {
+			totalTiming.stop();
 			logger.debug("OUT");
 		}
 	}
 
-	private boolean haveCountDistinct(List<ProjectionCriteria> projections) {
-		for (ProjectionCriteria projection : projections) {
-			if (AggregationFunctions.COUNT_DISTINCT.equals(projection.getAggregateFunction())) {
-				return true;
+	private IDataStore getEmptyDataStore(IDataSet dataSet) {
+		IDataStore dataStore;
+		dataStore = new DataStore();
+		IMetaData metadata = dataSet.getMetadata();
+		metadata.setProperty("resultNumber", 0);
+		dataStore.setMetaData(metadata);
+		adjustMetadata((DataStore) dataStore, dataSet, null);
+		return dataStore;
+	}
+
+	public void putDataSetInCache(IDataSet dataSet, ICache cache) throws DataBaseException {
+		if (dataSet.isCachingSupported()) {
+			if (dataSet instanceof AbstractJDBCDataset && !dataSet.hasDataStoreTransformer()) {
+				logger.debug("Copying JDBC dataset in cache using its iterator");
+				cache.put(dataSet);
+			} else {
+				logger.debug("Copying dataset in cache by loading the whole set of data in memory");
+				dataSet.loadData();
+				if (dataSet.getDataStore().getMetaData().getFieldCount() > 0) {
+					cache.put(dataSet, dataSet.getDataStore());
+				} else {
+					cache.put(dataSet, getEmptyDataStore(dataSet));
+				}
 			}
 		}
-		return false;
 	}
 
 	private Date getPersistedDate(IDataSet dataSet) {
@@ -503,103 +525,6 @@ public class DatasetManagementAPI {
 		}
 	}
 
-	private List<IDataStore> storeDataSetsInCache(List<IDataSet> joinedDataSets, Map<String, String> parametersValues, boolean wait) {
-
-		List<IDataStore> dataStores = new ArrayList<>();
-
-		try {
-			SQLDBCache cache = (SQLDBCache) SpagoBICacheManager.getCache();
-			cache.setUserProfile(userProfile);
-
-			WorkManager spagoBIWorkManager;
-			try {
-				spagoBIWorkManager = new WorkManager(GeneralUtilities.getSpagoBIConfigurationProperty("JNDI_THREAD_MANAGER"));
-			} catch (NamingException t) {
-				throw new RuntimeException("Impossible to initialize work manager");
-			}
-			commonj.work.WorkManager workManager = spagoBIWorkManager.getInnerInstance();
-
-			List<Work> workItemList = new ArrayList<>();
-			for (IDataSet dataSet : joinedDataSets) {
-				// first we set parameters because they change the signature
-				dataSet.setParamsMap(parametersValues);
-
-				// then we verified if the store associated to the joined
-				// dtatset is in cache
-				if (cache.contains(dataSet)) {
-					continue;
-				}
-
-				// if not we create a work to store it and we add it to works
-				// list
-
-				dataSet.loadData();
-				IDataStore dataStore = dataSet.getDataStore();
-
-				Work cacheWriteWork = new SQLDBCacheWriteWork(cache, dataStore, dataSet, userProfile);
-
-				workItemList.add(cacheWriteWork);
-			}
-
-			if (workItemList.size() > 0) {
-				if (wait == true) {
-					workManager.waitForAll(workItemList, workManager.INDEFINITE);
-				} else {
-					for (Work work : workItemList) {
-						workManager.schedule(work);
-					}
-				}
-			}
-
-		} catch (Throwable t) {
-			throw new RuntimeException("An unexpected error occured while storing datasets in cache", t);
-		} finally {
-			logger.debug("OUT");
-		}
-
-		return dataStores;
-	}
-
-	private IDataStore storeDataSetInCache(IDataSet dataSet, Map<String, String> parametersValues, boolean wait) {
-		try {
-			SQLDBCache cache = (SQLDBCache) SpagoBICacheManager.getCache();
-			cache.setUserProfile(userProfile);
-			dataSet.setParamsMap(parametersValues);
-			dataSet.loadData();
-			IDataStore dataStore = dataSet.getDataStore();
-
-			WorkManager spagoBIWorkManager;
-			try {
-				spagoBIWorkManager = new WorkManager(GeneralUtilities.getSpagoBIConfigurationProperty("JNDI_THREAD_MANAGER"));
-			} catch (NamingException t) {
-				throw new RuntimeException("Impossible to initialize work manager");
-			}
-			commonj.work.WorkManager workManager = spagoBIWorkManager.getInnerInstance();
-
-			List<Work> workItemList = new ArrayList<>();
-			Work cacheWriteWork = new SQLDBCacheWriteWork(cache, dataStore, dataSet, userProfile);
-			workItemList.add(cacheWriteWork);
-
-			if (workItemList.size() > 0) {
-				if (wait == true) {
-					workManager.waitForAll(workItemList, workManager.INDEFINITE);
-				} else {
-					for (Work work : workItemList) {
-						workManager.schedule(work);
-					}
-				}
-			}
-
-			return dataStore;
-		} catch (ParametersNotValorizedException p) {
-			throw new ParametersNotValorizedException(p.getMessage());
-		} catch (Throwable t) {
-			throw new RuntimeException("An unexpected error occured while executing method", t);
-		} finally {
-			logger.debug("OUT");
-		}
-	}
-
 	/**
 	 * @deprectade
 	 */
@@ -623,13 +548,9 @@ public class DatasetManagementAPI {
 
 			}
 
-			List<ProjectionCriteria> projectionCriteria = this.getProjectionCriteria(label, crosstabDefinition);
-			List<FilterCriteria> filterCriteria = new ArrayList<>(); // empty
-			// in
-			// this
-			// case
-			List<GroupCriteria> groupCriteria = this.getGroupCriteria(label, crosstabDefinition);
-			dataStore = cache.get(dataSet, groupCriteria, filterCriteria, projectionCriteria, 0, 0);
+			List<Projection> projections = this.getProjections(dataSet, crosstabDefinition);
+			List<Projection> groups = this.getGroups(dataSet, crosstabDefinition);
+			dataStore = cache.get(dataSet, projections, null, groups, null, null, 0, 0, -1);
 
 			/*
 			 * since the datastore, at this point, is a JDBC datastore, it does not contain information about measures/attributes, fields' name and alias...
@@ -726,22 +647,6 @@ public class DatasetManagementAPI {
 		}
 	}
 
-	private List<IDataSet> filterDatasetsByUser(List<IDataSet> dataSets, Set<Domain> categories) {
-		List<IDataSet> validDataSets = new LinkedList<>();
-		for (IDataSet ds : dataSets) {
-			Integer idCategory = ds.getCategoryId();
-			if (idCategory != null) {
-				for (Domain dom : categories) {
-					if (idCategory.equals(dom.getValueId())) {
-						validDataSets.add(ds);
-						break;
-					}
-				}
-			}
-		}
-		return validDataSets;
-	}
-
 	public List<IDataSet> getUncertifiedDataSet() {
 		try {
 
@@ -789,79 +694,6 @@ public class DatasetManagementAPI {
 		}
 	}
 
-	public Integer creatDataSet(IDataSet dataSet) {
-		logger.debug("IN");
-		Integer toReturn = null;
-		if (dataSet == null) {
-			logger.error("Dataset is null");
-			return null;
-		}
-
-		try {
-
-			validateDataSet(dataSet);
-
-			// validate
-			logger.debug("Getting the data set dao..");
-			IDataSetDAO dataSetDao = DAOFactory.getDataSetDAO();
-			logger.debug("DatasetDAo loaded");
-			logger.debug("Inserting the data set wit the dao...");
-			toReturn = dataSetDao.insertDataSet(dataSet);
-			logger.debug("Data Set inserted");
-			if (toReturn != null) {
-				logger.info("DataSet " + dataSet.getLabel() + " saved with id = " + toReturn);
-			} else {
-				logger.error("DataSet not saved: check error log");
-			}
-
-		} catch (ValidationException e) {
-			logger.error("Failed validation of dataset " + dataSet.getLabel() + " with cause: " + e.getValidationMessage());
-			throw new RuntimeException(e.getValidationMessage(), e);
-		} catch (EMFUserError e) {
-			logger.error("EmfUserError ", e);
-			throw new RuntimeException("EmfUserError ", e);
-		}
-
-		logger.debug("OUT");
-		return toReturn;
-	}
-
-	private boolean validateDataSet(IDataSet dataSet) throws ValidationException, EMFUserError {
-		logger.debug("IN");
-
-		logger.debug("check the dataset not alreaduy present with same label");
-
-		IDataSet datasetLab = DAOFactory.getDataSetDAO().loadDataSetByLabel(dataSet.getLabel());
-		// checkQbeDataset(datasetLab);
-
-		if (datasetLab != null) {
-			throw new ValidationException("Dataset with label " + dataSet.getLabel() + " already found");
-		}
-
-		logger.debug("OUT");
-		return true;
-
-	}
-
-	public class ValidationException extends Exception {
-		private final String validationMessage;
-
-		ValidationException(String _validationMessage) {
-			super();
-			this.validationMessage = _validationMessage;
-		}
-
-		ValidationException(String _validationMessage, Throwable e) {
-			super(e);
-			this.validationMessage = _validationMessage;
-		}
-
-		public String getValidationMessage() {
-			return this.validationMessage;
-		}
-
-	}
-
 	// ------------------------------------------------------------------------------
 	// Methods for extracting information from CrosstabDefinition and related
 	// ------------------------------------------------------------------------------
@@ -870,9 +702,10 @@ public class DatasetManagementAPI {
 	 * @deprecated
 	 */
 	@Deprecated
-	private List<ProjectionCriteria> getProjectionCriteria(String dataset, CrosstabDefinition crosstabDefinition) {
+	private List<Projection> getProjections(IDataSet dataSet, CrosstabDefinition crosstabDefinition) {
 		logger.debug("IN");
-		List<ProjectionCriteria> projectionCriterias = new ArrayList<>();
+
+		List<Projection> projections = new ArrayList<>();
 
 		List<CrosstabDefinition.Row> rows = crosstabDefinition.getRows();
 		List<CrosstabDefinition.Column> colums = crosstabDefinition.getColumns();
@@ -883,16 +716,14 @@ public class DatasetManagementAPI {
 		while (columsIt.hasNext()) {
 			CrosstabDefinition.Column aColumn = columsIt.next();
 			String columnName = aColumn.getEntityId();
-			ProjectionCriteria aProjectionCriteria = new ProjectionCriteria(dataset, columnName, null, columnName);
-			projectionCriterias.add(aProjectionCriteria);
+			projections.add(new Projection(dataSet, columnName));
 		}
 		// appends rows
 		Iterator<CrosstabDefinition.Row> rowsIt = rows.iterator();
 		while (rowsIt.hasNext()) {
 			CrosstabDefinition.Row aRow = rowsIt.next();
 			String columnName = aRow.getEntityId();
-			ProjectionCriteria aProjectionCriteria = new ProjectionCriteria(dataset, columnName, null, columnName);
-			projectionCriterias.add(aProjectionCriteria);
+			projections.add(new Projection(dataSet, columnName));
 		}
 
 		// appends measures
@@ -915,27 +746,24 @@ public class DatasetManagementAPI {
 				 */
 			} else {
 				if (function != AggregationFunctions.NONE_FUNCTION) {
-					ProjectionCriteria aProjectionCriteria = new ProjectionCriteria(dataset, columnName, function.getName(), columnName);
-					projectionCriterias.add(aProjectionCriteria);
+					projections.add(new Projection(function, dataSet, columnName));
 				} else {
-					ProjectionCriteria aProjectionCriteria = new ProjectionCriteria(dataset, columnName, null, columnName);
-					projectionCriterias.add(aProjectionCriteria);
+					projections.add(new Projection(dataSet, columnName));
 				}
 			}
-
 		}
 
 		logger.debug("OUT");
-		return projectionCriterias;
+		return projections;
 	}
 
 	/**
 	 * @deprecated
 	 */
 	@Deprecated
-	private List<GroupCriteria> getGroupCriteria(String dataset, CrosstabDefinition crosstabDefinition) {
+	private List<Projection> getGroups(IDataSet dataSet, CrosstabDefinition crosstabDefinition) {
 		logger.debug("IN");
-		List<GroupCriteria> groupCriterias = new ArrayList<>();
+		List<Projection> groups = new ArrayList<>();
 
 		List<CrosstabDefinition.Row> rows = crosstabDefinition.getRows();
 		List<CrosstabDefinition.Column> colums = crosstabDefinition.getColumns();
@@ -945,8 +773,7 @@ public class DatasetManagementAPI {
 		while (columsIt.hasNext()) {
 			CrosstabDefinition.Column aColumn = columsIt.next();
 			String columnName = aColumn.getEntityId();
-			GroupCriteria groupCriteria = new GroupCriteria(dataset, columnName, null);
-			groupCriterias.add(groupCriteria);
+			groups.add(new Projection(dataSet, columnName));
 		}
 
 		// appends rows
@@ -954,11 +781,10 @@ public class DatasetManagementAPI {
 		while (rowsIt.hasNext()) {
 			CrosstabDefinition.Row aRow = rowsIt.next();
 			String columnName = aRow.getEntityId();
-			GroupCriteria groupCriteria = new GroupCriteria(dataset, columnName, null);
-			groupCriterias.add(groupCriteria);
+			groups.add(new Projection(dataSet, columnName));
 		}
 		logger.debug("OUT");
-		return groupCriterias;
+		return groups;
 	}
 
 	protected void adjustMetadata(DataStore dataStore, IDataSet dataset, JSONArray fieldOptions) {
@@ -1015,185 +841,6 @@ public class DatasetManagementAPI {
 				}
 			}
 		}
-	}
-
-	/**
-	 * The association is valid if number of records froma ssociation is less than Maximum of single datasets
-	 *
-	 * @param dsLabel1
-	 * @param dsLabel2
-	 * @param field1
-	 * @param field2
-	 * @return
-	 * @throws Exception
-	 */
-
-	public boolean checkAssociation(JSONArray arrayAss) throws Exception {
-		logger.debug("IN");
-
-		logger.debug("Check join");
-		boolean toReturn = false;
-
-		String[] synonims = new String[] { "a", "b", "c", "d", "e", "f", "g", "h", "i", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "z" };
-		String where = "";
-
-		SelectBuilder joinSqlBuilder = new SelectBuilder();
-		joinSqlBuilder.column("count(*) counter");
-
-		try {
-			SQLDBCache cache = (SQLDBCache) SpagoBICacheManager.getCache();
-			cache.setUserProfile(userProfile);
-			IDataSource dataSource = cache.getDataSource();
-			Long maxSingleCount = 0L;
-
-			// all arrays with fields of a single association
-			ArrayList<JSONArray> assFieldsJSONArray = new ArrayList<>();
-			// mapping datasetLabel to table involved
-			Map<String, String> datasetsLabelsMap = new HashMap<>();
-			// maps each table to the synonim used in the join clause
-			Map<String, String> tableSynonimMap = new HashMap<>();
-
-			logger.debug("cycle on associations");
-			for (int j = 0; j < arrayAss.length(); j++) {
-
-				logger.debug("this is an association");
-
-				JSONObject association = (JSONObject) arrayAss.get(j);
-				JSONArray fieldsAss = association.getJSONArray("fields");
-				assFieldsJSONArray.add(fieldsAss);
-
-				logger.debug("cycle on fields");
-				// Collect all tables involved
-				for (int z = 0; z < fieldsAss.length(); z++) {
-					JSONObject field = (JSONObject) fieldsAss.get(z);
-					String dsLabel = field.getString("store");
-
-					if (!datasetsLabelsMap.keySet().contains(dsLabel)) {
-
-						logger.debug("Dataset with label " + dsLabel);
-						IDataSet dataset = DAOFactory.getDataSetDAO().loadDataSetByLabel(dsLabel);
-						// Datasets related to documents are not on DB so
-						// 'dataset' can be null
-						if (dataset == null) {
-							// assFieldsJSONArray.get(assFieldsJSONArray.size()-1).remove(z);
-							fieldsAss.remove(z);
-							continue;
-						}
-						// checkQbeDataset(dataset);
-
-						// check datasets are cached otherwise cache it
-						// IDataStore cachedResultSet = cache.get(dataset);
-						// if (cachedResultSet == null) {
-						if (!cache.getMetadata().containsCacheItem(dataset.getSignature())) {
-							logger.error("dataset " + dataset.getLabel() + " is not already cached, cache it");
-							// IDataStore dataStore = dataStore =
-							// cache.refresh(dataset, false);
-							cache.refresh(dataset, true);
-						}
-
-						String table = cache.getMetadata().getCacheItem(dataset.getSignature()).getTable();
-						logger.debug("Table " + table);
-						// dataset to table mapping
-						datasetsLabelsMap.put(dsLabel, table);
-
-						logger.debug("Execute dataset to count records and keep track of max");
-
-						// count single value
-						SelectBuilder sqlBuilder = new SelectBuilder();
-						sqlBuilder = new SelectBuilder();
-						sqlBuilder.column("count(*) counter");
-						sqlBuilder.from(table + " a");
-						String queryText1 = sqlBuilder.toString();
-						logger.debug("execute " + queryText1);
-						IDataStore dataStore = dataSource.executeStatement(queryText1, 0, 0);
-						Object countO = ((DataStore) dataStore).getRecordAt(0).getFieldAt(0).getValue();
-						Long count1 = (countO instanceof Long) ? (Long) countO : Long.valueOf(((Number) countO).longValue());
-
-						logger.debug("On query on table " + table + " counted " + count1 + " records");
-
-						if (count1 > maxSingleCount) {
-							maxSingleCount = count1;
-						}
-
-					}
-
-				}
-
-				logger.debug("Maximum among tables count is " + maxSingleCount);
-
-			}
-
-			// Build join query
-
-			logger.debug("Write from and join clauses for join query");
-
-			int index = 0;
-			for (Iterator iterator = datasetsLabelsMap.keySet().iterator(); iterator.hasNext();) {
-				String dsLabel = (String) iterator.next();
-				String table = datasetsLabelsMap.get(dsLabel);
-				joinSqlBuilder.from(table + " " + synonims[index]);
-				tableSynonimMap.put(table, synonims[index]);
-
-				index++;
-			}
-
-			// "fields":[{"store":"ds__4221948","column":"Citta"},{"store":"ALTRO_USER","column":"Regione"},{"store":"ds__3714475","column":"Citta"}]}]"
-			logger.debug("Build and write where clauses for join query");
-
-			for (int j = 0; j < assFieldsJSONArray.size(); j++) {
-				JSONArray fieldsJSOONArray = assFieldsJSONArray.get(j);
-				for (int i = 0; i < fieldsJSOONArray.length(); i++) {
-					JSONObject field = fieldsJSOONArray.getJSONObject(i);
-					String dsLabel = field.getString("store");
-					String column = field.getString("column");
-					String table = datasetsLabelsMap.get(dsLabel);
-					String synonim = tableSynonimMap.get(table);
-
-					if (i > 0 && table != null) {
-						if (!where.isEmpty()) {
-							where += " AND ";
-						}
-						JSONObject previousField = fieldsJSOONArray.getJSONObject(i - 1);
-						String previousDsLabel = previousField.getString("store");
-						String previousColumn = previousField.getString("column");
-						String previousTable = datasetsLabelsMap.get(previousDsLabel);
-						String previousSynonim = tableSynonimMap.get(previousTable);
-
-						// add where conditions
-						where += synonim + "." + AbstractJDBCDataset.encapsulateColumnName(column, dataSource) + "=" + previousSynonim + "."
-								+ AbstractJDBCDataset.encapsulateColumnName(previousColumn, dataSource);
-					}
-				}
-			}
-			// checking if there is a where condition
-			if (where == null || "".equals(where)) {
-				// no one association to check
-				toReturn = true;
-			} else {
-				logger.debug("Join where condition is " + where);
-				joinSqlBuilder.where(where);
-
-				String joinQueryText = joinSqlBuilder.toString();
-				logger.debug("Join query is equal to [" + joinQueryText + "]");
-				IDataStore joinDataStore = dataSource.executeStatement(joinQueryText, 0, 0);
-				Object joinCountO = ((DataStore) joinDataStore).getRecordAt(0).getFieldAt(0).getValue();
-				Long joinCount = (joinCountO instanceof Long) ? (Long) joinCountO : Long.valueOf(((Number) joinCountO).longValue());
-
-				if (joinCount > maxSingleCount) {
-					logger.warn("Chosen join among tables return too many rows");
-					toReturn = false;
-				} else {
-					logger.debug("Chosen join among tables is valid");
-					toReturn = true;
-				}
-			}
-		} catch (Exception e) {
-			logger.error("Error while checking the join among tables return too many rows", e);
-			throw new Exception("Error while checking the join among tables", e);
-		} finally {
-			logger.debug("OUT");
-		}
-		return toReturn;
 	}
 
 	/*
@@ -1285,48 +932,42 @@ public class DatasetManagementAPI {
 		return statement;
 	}
 
-	private IDataStore queryPersistedDataset(List<GroupCriteria> groups, List<FilterCriteria> filters, List<FilterCriteria> havings,
-			List<ProjectionCriteria> projections, List<ProjectionCriteria> summaryRowProjections, IDataSet dataSet, int offset, int fetchSize, int maxRowCount)
-			throws InstantiationException, IllegalAccessException {
+	private IDataStore queryPersistedDataset(IDataSet dataSet, List<Projection> projections, Filter filter, List<Projection> groups, List<Sorting> sortings,
+			List<Projection> summaryRowProjections, int offset, int fetchSize, int maxRowCount) throws DataBaseException {
 		IDataSource dataSource = dataSet.getDataSourceForWriting();
 		String tableName = dataSet.getPersistTableName();
-		return queryDataset(new SelectBuilder(), dataSource, tableName, groups, filters, havings, projections, summaryRowProjections, dataSet, offset,
-				fetchSize, maxRowCount);
+		return queryDataset(dataSet, dataSource, projections, tableName, filter, groups, sortings, summaryRowProjections, offset, fetchSize, maxRowCount);
 	}
 
-	private IDataStore queryFlatDataset(List<GroupCriteria> groups, List<FilterCriteria> filters, List<FilterCriteria> havings,
-			List<ProjectionCriteria> projections, List<ProjectionCriteria> summaryRowProjections, IDataSet dataSet, int offset, int fetchSize, int maxRowCount)
-			throws InstantiationException, IllegalAccessException {
+	private IDataStore queryFlatDataset(IDataSet dataSet, List<Projection> projections, Filter filter, List<Projection> groups, List<Sorting> sortings,
+			List<Projection> summaryRowProjections, int offset, int fetchSize, int maxRowCount) throws DataBaseException {
 		IDataSource dataSource = dataSet.getDataSource();
 		String tableName = dataSet.getFlatTableName();
-		return queryDataset(new SelectBuilder(), dataSource, tableName, groups, filters, havings, projections, summaryRowProjections, dataSet, offset,
-				fetchSize, maxRowCount);
+		return queryDataset(dataSet, dataSource, projections, tableName, filter, groups, sortings, summaryRowProjections, offset, fetchSize, maxRowCount);
 	}
 
-	private IDataStore queryJDBCDataset(List<GroupCriteria> groups, List<FilterCriteria> filters, List<FilterCriteria> havings,
-			List<ProjectionCriteria> projections, List<ProjectionCriteria> summaryRowProjections, IDataSet dataSet, int offset, int fetchSize, int maxRowCount)
-			throws JSONException, Exception, IllegalAccessException {
+	private IDataStore queryJDBCDataset(IDataSet dataSet, List<Projection> projections, Filter filter, List<Projection> groups, List<Sorting> sortings,
+			List<Projection> summaryRowProjections, int offset, int fetchSize, int maxRowCount) throws DataBaseException {
 		IDataSource dataSource = dataSet.getDataSource();
 		QuerableBehaviour querableBehaviour = (QuerableBehaviour) dataSet.getBehaviour(QuerableBehaviour.class.getName());
-		String tableName = querableBehaviour.getStatement();
-		InLineViewBuilder sqlBuilder = new InLineViewBuilder();
-		return queryDataset(sqlBuilder, dataSource, tableName, groups, filters, havings, projections, summaryRowProjections, dataSet, offset, fetchSize,
-				maxRowCount);
+		String subQueryAlias = DataBaseFactory.getDataBase(dataSource).getSubQueryAlias();
+		String tableName = "(" + querableBehaviour.getStatement().replace(";", "") + ") " + subQueryAlias;
+		return queryDataset(dataSet, dataSource, projections, tableName, filter, groups, sortings, summaryRowProjections, offset, fetchSize, maxRowCount);
 	}
 
-	private IDataStore queryNearRealtimeDataset(List<GroupCriteria> groups, List<FilterCriteria> filters, List<FilterCriteria> havings,
-			List<ProjectionCriteria> projections, List<ProjectionCriteria> summaryRowProjections, IDataSet dataSet, int offset, int fetchSize,
-			int maxRowCount) {
+	private IDataStore queryRealtimeDataset(IDataSet dataSet, List<Projection> projections, Filter filter, List<Projection> groups, List<Sorting> sortings,
+			List<Projection> summaryRowProjections, int offset, int fetchSize, int maxRowCount) throws DataBaseException {
 		dataSet.loadData();
 		IDataStore dataStore = dataSet.getDataStore();
 		if (dataStore != null && dataStore.getRecordsCount() < METAMODEL_LIMIT) {
 			String tableName = DataStore.DEFAULT_SCHEMA_NAME + "." + DataStore.DEFAULT_TABLE_NAME;
 			List<String> orderColumns = new ArrayList<>();
 
-			String originalQuery = getQueryText(null, tableName, groups, filters, havings, projections, null, dataSet, true, orderColumns);
+			PreparedStatementData data = new SelectQuery(dataSet).selectDistinct().select(projections).from(tableName).where(filter).groupBy(groups)
+					.orderBy(sortings).getPreparedStatementData(null);
 			boolean hasSortingOnCalculatedColumns = checkSortingOnCalculatedColumns(orderColumns);
 
-			IDataStore originalDataStore = dataStore.aggregateAndFilterRecords(originalQuery, -1, -1, maxRowCount);
+			IDataStore originalDataStore = dataStore.aggregateAndFilterRecords(data.getQuery(), data.getValues(), -1, -1, maxRowCount, null);
 			if (hasSortingOnCalculatedColumns) {
 				appendCalculatedColumnsToDataStore(projections, originalDataStore);
 				sortColumnsOnDataStore(orderColumns, originalDataStore);
@@ -1337,9 +978,11 @@ public class DatasetManagementAPI {
 				appendCalculatedColumnsToDataStore(projections, pagedDataStore);
 			}
 
-			if (summaryRowProjections != null && summaryRowProjections.size() > 0) {
-				String summaryRowQuery = getQueryText(null, tableName, groups, filters, havings, projections, summaryRowProjections, dataSet, true, null);
-				IDataStore summaryRowDataStore = originalDataStore.aggregateAndFilterRecords(summaryRowQuery, -1, -1, maxRowCount);
+			if (summaryRowProjections != null && !summaryRowProjections.isEmpty()) {
+				PreparedStatementData summaryRowData = new SelectQuery(dataSet).selectDistinct().select(summaryRowProjections).from(tableName).where(filter)
+						.orderBy(sortings).getPreparedStatementData(null);
+				IDataStore summaryRowDataStore = originalDataStore.aggregateAndFilterRecords(summaryRowData.getQuery(), summaryRowData.getValues(), -1, -1,
+						maxRowCount, null);
 				appendSummaryRowToPagedDataStore(projections, summaryRowProjections, pagedDataStore, summaryRowDataStore);
 			}
 
@@ -1353,7 +996,7 @@ public class DatasetManagementAPI {
 		return dataStore;
 	}
 
-	private void appendCalculatedColumnsToDataStore(List<ProjectionCriteria> projections, IDataStore pagedDataStore) {
+	private void appendCalculatedColumnsToDataStore(List<Projection> projections, IDataStore pagedDataStore) {
 		if (projections != null) {
 			IMetaData storeMetaData = pagedDataStore.getMetaData();
 
@@ -1361,11 +1004,10 @@ public class DatasetManagementAPI {
 			Map<String, String> basicColumnMap = new HashMap<>(); // aggregated basic column name -> basic column name
 			Map<String, Integer> fieldIndexMap = new HashMap<>(); // basic column name -> field index
 
-			for (ProjectionCriteria projection : projections) {
-				String columnName = projection.getColumnName();
+			for (Projection projection : projections) {
+				String columnName = projection.getName();
 
-				String aggregateFunction = projection.getAggregateFunction();
-				IAggregationFunction aggregationFunction = AggregationFunctions.get(aggregateFunction);
+				IAggregationFunction aggregationFunction = projection.getAggregationFunction();
 
 				if (columnName.contains(AbstractDataBase.STANDARD_ALIAS_DELIMITER)) { // this is a calculated field!
 					for (String basicColumnName : getBasicColumnsFromCalculatedColumn(columnName)) {
@@ -1425,7 +1067,7 @@ public class DatasetManagementAPI {
 						} else {
 							fieldMetaData.setName(columnName);
 						}
-						String aliasName = projection.getAliasName();
+						String aliasName = projection.getAlias();
 						if (aliasName != null && !aliasName.isEmpty()) {
 							fieldMetaData.setAlias(aliasName);
 						}
@@ -1520,315 +1162,64 @@ public class DatasetManagementAPI {
 		}
 	}
 
-	public void appendSummaryRowToPagedDataStore(List<ProjectionCriteria> projections, List<ProjectionCriteria> summaryRowProjections,
-			IDataStore pagedDataStore, IDataStore summaryRowDataStore) {
-		// calc a map for summaryRowProjections -> projections
-		Map<Integer, Integer> projectionToSummaryRowProjection = new HashMap<>();
-		for (int i = 0; i < summaryRowProjections.size(); i++) {
-			ProjectionCriteria summaryRowProjection = summaryRowProjections.get(i);
-			for (int j = 0; j < projections.size(); j++) {
-				ProjectionCriteria projection = projections.get(j);
-				if (summaryRowProjection.getColumnName().equals(projection.getAliasName())) {
-					projectionToSummaryRowProjection.put(j, i);
-					break;
-				}
-			}
-		}
-
+	public void appendSummaryRowToPagedDataStore(List<Projection> projections, List<Projection> summaryRowProjections, IDataStore pagedDataStore,
+			IDataStore summaryRowDataStore) {
 		IMetaData pagedMetaData = pagedDataStore.getMetaData();
 		IMetaData summaryRowMetaData = summaryRowDataStore.getMetaData();
 
-		// append summary row
-		IRecord summaryRowRecord = summaryRowDataStore.getRecordAt(0);
-		Record newRecord = new Record();
-		for (int projectionIndex = 0; projectionIndex < pagedMetaData.getFieldCount(); projectionIndex++) {
-			Field field = new Field(null);
-			if (projectionToSummaryRowProjection.containsKey(projectionIndex)) {
-				Integer summaryRowIndex = projectionToSummaryRowProjection.get(projectionIndex);
-				Object value = summaryRowRecord.getFieldAt(summaryRowIndex).getValue();
-				field.setValue(value);
+		if (pagedMetaData.getFieldCount() >= summaryRowMetaData.getFieldCount()) {
+			// calc a map for summaryRowProjections -> projections
+			Map<Integer, Integer> projectionToSummaryRowProjection = new HashMap<>();
+			for (int i = 0; i < summaryRowProjections.size(); i++) {
+				Projection summaryRowProjection = summaryRowProjections.get(i);
+				for (int j = 0; j < projections.size(); j++) {
+					Projection projection = projections.get(j);
+					String projectionAlias = projection.getAlias();
+					if (summaryRowProjection.getAlias().equals(projectionAlias) || summaryRowProjection.getName().equals(projectionAlias)) {
+						projectionToSummaryRowProjection.put(j, i);
+						break;
+					}
+				}
 			}
-			newRecord.appendField(field);
-		}
-		pagedDataStore.appendRecord(newRecord);
 
-		// copy metadata from summary row
-		for (Integer projectionIndex : projectionToSummaryRowProjection.keySet()) {
-			Integer summaryRowIndex = projectionToSummaryRowProjection.get(projectionIndex);
-			pagedMetaData.getFieldMeta(projectionIndex).setType(summaryRowMetaData.getFieldType(summaryRowIndex));
+			// append summary row
+			IRecord summaryRowRecord = summaryRowDataStore.getRecordAt(0);
+			Record newRecord = new Record();
+			for (int projectionIndex = 0; projectionIndex < pagedMetaData.getFieldCount(); projectionIndex++) {
+				Field field = new Field(null);
+				if (projectionToSummaryRowProjection.containsKey(projectionIndex)) {
+					Integer summaryRowIndex = projectionToSummaryRowProjection.get(projectionIndex);
+					Object value = summaryRowRecord.getFieldAt(summaryRowIndex).getValue();
+					field.setValue(value);
+				}
+				newRecord.appendField(field);
+			}
+			pagedDataStore.appendRecord(newRecord);
+
+			// copy metadata from summary row
+			for (Integer projectionIndex : projectionToSummaryRowProjection.keySet()) {
+				Integer summaryRowIndex = projectionToSummaryRowProjection.get(projectionIndex);
+				pagedMetaData.getFieldMeta(projectionIndex).setType(summaryRowMetaData.getFieldType(summaryRowIndex));
+			}
 		}
 	}
 
-	private IDataStore queryDataset(SelectBuilder sqlBuilder, IDataSource dataSource, String tableName, List<GroupCriteria> groups,
-			List<FilterCriteria> filters, List<FilterCriteria> havings, List<ProjectionCriteria> projections, List<ProjectionCriteria> summaryRowProjections,
-			IDataSet dataSet, int offset, int fetchSize, int maxRowCount) throws InstantiationException, IllegalAccessException {
+	private IDataStore queryDataset(IDataSet dataSet, IDataSource dataSource, List<Projection> projections, String tableName, Filter filter,
+			List<Projection> groups, List<Sorting> sortings, List<Projection> summaryRowProjections, int offset, int fetchSize, int maxRowCount)
+			throws DataBaseException {
 		logger.debug("IN");
 
-		String query = getQueryText(sqlBuilder, dataSource, tableName, groups, filters, havings, projections, null, dataSet, false, null);
-		IDataStore pagedDataStore = dataSource.executeStatement(query, offset, fetchSize, maxRowCount);
+		SelectQuery selectQuery = new SelectQuery(dataSet).selectDistinct().select(projections).from(tableName).where(filter).groupBy(groups).orderBy(sortings);
+		IDataStore pagedDataStore = dataSource.executeStatement(selectQuery, offset, fetchSize, maxRowCount);
 
-		if (summaryRowProjections != null && summaryRowProjections.size() > 0) {
-			String summaryRowQuery = getQueryText(sqlBuilder.getClass().newInstance(), dataSource, tableName, groups, filters, havings, projections,
-					summaryRowProjections, dataSet, false, null);
+		if (summaryRowProjections != null && !summaryRowProjections.isEmpty()) {
+			String summaryRowQuery = new SelectQuery(dataSet).selectDistinct().select(summaryRowProjections).from(tableName).where(filter).toSql(dataSource);
 			IDataStore summaryRowDataStore = dataSource.executeStatement(summaryRowQuery, -1, -1, maxRowCount);
 			appendSummaryRowToPagedDataStore(projections, summaryRowProjections, pagedDataStore, summaryRowDataStore);
 		}
 
 		logger.debug("OUT");
 		return pagedDataStore;
-	}
-
-	public String getQueryText(IDataSource dataSource, String tableName, List<GroupCriteria> groups, List<FilterCriteria> filters, List<FilterCriteria> havings,
-			List<ProjectionCriteria> projections, List<ProjectionCriteria> summaryRowProjections, IDataSet dataSet, boolean isNearRealtime,
-			List<String> outputOrderColumns) {
-		return getQueryText(new SelectBuilder(), dataSource, tableName, groups, filters, havings, projections, summaryRowProjections, dataSet, isNearRealtime,
-				outputOrderColumns);
-	}
-
-	public String getQueryText(SelectBuilder sqlBuilder, IDataSource dataSource, String tableName, List<GroupCriteria> groups, List<FilterCriteria> filters,
-			List<FilterCriteria> havings, List<ProjectionCriteria> projections, List<ProjectionCriteria> summaryRowProjections, IDataSet dataSet,
-			boolean isNearRealtime, List<String> outputOrderColumns) {
-
-		if (tableName == null || tableName.isEmpty() || (!isNearRealtime && dataSource == null)) {
-			throw new IllegalArgumentException(
-					"Found one or more arguments invalid. Tablename [" + tableName + "] and/or dataSource [" + dataSource + "] are null or empty.");
-		}
-
-		String label = dataSet.getLabel();
-		logger.debug("Build query for dataset [" + label + "] with table name [" + tableName + "]");
-		logger.debug("Loading data from [" + label + "] to gather its metadata...");
-
-		List<String> orderColumns = new ArrayList<>();
-		String queryText = null;
-		if (summaryRowProjections == null || summaryRowProjections.size() == 0 || !isNearRealtime) {
-			sqlBuilder.from(tableName);
-
-			setColumnsToSelect(dataSource, projections, sqlBuilder, orderColumns, isNearRealtime, dataSet);
-			setWhereConditions(dataSource, filters, sqlBuilder);
-			setGroupbyConditions(dataSource, groups, sqlBuilder, dataSet);
-			setHavingConditions(dataSource, havings, sqlBuilder);
-			setOrderbyConditions(dataSource, orderColumns, sqlBuilder);
-
-			queryText = sqlBuilder.toString();
-		}
-
-		if (summaryRowProjections != null && summaryRowProjections.size() > 0) {
-			StringBuilder sb = new StringBuilder();
-			sb.append("SELECT ");
-			String comma = "";
-			for (int i = 0; i < projections.size(); i++) {
-				ProjectionCriteria projection = projections.get(i);
-				String alias = projection.getAliasName();
-				String aggregateFunction = null;
-				for (ProjectionCriteria summaryRowProjection : summaryRowProjections) {
-					String columnName = summaryRowProjection.getColumnName();
-					if (columnName.equals(alias)) {
-						aggregateFunction = summaryRowProjection.getAggregateFunction();
-						break;
-					}
-				}
-				if (aggregateFunction != null) {
-					sb.append(comma);
-					comma = ",";
-					sb.append(aggregateFunction);
-					sb.append("(");
-					sb.append(AbstractJDBCDataset.encapsulateColumnName(alias, dataSource));
-					sb.append(")");
-				}
-			}
-			sb.append(" FROM ");
-			if (isNearRealtime) {
-				sb.append(tableName);
-			} else {
-				sb.append("(");
-				sb.append(queryText);
-				sb.append(") T");
-			}
-
-			queryText = sb.toString();
-		}
-		logger.debug("Dataset access query is equal to [" + queryText + "]");
-
-		if (outputOrderColumns != null) {
-			outputOrderColumns.clear();
-			outputOrderColumns.addAll(orderColumns);
-		}
-
-		return queryText;
-	}
-
-	private void setColumnsToSelect(IDataSource dataSource, List<ProjectionCriteria> projections, SelectBuilder sqlBuilder, List<String> orderColumns,
-			boolean isNearRealtime, IDataSet dataSet) {
-
-		boolean isHsqlDialect = false;
-		if (dataSource != null) {
-			isHsqlDialect = dataSource.getHibDialectName().contains("hsql");
-		}
-
-		if (orderColumns == null) {
-			throw new SpagoBIRuntimeException("Unable to manage ORDER BY clauses");
-		}
-
-		ArrayList<String> arrayCategoriesForOrdering = new ArrayList<>();
-		String keepCategoryForOrdering = "";
-		boolean columnAndCategoryAreTheSame = false;
-		boolean isOrderColumnPresent = false;
-		boolean isAggregationPresent = false;
-
-		if (projections != null) {
-			Set<String> notCalculatedColumns = new HashSet<>();
-			Set<String> aggregatedBasicColumns = new HashSet<>();
-
-			for (ProjectionCriteria projection : projections) {
-				String columnName = projection.getColumnName();
-				boolean isCalculatedColumn = columnName.contains(AbstractDataBase.STANDARD_ALIAS_DELIMITER);
-				String aggregateFunction = projection.getAggregateFunction();
-				IAggregationFunction aggregationFunction = AggregationFunctions.get(aggregateFunction);
-				String aliasName = projection.getAliasName();
-				boolean hasAlias = aliasName != null && !aliasName.isEmpty();
-				String orderType = projection.getOrderType().toUpperCase();
-
-				if (columnName.contains(":")) {
-					columnName = getQbeDataSetColumn(dataSet, columnName);
-				}
-
-				if (isCalculatedColumn) {
-					// this is a calculated field!
-					if (isNearRealtime) {
-						if (aggregationFunction == null) {
-							throw new SpagoBIRuntimeException("Projection [" + columnName + "] requires an aggregation function");
-						}
-						Set<String> basicColumns = getBasicColumnsFromCalculatedColumn(columnName);
-						for (String basicColumn : basicColumns) {
-							aggregatedBasicColumns.add(aggregationFunction.apply(basicColumn));
-						}
-					} else {
-						columnName = AbstractJDBCDataset.substituteStandardWithDatasourceDelimiter(columnName, dataSource);
-					}
-				} else {
-					if (!columnName.equals("*")) {
-						columnName = AbstractJDBCDataset.encapsulateColumnName(columnName, dataSource);
-					}
-				}
-
-				aliasName = AbstractJDBCDataset.encapsulateColumnName(aliasName, dataSource);
-				if (aggregationFunction != null && !aggregationFunction.equals(AggregationFunctions.NONE_FUNCTION) && columnName != "*") {
-					columnName = aggregationFunction.apply(columnName);
-					isAggregationPresent = true;
-					if (hasAlias) {
-						if (orderType != null && !orderType.isEmpty()) {
-							if (isHsqlDialect) {
-								orderColumns.add(aliasName + " " + orderType);
-							} else {
-								orderColumns.add(columnName + " " + orderType);
-							}
-						}
-					} else {
-						throw new SpagoBIRuntimeException("Projection [" + columnName + "] requires an alias");
-					}
-				} else {
-					/**
-					 * Handling of the ordering criteria set for the first category.
-					 *
-					 * @author Danilo Ristovski (danristo, danilo.ristovski@mht.net)
-					 */
-					// If the order type is not defined for current item, consider it as it is of an empty value (empty string).
-					if (orderType == null) {
-						orderType = "";
-					}
-
-					String orderColumn = projection.getOrderColumn();
-					/**
-					 * If the order column is defined and is not an empty string the column (attribute) through which the first category should be ordered is
-					 * set.
-					 */
-					if (orderColumn != null && !orderColumn.isEmpty()) {
-						isOrderColumnPresent = true;
-						orderColumn = AbstractJDBCDataset.encapsulateColumnName(orderColumn, dataSource);
-
-						if (orderType.isEmpty()) {
-							arrayCategoriesForOrdering.add(orderColumn + " ASC");
-						} else {
-							arrayCategoriesForOrdering.add(orderColumn + " " + orderType);
-						}
-
-						/**
-						 * If the ordering column is the same as the category for which is set.
-						 */
-						if (orderColumn.equals(columnName)) {
-							columnAndCategoryAreTheSame = true;
-						} else {
-							sqlBuilder.column(orderColumn);
-							sqlBuilder.groupBy(orderColumn);
-						}
-					} else {
-						if (!orderType.isEmpty()) {
-							if (hasAlias && isHsqlDialect) {
-								orderColumns.add(aliasName + " " + orderType);
-							} else {
-								orderColumns.add(columnName + " " + orderType);
-							}
-						} else {
-							/**
-							 * Keep the ordering for the first category so it can be appended to the end of the ORDER BY clause when it is needed.
-							 */
-							if (keepCategoryForOrdering.isEmpty()) {
-								if (hasAlias && isHsqlDialect) {
-									keepCategoryForOrdering = aliasName + " ASC";
-								} else {
-									keepCategoryForOrdering = columnName + " ASC";
-								}
-							}
-						}
-					}
-				}
-
-				if (!isCalculatedColumn) {
-					notCalculatedColumns.add(columnName);
-				}
-				if (!isCalculatedColumn || !isNearRealtime) {
-					if (hasAlias) {
-						columnName += " AS " + aliasName;
-					}
-					sqlBuilder.column(columnName);
-				}
-			}
-
-			if (isOrderColumnPresent) {
-				/**
-				 * Only in the case when the category name and the name of the column through which it should be ordered are not the same, append the part for
-				 * ordering that category to the end of the ORDER BY clause.
-				 *
-				 * @author Danilo Ristovski (danristo, danilo.ristovski@mht.net)
-				 */
-				if (!columnAndCategoryAreTheSame && !keepCategoryForOrdering.isEmpty()) {
-					arrayCategoriesForOrdering.add(keepCategoryForOrdering);
-				}
-
-				/**
-				 * Append ordering by categories (columns, attributes) at the end of the array of table columns through which the ordering of particular
-				 * ordering type should be performed. This is the way in which the query is constructed inside the Chart Engine, so we will keep the same
-				 * approach.
-				 *
-				 * @author Danilo Ristovski (danristo, danilo.ristovski@mht.net)
-				 */
-				for (int i = 0; i < arrayCategoriesForOrdering.size(); i++) {
-					orderColumns.add(arrayCategoriesForOrdering.get(i));
-				}
-			}
-
-			if (isNearRealtime && orderColumns.isEmpty() && !keepCategoryForOrdering.isEmpty()) {
-				orderColumns.add(keepCategoryForOrdering);
-			}
-
-			aggregatedBasicColumns.removeAll(notCalculatedColumns);
-
-			for (String additionalColumnName : aggregatedBasicColumns) {
-				sqlBuilder.column(additionalColumnName);
-			}
-
-			sqlBuilder.setDistinctEnabled(!isAggregationPresent);
-		}
 	}
 
 	private Set<String> getBasicColumnsFromCalculatedColumn(String columnName) {
@@ -1847,148 +1238,6 @@ public class DatasetManagementAPI {
 			endIndex++;
 		}
 		return columnNames;
-	}
-
-	private void setWhereConditions(IDataSource dataSource, List<FilterCriteria> filters, SelectBuilder sqlBuilder) {
-		if (filters != null) {
-			boolean isHsqlDialect = false;
-			boolean isSqlServerDialect = false;
-			if (dataSource != null) {
-				String dialect = dataSource.getHibDialectName();
-				if (dialect != null) {
-					isHsqlDialect = dialect.contains("hsql");
-					isSqlServerDialect = dialect.contains("sqlserver");
-				}
-			}
-
-			for (FilterCriteria filter : filters) {
-				String operator = filter.getOperator();
-
-				String leftOperand = null;
-				String[] columns = filter.getLeftOperand().getOperandValueAsString().split(",");
-				if ("IN".equalsIgnoreCase(operator)) {
-					leftOperand = (isHsqlDialect || isSqlServerDialect) ? "(" : "(1,";
-					String separator = "";
-					for (String value : columns) {
-						leftOperand += separator + AbstractJDBCDataset.encapsulateColumnName(value, dataSource);
-						separator = ",";
-					}
-					leftOperand += ")";
-				} else {
-					if (filter.getLeftOperand().isCostant()) {
-						// why? warning!
-						leftOperand = filter.getLeftOperand().getOperandValueAsString();
-					} else { // it's a column
-						String datasetLabel = filter.getLeftOperand().getOperandDataSet();
-						leftOperand = filter.getLeftOperand().getOperandValueAsString();
-						leftOperand = AbstractJDBCDataset.encapsulateColumnName(leftOperand, dataSource);
-					}
-				}
-
-				StringBuilder rightOperandSB = new StringBuilder();
-				if (filter.getRightOperand().isCostant()) {
-					if (filter.getRightOperand().isMultivalue()) {
-						if (!isHsqlDialect && !isSqlServerDialect) {
-							rightOperandSB.append("(");
-						}
-						String separator = "";
-						List<String> values = filter.getRightOperand().getOperandValueAsList();
-						for (int i = 0; i < values.size(); i++) {
-							String value = values.get(i);
-							if ("IN".equalsIgnoreCase(operator)) {
-								if (value.startsWith("(") && value.endsWith(")")) {
-									value = value.substring(1, value.length() - 1);
-								}
-								if (i % columns.length == 0) {// 1st item of tuple of values
-									if (i >= columns.length) { // starting from 2nd tuple of values
-										rightOperandSB.append(",");
-									}
-									rightOperandSB.append(isHsqlDialect || isSqlServerDialect ? "(" : "(1");
-								}
-								if (i % columns.length != 0 || (!isHsqlDialect && !isSqlServerDialect)) {
-									rightOperandSB.append(",");
-								}
-								rightOperandSB.append(value);
-								if (i % columns.length == columns.length - 1) { // last item of tuple of values
-									rightOperandSB.append(")");
-								}
-							} else {
-								rightOperandSB.append(separator);
-								rightOperandSB.append("'");
-								rightOperandSB.append(value);
-								rightOperandSB.append("'");
-							}
-							separator = ",";
-						}
-						if (!isHsqlDialect && !isSqlServerDialect) {
-							rightOperandSB.append(")");
-						}
-					} else {
-						rightOperandSB.append(filter.getRightOperand().getOperandValueAsString());
-					}
-				} else { // it's a column
-					rightOperandSB.append(AbstractJDBCDataset.encapsulateColumnName(filter.getRightOperand().getOperandValueAsString(), dataSource));
-				}
-
-				String rightOperandString = rightOperandSB.toString();
-				sqlBuilder.where("(" + leftOperand + " " + operator + " " + rightOperandString + ")");
-			}
-		}
-	}
-
-	private void setGroupbyConditions(IDataSource dataSource, List<GroupCriteria> groups, SelectBuilder sqlBuilder, IDataSet dataSet) {
-		if (groups != null) {
-			List<String> groupColumnNames = new ArrayList<>();
-
-			for (GroupCriteria group : groups) {
-				String columnName = group.getColumnName();
-				String aggregateFunction = group.getAggregateFunction();
-
-				if (columnName.contains(":")) {
-					columnName = getQbeDataSetColumn(dataSet, columnName);
-				}
-
-				columnName = AbstractJDBCDataset.encapsulateColumnName(columnName, dataSource);
-
-				if ((aggregateFunction != null) && (!aggregateFunction.isEmpty()) && (columnName != "*")) {
-					columnName = aggregateFunction + "(" + columnName + ")";
-				}
-
-				groupColumnNames.add(columnName);
-			}
-
-			for (String groupColumnName : groupColumnNames) {
-				sqlBuilder.groupBy(groupColumnName);
-			}
-		}
-	}
-
-	private void setHavingConditions(IDataSource dataSource, List<FilterCriteria> filters, SelectBuilder sqlBuilder) {
-		if (filters != null) {
-			for (FilterCriteria filter : filters) {
-				String leftOperand = filter.getLeftOperand().getOperandValueAsString();
-				String operator = filter.getOperator();
-				String rightOperand = filter.getRightOperand().getOperandValueAsString();
-				sqlBuilder.having("(" + leftOperand + " " + operator + " " + rightOperand + ")");
-			}
-		}
-	}
-
-	private void setOrderbyConditions(IDataSource dataSource, List<String> orderColumns, SelectBuilder sqlBuilder) {
-		// ORDER BY conditions
-		// https://production.eng.it/jira/browse/KNOWAGE-149
-		String aliasDelimiter = TemporaryTableManager.getAliasDelimiter(dataSource);
-		for (String orderColumn : orderColumns) {
-			int count = StringUtils.countMatches(orderColumn, aliasDelimiter);
-			if (aliasDelimiter.isEmpty() || count <= 2) {
-				sqlBuilder.orderBy(orderColumn);
-			}
-		}
-	}
-
-	private void setPagingConditions(int limit, int offset, SelectBuilder sqlBuilder) {
-		sqlBuilder.setLimit(limit);
-		sqlBuilder.setOffset(offset);
 	}
 
 	protected List<Integer> getCategories(IEngUserProfile profile) {
@@ -2033,19 +1282,7 @@ public class DatasetManagementAPI {
 		return categories;
 	}
 
-	private List<IDataSet> getFilteredDatasets(List<IDataSet> unfilteredDataSets, List<Integer> categories) {
-		List<IDataSet> dataSets = new ArrayList<>();
-		if (categories != null && categories.size() != 0) {
-			for (IDataSet ds : unfilteredDataSets) {
-				if (ds.getCategoryId() == null || categories.contains(ds.getCategoryId())) {
-					dataSets.add(ds);
-				}
-			}
-		}
-		return dataSets;
-	}
-
-	private void setDataSetParameters(IDataSet dataSet, Map<String, String> paramValues) {
+	public void setDataSetParameters(IDataSet dataSet, Map<String, String> paramValues) {
 		List<JSONObject> parameters = getDataSetParameters(dataSet.getLabel());
 		if (parameters.size() > paramValues.size()) {
 			String parameterNotValorizedStr = getParametersNotValorized(parameters, paramValues);
@@ -2061,11 +1298,18 @@ public class DatasetManagementAPI {
 						boolean isMultiValue = parameter.optBoolean("multiValuePar");
 						int length = isMultiValue ? values.length : 1;
 
+						String typePar = parameter.optString("typePar");
+						String delim = "string".equalsIgnoreCase(typePar) ? "'" : "";
+
 						List<String> newValues = new ArrayList<>();
 						for (int j = 0; j < length; j++) {
 							String value = values[j].trim();
 							if (!value.isEmpty()) {
-								newValues.add(value);
+								if (!value.startsWith(delim) && !value.endsWith(delim)) {
+									newValues.add(delim + value + delim);
+								} else {
+									newValues.add(value);
+								}
 							}
 						}
 						paramValues.put(paramName, StringUtils.join(newValues, ","));
@@ -2074,16 +1318,6 @@ public class DatasetManagementAPI {
 				}
 			}
 			dataSet.setParamsMap(paramValues);
-		}
-	}
-
-	public static boolean isJDBCDataSet(IDataSet dataSet) {
-		if (dataSet instanceof JDBCDataSet) {
-			return true;
-		} else if (dataSet instanceof VersionedDataSet && ((VersionedDataSet) dataSet).getWrappedDataset() instanceof JDBCDataSet) {
-			return true;
-		} else {
-			return false;
 		}
 	}
 
@@ -2108,6 +1342,7 @@ public class DatasetManagementAPI {
 			if (!file.exists()) {
 				logger.debug(
 						"Impossible to find a binary file named [" + hashSignature + DataSetConstants.DOMAIN_VALUES_EXTENSION + "] located at [" + path + "]");
+
 				calculateDomainValues(dataSet, wait);
 			}
 			if (wait) {
@@ -2179,7 +1414,7 @@ public class DatasetManagementAPI {
 	}
 
 	/**
-	 * if a filter has MAX() or MIN() value convert it bay calculating the right value
+	 * if a filter has MAX() or MIN() value convert it by calculating the right value
 	 *
 	 * @param label
 	 * @param parameters
@@ -2201,196 +1436,102 @@ public class DatasetManagementAPI {
 	 * @return
 	 */
 
-	public List<FilterCriteria> calculateMinMaxFilter(String label, String parameters, String selections, String likeSelections, int maxRowCount,
-			String aggregations, String summaryRow, int offset, int fetchSize, boolean isNearRealtime, List<GroupCriteria> groupCriteria,
-			List<FilterCriteria> filterCriteriaForMetaModel, List<ProjectionCriteria> summaryRowProjectionCriteria, List<FilterCriteria> havingCriteria,
-			List<FilterCriteria> havingCriteriaForMetaModel, List<FilterCriteria> filterCriteria, List<ProjectionCriteria> projectionCriteria) {
+	// FIXME
+	public List<Filter> calculateMinMaxFilters(IDataSet dataSet, boolean isNearRealtime, Map<String, String> parametersValues, List<Projection> projections,
+			List<Filter> filters, List<SimpleFilter> likeFilters, List<Projection> groups) {
 
 		logger.debug("IN");
 
-		// filters list with max min substituted, to be returned
-		List<FilterCriteria> toReturn = new ArrayList<FilterCriteria>();
+		List<Filter> newFilters = new ArrayList<>(filters);
 
-		// all other filters, use it to get max min values
-		List<FilterCriteria> noMaxMinfilterCriteria = new ArrayList<FilterCriteria>();
+		List<Integer> minMaxFilterIndexes = new ArrayList<>();
+		List<Projection> minMaxProjections = new ArrayList<>();
 
-		// indexes of max and min filters found in filtersCriteria
-		List<Integer> maxMinFilterCriteriaIndex = new ArrayList<>();
-		// map column name to filter criteria
-		Map<String, Integer> maxMinFilterCriteriaNameToIndex = new HashMap<String, Integer>();
+		List<Filter> noMinMaxFilters = new ArrayList<>();
 
-		// columns name with a min filter criteria
-		List<String> minFilterCriteriaString = new ArrayList<>();
-		// columns name with a max filter criteria
-		List<String> maxFilterCriteriaString = new ArrayList<>();
+		for (int i = 0; i < filters.size(); i++) {
+			Filter filter = filters.get(i);
+			if (filter instanceof SimpleFilter) {
+				SimpleFilter simpleFilter = (SimpleFilter) filter;
+				SimpleFilterOperator operator = simpleFilter.getOperator();
 
-		// what to put in select clause when retrieving for MAX or MIN
-		List<ProjectionCriteria> aggregationProjectionCriteria = new ArrayList<ProjectionCriteria>();
-		ArrayList<String> aggregationFields = new ArrayList<>();
+				if (SimpleFilterOperator.EQUALS_TO_MIN.equals(operator)) {
+					logger.debug("Min filter found at index [" + i + "]");
+					minMaxFilterIndexes.add(i);
 
-		/**
-		 * pass al filters criteria in order ot find MAX() or MIN() filters
-		 */
-		for (int i = 0; i < filterCriteria.size(); i++) {
-			FilterCriteria fc = filterCriteria.get(i);
-			String operator = fc.getOperator();
+					String columnName = ((SingleProjectionSimpleFilter) filter).getProjection().getName();
+					Projection projection = new Projection(AggregationFunctions.MIN_FUNCTION, dataSet, columnName);
+					minMaxProjections.add(projection);
+				} else if (SimpleFilterOperator.EQUALS_TO_MAX.equals(operator)) {
+					logger.debug("Max filter found at index [" + i + "]");
+					minMaxFilterIndexes.add(i);
 
-			Operand leftOperand = fc.getLeftOperand();
-			Object lov = leftOperand.getOperandValue();
-			String letOp = lov.toString();
-
-			// Operand rightOperand = fc.getRightOperand();
-			// Object rov = rightOperand.getOperandValue();
-			// String values = rov.toString();
-
-			if (operator.equalsIgnoreCase("min")) {
-				logger.debug("found a MIN filter criteria at index " + i + " for coulmnn " + fc.getLeftOperand().getOperandValueAsString());
-				String columnName = fc.getLeftOperand().getOperandValueAsString();
-				maxMinFilterCriteriaIndex.add(i);
-				maxMinFilterCriteriaNameToIndex.put(letOp, i);
-				minFilterCriteriaString.add(fc.getLeftOperand().getOperandValueAsString());
-
-				ProjectionCriteria aggregatePc = new ProjectionCriteria(null, columnName, "MIN", columnName); // TODO GET DATASET
-				aggregatePc.setOrderType("");
-				aggregationProjectionCriteria.add(aggregatePc);
-				aggregationFields.add(aggregatePc.getAliasName());
-
-			} else if (operator.equalsIgnoreCase("max")) {
-				logger.debug("found a MAX filter criteria at index " + i + " for coulmnn " + fc.getLeftOperand().getOperandValueAsString());
-				String columnName = fc.getLeftOperand().getOperandValueAsString();
-				maxMinFilterCriteriaIndex.add(i);
-				maxMinFilterCriteriaNameToIndex.put(letOp, i);
-				maxFilterCriteriaString.add(fc.getLeftOperand().getOperandValueAsString());
-
-				ProjectionCriteria aggregatePc = new ProjectionCriteria(null, columnName, "MAX", columnName);
-				aggregatePc.setOrderType("");
-				aggregationProjectionCriteria.add(aggregatePc);
-				aggregationFields.add(aggregatePc.getAliasName());
-
+					String columnName = ((SingleProjectionSimpleFilter) filter).getProjection().getName();
+					Projection projection = new Projection(AggregationFunctions.MAX_FUNCTION, dataSet, columnName, columnName);
+					minMaxProjections.add(projection);
+				} else {
+					noMinMaxFilters.add(filter);
+				}
 			} else {
-				noMaxMinfilterCriteria.add(fc);
+				noMinMaxFilters.add(filter);
 			}
 		}
 
-		/**
-		 * Enters here only if found MAX() or MIN() filter
-		 */
-		if (maxMinFilterCriteriaIndex.size() > 0) {
-			logger.debug("Max or min filter found");
+		if (minMaxFilterIndexes.size() > 0) {
+			logger.debug("MIN/MAX filter found");
 
-			// index projecton Criteria
-			// for each projection if it is in maxMin aggregations write specific projection
-			// for (Iterator iterator = projectionCriteria.iterator(); iterator.hasNext();) {
-			// ProjectionCriteria pc = (ProjectionCriteria) iterator.next();
-			// String columnName = pc.getColumnName();
-			//
-			// if (minFilterCriteriaString.contains(columnName)) {
-			// logger.debug(columnName + " is among MIN aggregation");
-			// ProjectionCriteria aggregatePc = new ProjectionCriteria(pc.getDataset(), columnName, "MIN", columnName);
-			// aggregationProjectionCriteria.add(aggregatePc);
-			// aggregationFields.add(aggregatePc.getAliasName());
-			// }
-			// if (maxFilterCriteriaString.contains(columnName)) {
-			// logger.debug(columnName + " is among MAX aggregation");
-			// ProjectionCriteria aggregatePc = new ProjectionCriteria(pc.getDataset(), columnName, "MAX", columnName);
-			// aggregationProjectionCriteria.add(aggregatePc);
-			// aggregationFields.add(aggregatePc.getAliasName());
-			// }
-			// }
+			Filter where = getWhereFilter(noMinMaxFilters, likeFilters);
 
-			/**
-			 * pre-calculate values to substitute in filters
-			 */
-
-			// get Values to store in filters
-			IDataStore dataStore = getDataStore(label, offset, fetchSize, maxRowCount, isNearRealtime, DataSetUtilities.getParametersMap(parameters), null,
-					// groupCriteria,
-					noMaxMinfilterCriteria, filterCriteriaForMetaModel, null, null,
-					// havingCriteria,
-					// havingCriteriaForMetaModel,
-					aggregationProjectionCriteria, summaryRowProjectionCriteria);
-
+			IDataStore dataStore = getDataStore(dataSet, isNearRealtime, parametersValues, minMaxProjections, where, null, null, null, -1, -1, -1);
 			if (dataStore == null) {
-				logger.error("Error in getting MAX and MIN filters values");
-				throw new SpagoBIRuntimeException("Error in getting MAX and MIN filters values, avlues not returned");
+				String errorMessage = "Error in getting min and max filters values";
+				logger.error(errorMessage);
+				throw new SpagoBIRuntimeException(errorMessage);
 			}
 
-			logger.debug("MIN / MAX filter values calculated");
+			logger.debug("MIN/MAX filter values calculated");
 
-			/**
-			 * get Values from datastore and substitute them in original filters
-			 */
-			// get value and substitute it in filter
-			boolean multiple = false;
-			for (int i = 0; i < aggregationFields.size(); i++) {
-				String aliasField = aggregationFields.get(i);
+			for (int i = 0; i < minMaxProjections.size(); i++) {
+				Projection projection = minMaxProjections.get(i);
+				String alias = projection.getAlias();
+				String errorMessage = "MIN/MAX value for field [" + alias + "] not found";
 
-				List values = dataStore.getFieldValues(dataStore.getMetaData().getFieldIndex(aliasField));
-				Class type = dataStore.getMetaData().getFieldType(dataStore.getMetaData().getFieldIndex(aliasField));
+				int index = minMaxFilterIndexes.get(i);
 
-				String valueString = null;
+				List values = dataStore.getFieldValues(i);
 				if (values == null) {
-					logger.error("Error, MIN/MAX value for field " + aliasField + " not found");
-					throw new SpagoBIRuntimeException("Error, MIN/MAX value for field " + aliasField + " not found");
-				}
-				// this is not an error case because in case of summary row it is normal to have a more row
-				// else if (values.size() > 1) {
-				// logger.error("Error, unexpected multiple MIN/MAX value for field " + aliasField + "");
-				// multiple = true;
-				// throw new SpagoBIRuntimeException("Error, unexpected multiple MIN/MAX value for field " + aliasField + "");
-				// }
-				else if (values.isEmpty()) {
-					logger.warn("no MIN/MAX value for field " + aliasField + " not found, put NULL");
-					valueString = null;
+					logger.error(errorMessage);
+					throw new SpagoBIRuntimeException(errorMessage);
 				} else {
-					Object value = values.get(0);
-					valueString = value.toString();
-					// if it is string type add ''
-					if (type.equals(String.class)) {
-						valueString = "'" + valueString + "'";
-					} else if (type.equals(Timestamp.class) || type.equals(java.sql.Date.class)) {
-						valueString = "'" + valueString + "'";
+					Projection projectionWithoutAggregation = new Projection(projection.getDataset(), projection.getName(), alias);
+					if (values.isEmpty()) {
+						logger.warn(errorMessage + ", put NULL");
+						newFilters.set(index, new NullaryFilter(projectionWithoutAggregation, SimpleFilterOperator.IS_NULL));
+					} else {
+						Object value = values.get(0);
+						logger.debug("MIN/MAX value for field [" + alias + "] is equal to [" + value + "]");
+						newFilters.set(index, new UnaryFilter(projectionWithoutAggregation, SimpleFilterOperator.EQUALS_TO, value));
 					}
 				}
-
-				logger.debug("Filter with name " + aliasField + " have MAX/MIN value " + valueString);
-
-				// among criteria filters find the one to substitute
-				Integer indexOfCriteriaToChange = maxMinFilterCriteriaNameToIndex.get(aliasField);
-				FilterCriteria filterCriteriaToChange = filterCriteria.get(indexOfCriteriaToChange);
-
-				logger.debug("Substitute previous valuewith " + valueString);
-
-				List valueList = null;
-
-				if (multiple) {
-					logger.debug("multiple value , delete filter");
-					filterCriteria.remove(indexOfCriteriaToChange);
-				} else if (valueString != null) {
-					valueList = new ArrayList<>();
-					valueList.add(valueString);
-					filterCriteriaToChange.getRightOperand().setOperandValue(valueList);
-					filterCriteriaToChange.setOperator("IN");
-				} else {
-					filterCriteriaToChange.setOperator("IS");
-					filterCriteriaToChange.getRightOperand().setOperandValue(null);
-					// logger.debug("Value is null so no MIN or MAX is present so delete the filter ");
-					// filterCriteria.remove(indexOfCriteriaToChange);
-
-				}
-
 			}
 		}
+
 		logger.debug("OUT");
-		return filterCriteria;
+		return newFilters;
 	}
 
-	public boolean isZeroOperandsOperator(String operator) throws JSONException {
-		List<String> operators = Arrays.asList(new String[] { "min", "max", "is null", "is not null" });
-		if (operator.contains(operator))
-			return true;
-		else
-			return false;
+	public Filter getWhereFilter(List<Filter> filters, List<SimpleFilter> likeFilters) {
+		Filter where = null;
+		if (filters.size() > 0) {
+			AndFilter andFilter = new AndFilter(filters);
+			if (likeFilters.size() > 0) {
+				where = andFilter.and(new OrFilter(likeFilters));
+			}
+			where = andFilter;
+		} else if (likeFilters.size() > 0) {
+			where = new OrFilter(likeFilters);
+		}
+		return where;
 	}
 
 }

@@ -3,6 +3,7 @@ function editTemporalHierarchyController($scope,sbiModule_translate,sbiModule_re
 	var olapModels=angular.copy(originalOlapModels);
 
 	$scope.hierarchyList=[];
+	debugger;
 	//load the hierarchy of the selected model if present
 	if(olapModels.length>0){
 
@@ -16,14 +17,15 @@ function editTemporalHierarchyController($scope,sbiModule_translate,sbiModule_re
 					tmpH.properties={};
 					for(var p=0;p<currH.properties.length;p++){
 						var currProp=currH.properties[p];
-						var val=currProp.value.value || currProp.value.propertyType.defaultValue;
+						var key = Object.keys(currProp)[0];
+						var val=currProp[key].value || currProp[key].propertyType.defaultValue;
 						if(angular.equals(val,"true")){
 							val=true;
 						}
 						if(angular.equals(val,"false")){
 							val=false;
 						}
-						tmpH.properties[currProp.value.propertyType.id.split(".")[1]]=val;
+						tmpH.properties[currProp[key].propertyType.id.split(".")[1]]=val;
 					}
 
 					tmpH.levels=[];
@@ -32,8 +34,9 @@ function editTemporalHierarchyController($scope,sbiModule_translate,sbiModule_re
 
 						//load the current levels levelType from the properties
 						for(var pro=0;pro<currL.properties.length;pro++){
-							if(angular.equals(currL.properties[pro].key.split(".")[1],"leveltype")){
-								currL.leveltype=currL.properties[pro].value.value;
+							var key = Object.keys(currL.properties[pro])[0];
+							if(angular.equals(key.split(".")[1],"leveltype")){
+								currL.leveltype=currL.properties[pro][key].value;
 							}
 						}
 
@@ -308,10 +311,10 @@ function addTemporalHierarchyController($scope,sbiModule_translate,$mdPanel,mdPa
 	                        	  size:"100px",
 	                        	  label:" ",
 	                        	  transformer:function(item){
-	                        		  var template= '<md-button ng-click="scopeFunctions.moveUp($parent.$parent.$index)" ng-disabled="$parent.$parent.$index==0" class="md-icon-button md-primary" aria-label="MoveUp">'+
+	                        		  var template= '<md-button ng-click="scopeFunctions.moveUp($parent.$parent.$index)" ng-disabled="$parent.$parent.$index==0" class="md-icon-button" aria-label="MoveUp">'+
 	                        		  				'	<md-icon md-font-icon="fa fa-arrow-up"></md-icon>'+
                     		  						'</md-button>'+
-                    		  						'<md-button ng-click="scopeFunctions.moveDown($parent.$parent.$index)" ng-disabled="$parent.$parent.$last" class="md-icon-button md-primary" aria-label="MoveDown">'+
+                    		  						'<md-button ng-click="scopeFunctions.moveDown($parent.$parent.$index)" ng-disabled="$parent.$parent.$last" class="md-icon-button" aria-label="MoveDown">'+
                         		  					'	<md-icon md-font-icon="fa fa-arrow-down"></md-icon>'+
                     		  						'</md-button>';
 

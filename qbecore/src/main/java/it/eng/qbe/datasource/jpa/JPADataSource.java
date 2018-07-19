@@ -1,7 +1,7 @@
 /*
  * Knowage, Open Source Business Intelligence suite
  * Copyright (C) 2016 Engineering Ingegneria Informatica S.p.A.
- * 
+ *
  * Knowage is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -11,7 +11,7 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU Affero General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
@@ -30,6 +30,7 @@ import javax.persistence.EntityManagerFactory;
 import javax.persistence.Persistence;
 
 import org.apache.log4j.Logger;
+import org.json.JSONObject;
 
 import it.eng.qbe.datasource.AbstractDataSource;
 import it.eng.qbe.datasource.ConnectionDescriptor;
@@ -48,6 +49,8 @@ import it.eng.qbe.model.structure.builder.IModelStructureBuilder;
 import it.eng.qbe.model.structure.builder.jpa.JPAModelStructureBuilder;
 import it.eng.qbe.query.Filter;
 import it.eng.qbe.query.filters.ProfileAttributesModelAccessModality;
+import it.eng.qbe.utility.CustomFunctionsSingleton;
+import it.eng.qbe.utility.CustomizedFunctionsReader;
 import it.eng.spagobi.commons.bo.UserProfile;
 import it.eng.spagobi.tools.datasource.bo.IDataSource;
 import it.eng.spagobi.utilities.assertion.Assert;
@@ -66,7 +69,7 @@ public class JPADataSource extends AbstractDataSource implements IJpaDataSource 
 	private static transient Logger logger = Logger.getLogger(JPADataSource.class);
 
 	protected JPADataSource(String dataSourceName, IDataSourceConfiguration configuration) {
-		logger.debug("Creating a new JPADataSource");
+		logger.debug("Creating a new JPADataSource -1");
 		setName(dataSourceName);
 		dataMartModelAccessModality = new AbstractModelAccessModality();
 
@@ -74,8 +77,7 @@ public class JPADataSource extends AbstractDataSource implements IJpaDataSource 
 		if (configuration instanceof FileDataSourceConfiguration) {
 			this.configuration = configuration;
 		} else if (configuration instanceof CompositeDataSourceConfiguration) {
-			IDataSourceConfiguration subConf = ((CompositeDataSourceConfiguration) configuration).getSubConfigurations()
-					.get(0);
+			IDataSourceConfiguration subConf = ((CompositeDataSourceConfiguration) configuration).getSubConfigurations().get(0);
 			if (subConf instanceof FileDataSourceConfiguration) {
 				this.configuration = subConf;
 				this.configuration.loadDataSourceProperties().putAll(configuration.loadDataSourceProperties());
@@ -99,9 +101,7 @@ public class JPADataSource extends AbstractDataSource implements IJpaDataSource 
 	/*
 	 * (non-Javadoc)
 	 *
-	 * @see
-	 * it.eng.qbe.datasource.IHibernateDataSource#getSessionFactory(java.lang
-	 * .String)
+	 * @see it.eng.qbe.datasource.IHibernateDataSource#getSessionFactory(java.lang .String)
 	 */
 	@Override
 	public EntityManagerFactory getEntityManagerFactory(String dmName) {
@@ -169,8 +169,7 @@ public class JPADataSource extends AbstractDataSource implements IJpaDataSource 
 		IDataSource dataSource = (IDataSource) configuration.loadDataSourceProperties().get("datasource");
 		// FOR SPAGOBIMETA
 		if (dataSource == null) {
-			ConnectionDescriptor connectionDescriptor = (ConnectionDescriptor) configuration.loadDataSourceProperties()
-					.get("connection");
+			ConnectionDescriptor connectionDescriptor = (ConnectionDescriptor) configuration.loadDataSourceProperties().get("connection");
 			if (connectionDescriptor != null) {
 				dataSource = connectionDescriptor.getDataSource();
 			}
@@ -183,17 +182,23 @@ public class JPADataSource extends AbstractDataSource implements IJpaDataSource 
 		userProfile = profile;
 		IModelStructureBuilder structureBuilder;
 		if (dataMartModelStructure == null) {
+			IDataSource dsSource = getToolsDataSource();
+			String dialect = dsSource.getHibDialectClass();
+			if (profile != null) {
+				JSONObject jsonObj = new CustomizedFunctionsReader().getJSONCustomFunctionsVariable(profile);
+				CustomFunctionsSingleton.getInstance().setCustomizedFunctionsJSON(jsonObj);
+			}
 			structureBuilder = new JPAModelStructureBuilder(this);
 			dataMartModelStructure = structureBuilder.build();
 
 			Map<String, List<String>> fieldsFilteredByRole = getFieldsFilteredByRole();
 
 			List<Filter> filtersOnProfileAttributes = getFiltersOnProfileAttributes();
+			Map<String, String> filtersConditionsOnProfileAttributes = getFiltersConditionsOnProfileAttribute();
 			if (!filtersOnProfileAttributes.isEmpty() || !fieldsFilteredByRole.isEmpty()) {
-				logger.debug(
-						"One or more profile attributes filters were found therefore profile attributes model access modality will be activated.");
-				this.setDataMartModelAccessModality(new ProfileAttributesModelAccessModality(filtersOnProfileAttributes,
-						fieldsFilteredByRole, profile));
+				logger.debug("One or more profile attributes filters were found therefore profile attributes model access modality will be activated.");
+				this.setDataMartModelAccessModality(new ProfileAttributesModelAccessModality(filtersOnProfileAttributes, fieldsFilteredByRole, profile,
+						filtersConditionsOnProfileAttributes));
 			}
 		}
 		return dataMartModelStructure;
@@ -236,8 +241,7 @@ public class JPADataSource extends AbstractDataSource implements IJpaDataSource 
 				IModelField field = fieldsIt.next();
 				String attributeName = (String) field.getProperty("attribute");
 				if (attributeName != null && !attributeName.trim().equals("")) {
-					logger.debug("Found profile attribute filter on field " + field.getUniqueName()
-							+ ": profile attribute is " + attributeName);
+					logger.debug("Found profile attribute filter on field " + field.getUniqueName() + ": profile attribute is " + attributeName);
 					// Filter filter = new Filter(entity.getUniqueName(), "F{" +
 					// field.getName() + "} = {" + attributeName + "}");
 					List<String> values = new ArrayList<String>();
@@ -246,6 +250,41 @@ public class JPADataSource extends AbstractDataSource implements IJpaDataSource 
 					values.add(attributeName);
 					Filter filter = new Filter(field, values);
 					toReturn.add(filter);
+				}
+			}
+		}
+		return toReturn;
+	}
+
+	private Map<String, String> getFiltersConditionsOnProfileAttribute() {
+		Map<String, String> toReturn = new HashMap<String, String>();
+		Iterator<String> it = dataMartModelStructure.getModelNames().iterator();
+		while (it.hasNext()) {
+			List<IModelEntity> list = dataMartModelStructure.getRootEntities(it.next());
+			Map<String, String> filterconditions = getFiltersConditionsOnProfileAttribute(list);
+			toReturn.putAll(filterconditions);
+		}
+		return toReturn;
+	}
+
+	private Map<String, String> getFiltersConditionsOnProfileAttribute(List<IModelEntity> list) {
+		Map<String, String> toReturn = new HashMap<String, String>();
+		Iterator<IModelEntity> it = list.iterator();
+		while (it.hasNext()) {
+			IModelEntity entity = it.next();
+			List<IModelField> allFields = entity.getAllFields();
+			Iterator<IModelField> fieldsIt = allFields.iterator();
+			while (fieldsIt.hasNext()) {
+				IModelField field = fieldsIt.next();
+				String attributeName = (String) field.getProperty("attribute");
+				// add filter condition to map only if there is a value for the property attribute (profile attribute)
+				if (attributeName != null && !attributeName.trim().equals("")) {
+					String filtercondition = (String) field.getProperty("filtercondition");
+					if (filtercondition != null && !filtercondition.trim().equals("")) {
+						toReturn.put(field.getUniqueName(), filtercondition);
+						logger.debug("Found profile attribute filter on field " + field.getUniqueName() + ": profile attribute is " + attributeName
+								+ " and is filter condition is " + filtercondition);
+					}
 				}
 			}
 		}
@@ -282,19 +321,23 @@ public class JPADataSource extends AbstractDataSource implements IJpaDataSource 
 	}
 
 	protected Map<String, Object> buildEmptyConfiguration() {
+		logger.debug("IN");
 		Map<String, Object> cfg = new HashMap<String, Object>();
 		String dialect = getToolsDataSource().getHibDialectClass();
 
 		// to solve http://spagoworld.org/jira/browse/SPAGOBI-1934
 		if (dialect != null && dialect.contains("SQLServerDialect")) {
 			dialect = "org.hibernate.dialect.ExtendedSQLServerDialect";
-		}
-
-		// at the moment (04/2015) hibernate doesn't provide a dialect for hive
-		// or hbase with phoenix. But its similar to the postrges one
-		if (SqlUtils.isHiveLikeDialect(dialect)) {
+		} else if (dialect != null && dialect.contains("MySQL")) {
+			dialect = "org.hibernate.dialect.ExtendedMySQLDialect";
+		} else if (dialect != null && dialect.contains("Oracle")) {
+			dialect = "org.hibernate.dialect.ExtendedOracleDialect";
+		} else if (SqlUtils.isHiveLikeDialect(dialect)) {
+			// because it seems similar.... really?
 			dialect = "org.hibernate.dialect.PostgreSQLDialect";
 		}
+
+		logger.debug("Dialect set is " + dialect);
 
 		if (getToolsDataSource().checkIsJndi()) {
 			cfg.put("javax.persistence.nonJtaDataSource", getToolsDataSource().getJndi());
@@ -310,7 +353,10 @@ public class JPADataSource extends AbstractDataSource implements IJpaDataSource 
 			cfg.put("hibernate.validator.apply_to_ddl", "false");
 			cfg.put("hibernate.validator.autoregister_listeners", "false");
 		}
+		logger.debug("OUT");
+
 		return cfg;
+
 	}
 
 	@Override

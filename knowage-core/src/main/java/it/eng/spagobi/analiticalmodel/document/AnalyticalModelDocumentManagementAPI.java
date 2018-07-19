@@ -33,8 +33,11 @@ import it.eng.spago.error.EMFUserError;
 import it.eng.spago.security.IEngUserProfile;
 import it.eng.spagobi.analiticalmodel.document.bo.BIObject;
 import it.eng.spagobi.analiticalmodel.document.bo.ObjTemplate;
+import it.eng.spagobi.analiticalmodel.document.bo.OutputParameter;
 import it.eng.spagobi.analiticalmodel.document.bo.SubObject;
 import it.eng.spagobi.analiticalmodel.document.dao.IBIObjectDAO;
+import it.eng.spagobi.analiticalmodel.document.dao.IOutputParameterDAO;
+import it.eng.spagobi.analiticalmodel.document.dao.OutputParameterDAOImpl;
 import it.eng.spagobi.analiticalmodel.document.dao.SubObjectDAOHibImpl;
 import it.eng.spagobi.behaviouralmodel.analyticaldriver.bo.BIObjectParameter;
 import it.eng.spagobi.behaviouralmodel.analyticaldriver.bo.ObjParuse;
@@ -44,6 +47,7 @@ import it.eng.spagobi.behaviouralmodel.analyticaldriver.dao.IBIObjectParameterDA
 import it.eng.spagobi.behaviouralmodel.analyticaldriver.dao.IObjParuseDAO;
 import it.eng.spagobi.behaviouralmodel.analyticaldriver.dao.IObjParviewDAO;
 import it.eng.spagobi.behaviouralmodel.analyticaldriver.dao.IParameterDAO;
+import it.eng.spagobi.commons.bo.UserProfile;
 import it.eng.spagobi.commons.dao.DAOFactory;
 import it.eng.spagobi.commons.serializer.MetadataJSONSerializer;
 import it.eng.spagobi.commons.utilities.indexing.LuceneIndexer;
@@ -74,6 +78,7 @@ public class AnalyticalModelDocumentManagementAPI {
 	private IObjMetadataDAO metadataPropertyDAO;
 	private IObjMetacontentDAO metadataContentDAO;
 	private SubObjectDAOHibImpl subObjectDAO;
+	private IOutputParameterDAO outuputParameterDAO;
 
 	// default for document parameters
 	public static final Integer REQUIRED = 0;
@@ -109,6 +114,9 @@ public class AnalyticalModelDocumentManagementAPI {
 
 			subObjectDAO = new SubObjectDAOHibImpl();
 			subObjectDAO.setUserProfile(userProfile);
+
+			outuputParameterDAO = new OutputParameterDAOImpl();
+			outuputParameterDAO.setUserProfile(userProfile);
 
 		} catch (Throwable t) {
 			throw new SpagoBIRuntimeException("Impossible to instatiate BIObjectDAO", t);
@@ -185,6 +193,7 @@ public class AnalyticalModelDocumentManagementAPI {
 					paramJSON.put("id", param.getId());
 					paramJSON.put("label", param.getLabel());
 					paramJSON.put("url", param.getParameterUrlName());
+					paramJSON.put("parType", param.getParameter().getType());
 					parametersList.add(paramJSON);
 				}
 			} catch (Throwable t) {
@@ -449,7 +458,7 @@ public class AnalyticalModelDocumentManagementAPI {
 
 				// document
 				logger.debug("Saving the clone of the document");
-				Integer clonedDocumentId = documentDAO.insertBIObject(clonedDocument, clonedTemplate);
+				Integer clonedDocumentId = documentDAO.insertBIObjectForClone(clonedDocument, clonedTemplate);
 				clonedDocument.setId(clonedDocumentId);
 
 				// parameters
@@ -459,6 +468,8 @@ public class AnalyticalModelDocumentManagementAPI {
 				// //subobjects
 				// copySubobjects(document, clonedDocument);
 
+				// output Parameters
+				copyOutputParameters(document, clonedDocument);
 				// metadata
 				logger.debug("Coping metadata");
 				copyMetadata(document, clonedDocument);
@@ -493,7 +504,8 @@ public class AnalyticalModelDocumentManagementAPI {
 
 		document.setLabel(buildCopiedString(document.getLabel(), version));
 		document.setName(buildCopiedString(document.getName(), version));
-		document.setCreationUser(String.valueOf(this.documentDAO.getUserProfile().getUserUniqueIdentifier()));
+		String userId = String.valueOf(((UserProfile) this.documentDAO.getUserProfile()).getUserId());
+		document.setCreationUser(userId);
 	}
 
 	private String buildCopiedString(String toCopy, int newVersion) {
@@ -769,6 +781,28 @@ public class AnalyticalModelDocumentManagementAPI {
 			throw new SpagoBIRuntimeException("An unexpected error occured while copying subobjects from document [" + sourceDocumentLabel + "] to document ["
 					+ destinationDocumentLabel + "]", e);
 		}
+	}
+
+	/**
+	 * Copy the output parameters
+	 */
+	private void copyOutputParameters(BIObject sourceDocument, BIObject destinationDocument) {
+		logger.debug("IN");
+
+		List<OutputParameter> outputParameters = sourceDocument.getOutputParameters();
+
+		for (Iterator iterator = outputParameters.iterator(); iterator.hasNext();) {
+			OutputParameter outputParameter = (OutputParameter) iterator.next();
+			OutputParameter newOutPar = new OutputParameter();
+			newOutPar.setBiObjectId(destinationDocument.getId());
+			newOutPar.setFormatCode(outputParameter.getFormatCode());
+			newOutPar.setFormatValue(outputParameter.getFormatValue());
+			newOutPar.setIsUserDefined(outputParameter.getIsUserDefined());
+			newOutPar.setName(outputParameter.getName());
+			newOutPar.setType(outputParameter.getType());
+			outuputParameterDAO.saveParameter(newOutPar);
+		}
+		logger.debug("OUT");
 	}
 
 	/**

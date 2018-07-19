@@ -27,7 +27,6 @@ import org.json.JSONObject;
 import org.safehaus.uuid.UUID;
 import org.safehaus.uuid.UUIDGenerator;
 
-
 import it.eng.spago.base.SourceBean;
 import it.eng.spago.base.SourceBeanException;
 import it.eng.spago.error.EMFInternalError;
@@ -35,6 +34,7 @@ import it.eng.spago.error.EMFUserError;
 import it.eng.spago.security.IEngUserProfile;
 import it.eng.spagobi.analiticalmodel.document.bo.BIObject;
 import it.eng.spagobi.analiticalmodel.document.bo.ObjTemplate;
+import it.eng.spagobi.commons.bo.UserProfile;
 import it.eng.spagobi.commons.constants.SpagoBIConstants;
 import it.eng.spagobi.commons.dao.DAOFactory;
 import it.eng.spagobi.commons.utilities.EngineUtilities;
@@ -51,6 +51,7 @@ import it.eng.spagobi.tools.catalogue.dao.IArtifactsDAO;
 import it.eng.spagobi.tools.datasource.bo.IDataSource;
 import it.eng.spagobi.utilities.assertion.Assert;
 import it.eng.spagobi.utilities.engines.EngineConstants;
+import it.eng.spagobi.utilities.engines.EngineStartServletIOManager;
 import it.eng.spagobi.utilities.exceptions.SpagoBIRuntimeException;
 
 public class WhatIfDriver extends GenericDriver {
@@ -135,7 +136,7 @@ public class WhatIfDriver extends GenericDriver {
 		parameters.put("document", documentId);
 		parameters.put("DOCUMENT_LABEL", documentLabel);
 		parameters.put("ENGINE", engineName);
-		parameters.put("mode", "edit");
+		parameters.put(EngineStartServletIOManager.ON_EDIT_MODE, "");
 		parameters.put("template", json);
 		// CREATE EXECUTION ID
 		String sbiExecutionId = null;
@@ -262,7 +263,7 @@ public class WhatIfDriver extends GenericDriver {
 		logger.debug("IN");
 
 		String statusToReturn = null;
-		String userId = profile.getUserUniqueIdentifier().toString();
+		String userId = ((UserProfile) profile).getUserId().toString();
 		String locker;
 		logger.debug("User Id is " + userId);
 		logger.debug("Artifact Id is " + artifactId);
@@ -280,15 +281,13 @@ public class WhatIfDriver extends GenericDriver {
 
 		int did = artifact.getId();
 
-		
-
 		// Boolean locked = artifact.getModelLocked();
-		
+
 		try {
-			if(!profile.getFunctionalities().contains("WorkFlowManagment")){
+			if (!profile.getFunctionalities().contains("WorkFlowManagment")) {
 				statusToReturn = SpagoBIConstants.SBI_ARTIFACT_VALUE_LOCKED_BY_USER;
 				locker = userId;
-			}else{
+			} else {
 				WhatIfWorkflowManager wfm = new WhatIfWorkflowManager();
 				locker = wfm.getActiveUser(did);
 				if (locker == null) {
@@ -302,7 +301,8 @@ public class WhatIfDriver extends GenericDriver {
 					}
 
 				}
-			};
+			}
+			;
 		} catch (EMFInternalError e) {
 			logger.error("Error checking functionality", e);
 			throw new SpagoBIRuntimeException("Error checking functionality", e);
@@ -310,9 +310,6 @@ public class WhatIfDriver extends GenericDriver {
 			logger.error("Error loading locker user", e);
 			throw new SpagoBIRuntimeException("Error loading locker user", e);
 		}
-		
-		
-		
 
 		logger.debug("Status of artifact is " + statusToReturn);
 		pars.put(SpagoBIConstants.SBI_ARTIFACT_STATUS, statusToReturn);

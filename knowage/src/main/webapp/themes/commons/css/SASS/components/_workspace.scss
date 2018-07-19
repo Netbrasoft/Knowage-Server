@@ -86,7 +86,7 @@ $organizerHeight : 120px;
 	}
 	
 	.shared {
-	   color: #c70751;
+	   color: $fabPrimaryColor;
 	}
 
 	.workspaceSearchInput{
@@ -380,7 +380,7 @@ $organizerHeight : 120px;
 	 	md-card-actions {
 	 		margin: 0;
 	 		md-icon.shared {
-	 			color: #c70751;
+	 			color: $fabPrimaryColor;
 	 		}
 	 	}
 	 }
@@ -545,6 +545,9 @@ $organizerHeight : 120px;
 				background-color: $baseColor;
 				md-icon {
 					color: $cardActionIconsColor;
+					&.shared {
+						color: $fabPrimaryColor;
+					}
 				}
 				.preview-icon {
 					height: 112px;
@@ -591,6 +594,26 @@ $organizerHeight : 120px;
 				}
 			}
 		}
+	 }
+	 .tabOverflow {
+	 	md-tab-content>div{
+	 		overflow-y:auto;
+	 	}
+	 }
+	 .workspaceDatasetWizard {
+	 	.validationStep {
+	 		margin-top:8px !important; 
+	 		height:390px;
+	 		max-height:390px;
+	 	}
+	 	.previewStep {
+	 		margin-top:8px !important; 
+	 		height:330px;
+	 		max-height:330px;
+	 		md-card-content {
+	 			overflow-y: hidden;
+	 		}
+	 	}
 	 }
 	
 }

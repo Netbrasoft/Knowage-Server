@@ -1,17 +1,7 @@
-<angular-table  ng-hide="showGridView==true || ngModel.length==0 " 
-				style="position:static;overflow:auto" 
-				layout-fill 
-				no-pagination=true
-				id='federationListTable' ng-model=ngModel
-				columns=tableColumns
-				columnsSearch='["name"]' 
-				show-search-bar=false
-				no-pagination=true
-				speed-menu-option=tableSpeedMenuOption
-				highlights-selected-item="true"
-				selected-item=selectedModel
-				click-function="clickFederation(item);">
-</angular-table>
+<kn-table ng-hide="showGridView==true || ngModel.length==0 "
+	columns='tableColumns' 
+	model="ngModel"
+	click-function="clickFederation(item)" custom-class="kn-table-clickable-rows kn-table-medium-rows kn-table-inverse-header kn-table-full-height kn-table-shadowed"></kn-table>		
 
 <!-- Federation Grid View -->
 <div layout="row"  layout-wrap ng-hide="showGridView!=true ">
@@ -49,7 +39,7 @@
 		           	</md-tooltip>
 		        </md-button>
 	      	 
-		        <md-button class="md-icon-button" aria-label="delete" ng-show="deleteEnabled" ng-click="deleteFederationAction({fed:federation});">
+		        <md-button  class="md-icon-button" aria-label="delete" ng-if="deleteEnabled && isAbletoDelete(federation)" ng-click="deleteFederationAction({fed:federation});">
 		          	<md-icon md-font-icon="fa fa-trash fa-2x"></md-icon>
 		          	<md-tooltip md-delay="1000">
 		             	{{translate.load('sbi.workspace.models.federationdefinition.delete')}}

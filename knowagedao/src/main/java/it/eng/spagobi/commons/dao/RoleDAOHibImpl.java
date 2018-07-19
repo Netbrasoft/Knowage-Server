@@ -17,6 +17,28 @@
  */
 package it.eng.spagobi.commons.dao;
 
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Set;
+
+import org.apache.log4j.Logger;
+import org.hibernate.Criteria;
+import org.hibernate.Hibernate;
+import org.hibernate.HibernateException;
+import org.hibernate.Query;
+import org.hibernate.Session;
+import org.hibernate.Transaction;
+import org.hibernate.criterion.Criterion;
+import org.hibernate.criterion.Expression;
+import org.hibernate.criterion.Order;
+import org.hibernate.criterion.Property;
+import org.hibernate.criterion.Restrictions;
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import it.eng.spago.error.EMFErrorSeverity;
 import it.eng.spago.error.EMFUserError;
 import it.eng.spagobi.behaviouralmodel.analyticaldriver.metadata.SbiParuse;
@@ -34,32 +56,9 @@ import it.eng.spagobi.commons.metadata.SbiProductType;
 import it.eng.spagobi.events.metadata.SbiEventsLog;
 import it.eng.spagobi.mapcatalogue.metadata.SbiGeoLayersRoles;
 import it.eng.spagobi.utilities.exceptions.SpagoBIRuntimeException;
-
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Set;
-
 import net.sf.ehcache.Cache;
 import net.sf.ehcache.CacheManager;
 import net.sf.ehcache.Element;
-
-import org.apache.log4j.Logger;
-import org.hibernate.Criteria;
-import org.hibernate.Hibernate;
-import org.hibernate.HibernateException;
-import org.hibernate.Query;
-import org.hibernate.Session;
-import org.hibernate.Transaction;
-import org.hibernate.criterion.Criterion;
-import org.hibernate.criterion.Expression;
-import org.hibernate.criterion.Order;
-import org.hibernate.criterion.Property;
-import org.hibernate.criterion.Restrictions;
-import org.json.JSONException;
-import org.json.JSONObject;
 
 /**
  * Defines the Hibernate implementations for all DAO methods, for a Role.
@@ -379,6 +378,7 @@ public class RoleDAOHibImpl extends AbstractHibernateDAO implements IRoleDAO {
 
 		hibRole.setCode(aRole.getCode());
 		hibRole.setDescr(aRole.getDescription());
+		hibRole.setIsPublic(aRole.getIsPublic());
 
 		hibRole.setName(aRole.getName());
 
@@ -465,6 +465,19 @@ public class RoleDAOHibImpl extends AbstractHibernateDAO implements IRoleDAO {
 		}
 	}
 
+	@Override
+	public void unsetOtherPublicRole(Session aSession) {
+		Criterion aCriterion = Expression.eq("isPublic", true);
+		Criteria aCriteria = aSession.createCriteria(SbiExtRoles.class);
+		aCriteria.add(aCriterion);
+		SbiExtRoles hibRole = (SbiExtRoles) aCriteria.uniqueResult();
+		if (hibRole != null) {
+			hibRole.setIsPublic(false);
+			aSession.update(hibRole);
+		}
+
+	}
+
 	/**
 	 * Modify role.
 	 *
@@ -482,6 +495,11 @@ public class RoleDAOHibImpl extends AbstractHibernateDAO implements IRoleDAO {
 			aSession = getSession();
 			tx = aSession.beginTransaction();
 
+			// if new role is public check there are no other public otherwise unset them
+			if (aRole.getIsPublic() != null && aRole.getIsPublic() == true) {
+				unsetOtherPublicRole(aSession);
+			}
+
 			SbiExtRoles hibRole = (SbiExtRoles) aSession.load(SbiExtRoles.class, aRole.getId());
 
 			hibRole.setCode(aRole.getCode());
@@ -498,6 +516,8 @@ public class RoleDAOHibImpl extends AbstractHibernateDAO implements IRoleDAO {
 
 			SbiDomains roleType = (SbiDomains) aSession.load(SbiDomains.class, aRole.getRoleTypeID());
 			hibRole.setRoleType(roleType);
+
+			hibRole.setIsPublic(aRole.getIsPublic());
 
 			hibRole.setRoleTypeCode(aRole.getRoleTypeCD());
 			updateSbiCommonInfo4Update(hibRole);
@@ -533,6 +553,7 @@ public class RoleDAOHibImpl extends AbstractHibernateDAO implements IRoleDAO {
 				if ((authI.getName().equals("SAVE_SUBOBJECTS") && aRole.isAbleToSaveSubobjects())
 						|| (authI.getName().equals("SEE_SUBOBJECTS") && aRole.isAbleToSeeSubobjects())
 						|| (authI.getName().equals("SEE_SNAPSHOTS") && aRole.isAbleToSeeSnapshots())
+						|| (authI.getName().equals("RUN_SNAPSHOTS") && aRole.isAbleToRunSnapshots())
 						|| (authI.getName().equals("SEE_VIEWPOINTS") && aRole.isAbleToSeeViewpoints())
 						|| (authI.getName().equals("SEE_NOTES") && aRole.isAbleToSeeNotes())
 						|| (authI.getName().equals("SEE_METADATA") && aRole.isAbleToSeeMetadata())
@@ -758,6 +779,7 @@ public class RoleDAOHibImpl extends AbstractHibernateDAO implements IRoleDAO {
 		role.setDescription(hibRole.getDescr());
 		role.setId(hibRole.getExtRoleId());
 		role.setName(hibRole.getName());
+		role.setIsPublic(hibRole.getIsPublic());
 
 		Set<SbiAuthorizationsRoles> authorizations = hibRole.getSbiAuthorizationsRoleses();
 		Iterator it = authorizations.iterator();
@@ -777,6 +799,9 @@ public class RoleDAOHibImpl extends AbstractHibernateDAO implements IRoleDAO {
 			}
 			if (name.equals("SEE_SNAPSHOTS")) {
 				role.setIsAbleToSeeSnapshots(true);
+			}
+			if (name.equals("RUN_SNAPSHOTS")) {
+				role.setIsAbleToRunSnapshots(true);
 			}
 			if (name.equals("SEE_NOTES")) {
 				role.setIsAbleToSeeNotes(true);
@@ -970,11 +995,18 @@ public class RoleDAOHibImpl extends AbstractHibernateDAO implements IRoleDAO {
 			aSession = getSession();
 			tx = aSession.beginTransaction();
 
+			// if new role is public check there are no other public otherwise unset them
+			if (role.getIsPublic() != null && role.getIsPublic() == true) {
+				unsetOtherPublicRole(aSession);
+			}
+
 			SbiExtRoles hibRole = new SbiExtRoles();
 
 			hibRole.setCode(role.getCode());
 			hibRole.setDescr(role.getDescription());
 			hibRole.setName(role.getName());
+			hibRole.setIsPublic(role.getIsPublic());
+
 			SbiDomains roleType = (SbiDomains) aSession.load(SbiDomains.class, role.getRoleTypeID());
 			hibRole.setRoleType(roleType);
 
@@ -1014,6 +1046,7 @@ public class RoleDAOHibImpl extends AbstractHibernateDAO implements IRoleDAO {
 				if ((functI.getName().equals("SAVE_SUBOBJECTS") && role.isAbleToSaveSubobjects())
 						|| (functI.getName().equals("SEE_SUBOBJECTS") && role.isAbleToSeeSubobjects())
 						|| (functI.getName().equals("SEE_SNAPSHOTS") && role.isAbleToSeeSnapshots())
+						|| (functI.getName().equals("RUN_SNAPSHOTS") && role.isAbleToRunSnapshots())
 						|| (functI.getName().equals("SEE_VIEWPOINTS") && role.isAbleToSeeViewpoints())
 						|| (functI.getName().equals("SEE_NOTES") && role.isAbleToSeeNotes())
 						|| (functI.getName().equals("SEE_METADATA") && role.isAbleToSeeMetadata())
@@ -1799,6 +1832,47 @@ public class RoleDAOHibImpl extends AbstractHibernateDAO implements IRoleDAO {
 		}
 		logger.debug("OUT");
 		return role;
+	}
+
+	@Override
+	public Role loadPublicRole() throws EMFUserError {
+		Role toReturn = null;
+		Session aSession = null;
+		Transaction tx = null;
+
+		try {
+			aSession = getSession();
+			tx = aSession.beginTransaction();
+
+			String hql = "from SbiExtRoles extRole where extRole.isPublic=?";
+
+			Query query = aSession.createQuery(hql);
+			query.setBoolean(0, true);
+
+			Object hibRoleO = query.uniqueResult();
+
+			if (hibRoleO == null)
+				return null;
+
+			SbiExtRoles hibRole = (SbiExtRoles) hibRoleO;
+
+			toReturn = toRole(hibRole);
+			tx.commit();
+		} catch (HibernateException he) {
+			logException(he);
+
+			if (tx != null)
+				tx.rollback();
+
+			throw new EMFUserError(EMFErrorSeverity.ERROR, 100);
+
+		} finally {
+			if (aSession != null) {
+				if (aSession.isOpen())
+					aSession.close();
+			}
+		}
+		return toReturn;
 	}
 
 	private void putIntoCache(String key, Role role) {

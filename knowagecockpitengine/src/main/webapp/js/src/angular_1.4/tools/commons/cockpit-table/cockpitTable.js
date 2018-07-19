@@ -22,7 +22,8 @@
 	currentScriptPath = currentScriptPath.substring(0, currentScriptPath.lastIndexOf('/') + 1);
 
     angular.module('cockpitTable', [])
-        .directive('cockpitTable', ['$mdDialog', 'sbiModule_translate', function($mdDialog, sbiModule_translate) {
+        .directive('cockpitTable', ['$mdDialog', 'sbiModule_translate',function($mdDialog, sbiModule_translate) {
+
             return {
                 restrict: "E",
                 scope: {
@@ -34,7 +35,7 @@
                 },
                 templateUrl: currentScriptPath+'/templates/cockpitTable.tpl.html',
                 link: function(scope, elem, attr) {
-                	scope.translate=sbiModule_translate;
+                	scope.translate = sbiModule_translate;
                     scope.loading = true; 			//initializing directive with the loading active
                     scope.settings.page = 1; 		//initial page number
                     scope.settings.rowsCount = 0;	//initial rows count
@@ -46,6 +47,8 @@
 	            	 	 "center":"center",
 	            	  	"flex-end":"right"
                 	};
+
+                    scope.tableId = Math.ceil(Math.random()*1000).toString();
 
                     //returning the column name for the sorting
                     scope.getSortingColumnFilter = function(){
@@ -89,8 +92,13 @@
                     //returning the style of the header cell
                     scope.getThStyle = function(thStyle,column){
                     	var style = angular.copy(thStyle?thStyle:{})
-                    	if(column.style && column.style.width) style['max-width'] = column.style.width;
-                    	if(column.style && column.style.width) style.width = column.style.width;
+                    	if(column.style && column.style.width) {
+                    		style['max-width'] = column.style.width;
+                    		style.width = column.style.width;
+                		}else{
+                			delete(style['max-width']);
+                    		delete(style.width);
+                		}
                     	if(column.style && column.style.td) scope.flexToAlign(scope.alignMap,column.style.td['justify-content'],style);
                     	return style;
                     }
@@ -114,8 +122,9 @@
                     	if(column.ranges && column.ranges.length >0){
                     		var ranges = column.ranges;
                     		for (var k in ranges) {
-                                if (value!="" && ranges[k]['background-color'] &&eval(value + ranges[k].operator + ranges[k].value)) {
-                                	style['background-color'] = ranges[k]['background-color'];
+                                if (value!="" && eval(value + ranges[k].operator + ranges[k].value)) {
+                                	style['background-color'] = ranges[k]['background-color'] || '';
+                                	style['color'] = ranges[k]['color'] || '';
                                     if (ranges[k].operator == '==') break;
                                 }
                             }
@@ -173,10 +182,6 @@
 
                 	scope.getContainerStyle = function(column){
                 		var style = {};
-//                		if(column.style && column.style.width){
-//                			style['width'] = column.style.width;
-//                			if(style['width'].indexOf('%') != -1 && column.barchart) style['width'] = '100%';
-//                		}
                 		if(column.style && column.style.td && column.style.td['justify-content']) style['justify-content'] = column.style.td['justify-content'];
                 		return style;
                 	}
@@ -211,7 +216,15 @@
                     	}else{
                     		return '0%';
                     	}
-
+                    }
+                    
+                    scope.getBarchartColor = function(column,value){
+                		for(var r in column.ranges){
+                			if(eval(value+column.ranges[r].operator+column.ranges[r].value)){
+                				return column.ranges[r].color;
+                			}
+                		}
+                		return column.barchart.style['background-color'];
                     }
 
                     //icon ranges recognition
@@ -219,7 +232,7 @@
                     	var ranges = column.ranges;
                         var icon = "";
                         for (var k in ranges) {
-                            if (value!="" && eval(value + ranges[k].operator + ranges[k].value)) {
+                            if (typeof value != "undefined" && eval(value + ranges[k].operator + ranges[k].value)) {
                                 icon = {
                                     "iconClass": ranges[k].icon,
                                     "iconColor": ranges[k].color
@@ -229,12 +242,23 @@
                         }
                         return icon;
                     };
+                    
+                    scope.hasPrecision = function(column){
+                    	if(column.type == 'java.lang.Double' || column.type == 'java.lang.Float' || column.type == 'java.math.BigDecimal' || column.type == 'java.lang.Long'){return true}
+                    	return false;
+                    }
 
                     //conditional value formatting
                     scope.formatValue = function (value, column){
             			var output = value;
             			var precision = 2;
             			if (column.style && column.style.precision >= 0) precision =  column.style.precision;
+
+            			//setting the number precision when format is not present
+            			if (column.style && column.style.precision && !column.style.format) {
+            				output = value.toFixed(column.style.precision);
+            			}
+
             			if (column.style && column.style.format){
             		    	switch (column.style.format) {
             		    	case "#.###":
@@ -287,6 +311,13 @@
                 }
             }
         }])
+
+        // for I18N of custom messages
+        .filter('i18n', function(sbiModule_i18n) {
+			return function(label) {
+				return sbiModule_i18n.getI18n(label);
+			}
+		})
 
     //Pagination directive
     .directive('cockpitTablePagination', ['sbiModule_translate', function(sbiModule_translate) {
@@ -341,7 +372,7 @@
             			scope.maxPageCount = 1;
             		}
 
-            		scope.settings.page = scope.settings.page > scope.maxPageCount ? scope.maxPageCount : scope.settings.page;
+            		scope.settings.page = scope.settings.page > scope.maxPageCount ? 1 : scope.settings.page;
                 }
 
                 scope.getTotalPages = function() {
@@ -378,5 +409,17 @@
             }
         };
     }])
+
+    .directive("onScroll", function ($window) {
+	    return {
+	    	restrict: "A",
+            link: function(scope, elem, attr) {
+		        elem.bind("scroll", function() {
+		        	scope.unit = "px";
+		        	angular.element(document.querySelector( '#'+attr.onScroll ))[0].style.left = -(this.scrollLeft)+scope.unit;
+		        });
+            }
+	    }
+	})
 
 }());

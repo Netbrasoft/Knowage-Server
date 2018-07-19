@@ -17,12 +17,14 @@
  */
 package it.eng.spagobi.tools.dataset.dao;
 
+import java.util.List;
+
+import org.hibernate.Session;
+
 import it.eng.spago.error.EMFUserError;
 import it.eng.spago.security.IEngUserProfile;
 import it.eng.spagobi.commons.dao.ISpagoBIDao;
 import it.eng.spagobi.tools.dataset.metadata.SbiDataSet;
-
-import java.util.List;
 
 public interface ISbiDataSetDAO extends ISpagoBIDao {
 
@@ -34,9 +36,6 @@ public interface ISbiDataSetDAO extends ISpagoBIDao {
 			String implementation, Boolean showDerivedDatasets);
 
 	public List<SbiDataSet> loadPaginatedSearchSbiDataSet(String search, Integer page, Integer item_per_page, IEngUserProfile finalUserProfile,
-			Boolean seeTechnical);
-
-	public List<SbiDataSet> loadPaginatedSearchSbiDataSet(String search, Integer page, Integer item_per_page, IEngUserProfile finalUserProfile,
 			Boolean seeTechnical, Integer[] ids);
 
 	public Integer countSbiDataSet(String search) throws EMFUserError;
@@ -44,5 +43,7 @@ public interface ISbiDataSetDAO extends ISpagoBIDao {
 	public Integer countSbiDataSet(String search, Integer[] ids) throws EMFUserError;
 
 	public SbiDataSet loadSbiDataSetByIdAndOrganiz(Integer id, String organiz);
+
+	public SbiDataSet loadSbiDataSetByIdAndOrganiz(Integer id, String organiz, Session session);
 
 }

@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -38,6 +39,9 @@ import javax.ws.rs.core.MediaType;
 import org.apache.commons.io.FileUtils;
 import org.apache.log4j.LogMF;
 import org.apache.log4j.Logger;
+import org.joda.time.LocalDate;
+import org.joda.time.format.DateTimeFormat;
+import org.joda.time.format.DateTimeFormatter;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -126,6 +130,7 @@ public class SelfServiceDataSetCRUD {
 
 	static private String previewRowsConfigLabel = "SPAGOBI.DATASET.PREVIEW_ROWS";
 
+	static private int ROWS_LIMIT_GUESS_TYPE_HEURISTIC = 10000;
 	@GET
 	@Produces(MediaType.APPLICATION_JSON + "; charset=UTF-8")
 	@UserConstraint(functionalities = { SpagoBIConstants.SELF_SERVICE_DATASET_MANAGEMENT })
@@ -385,6 +390,10 @@ public class SelfServiceDataSetCRUD {
 			if (normalizedDataset != null) {
 				dsNew = normalizedDataset;
 			}
+
+			// retrieve persist data
+			dsNew.setPersisted(Boolean.valueOf(persist));
+			dsNew.setPersistTableName(persistTablePrefix.toUpperCase() + persistTableName.toUpperCase());
 
 			Integer toReturnId = dsNew.getId();
 			if (dsNew.getId() == -1) {
@@ -970,6 +979,8 @@ public class SelfServiceDataSetCRUD {
 					}
 				}
 				if (elementFound) {
+					logger.debug(elementFound);
+					logger.debug(i);
 					fieldsArray.remove(i);
 				}
 
@@ -1046,7 +1057,7 @@ public class SelfServiceDataSetCRUD {
 
 								try {
 
-									if(obj!=null && !(obj instanceof BigDecimal) && !(obj instanceof Double) && !(obj instanceof Float) ) {
+									if (obj != null && !(obj instanceof BigDecimal) && !(obj instanceof Double) && !(obj instanceof Float)) {
 										Double.parseDouble(obj.toString());
 									}
 
@@ -1061,7 +1072,7 @@ public class SelfServiceDataSetCRUD {
 							case "INTEGER":
 
 								try {
-									if(obj!=null && !(obj instanceof Integer) && !(obj instanceof Long)  ) {
+									if (obj != null && !(obj instanceof Integer) && !(obj instanceof Long)) {
 										Integer.parseInt(obj.toString());
 									}
 								} catch (NumberFormatException nfe) {
@@ -1071,7 +1082,26 @@ public class SelfServiceDataSetCRUD {
 								}
 
 								break;
+							case "DATE":
+
+								try {
+									if (obj != null && !(obj instanceof Date)) {
+										String dsConfiguration = dataSet.getConfiguration();
+										JSONObject jsonConf = new JSONObject(dsConfiguration);
+										String dateFormat = jsonConf.get(DataSetConstants.FILE_DATE_FORMAT).toString();
+										DateTimeFormatter formatter = DateTimeFormat.forPattern(dateFormat);
+										LocalDate localDate = LocalDate.parse(obj.toString(), formatter);
+										localDate.toDate();
+									}
+								} catch (Exception nfe) {
+									logger.error("The cell cannot be formatted as Date value", nfe);
+									validationErrors.addError(j, i, dataStore.getRecordAt(j).getFieldAt(index),
+											"sbi.workspace.dataset.wizard.metadata.validation.error.date.title");
+								}
+
+								break;
 							}
+
 						}
 
 					}
@@ -1442,6 +1472,8 @@ public class SelfServiceDataSetCRUD {
 			String skipRows = req.getParameter("skipRows");
 			String limitRows = req.getParameter("limitRows");
 			String xslSheetNumber = req.getParameter("xslSheetNumber");
+			String dateFormat = req.getParameter("dateFormat");
+
 			String scopeCd = DataSetConstants.DS_SCOPE_USER;
 
 			jsonDsConfig.put(DataSetConstants.FILE_TYPE, fileType);
@@ -1459,6 +1491,7 @@ public class SelfServiceDataSetCRUD {
 			jsonDsConfig.put(DataSetConstants.XSL_FILE_LIMIT_ROWS, limitRows);
 			jsonDsConfig.put(DataSetConstants.XSL_FILE_SHEET_NUMBER, xslSheetNumber);
 			jsonDsConfig.put(DataSetConstants.DS_SCOPE, scopeCd);
+			jsonDsConfig.put(DataSetConstants.FILE_DATE_FORMAT, dateFormat);
 
 		} catch (Exception e) {
 			logger.error("Error while defining dataset configuration. Error: " + e.getMessage());
@@ -1562,6 +1595,7 @@ public class SelfServiceDataSetCRUD {
 			String ckanId = req.getParameter("ckanId");
 			String ckanUrl = req.getParameter("ckanUrl");
 			String scopeCd = DataSetConstants.DS_SCOPE_USER;
+			String dateFormat = req.getParameter("dateFormat");
 
 			jsonDsConfig.put(DataSetConstants.FILE_TYPE, fileType);
 			if (savingDataset) {
@@ -1574,6 +1608,7 @@ public class SelfServiceDataSetCRUD {
 			jsonDsConfig.put(DataSetConstants.CSV_FILE_DELIMITER_CHARACTER, csvDelimiter);
 			jsonDsConfig.put(DataSetConstants.CSV_FILE_QUOTE_CHARACTER, csvQuote);
 			jsonDsConfig.put(DataSetConstants.CSV_FILE_ENCODING, csvEncoding);
+			jsonDsConfig.put(DataSetConstants.FILE_DATE_FORMAT, dateFormat);
 			jsonDsConfig.put(DataSetConstants.XSL_FILE_SKIP_ROWS, skipRows);
 			jsonDsConfig.put(DataSetConstants.XSL_FILE_LIMIT_ROWS, limitRows);
 			jsonDsConfig.put(DataSetConstants.XSL_FILE_SHEET_NUMBER, xslSheetNumber);
@@ -1748,11 +1783,22 @@ public class SelfServiceDataSetCRUD {
 			for (int i = 0; i < metaData.getFieldCount(); i++) {
 				IFieldMetaData ifmd = metaData.getFieldMeta(i);
 
-				String gussedType = guessColumnType(dataStore, i);
-
+				String guessedType = guessColumnType(dataStore, i);
+				boolean isDate = false;
+				if (!guessedType.equalsIgnoreCase("Double") && !guessedType.equalsIgnoreCase("Integer")) {
+					isDate = isADate(dataSet, dataStore, i);
+				}
 				// Setting mandatory property to defaults, if specified they
 				// will be overridden
-				if ("Double".equalsIgnoreCase(gussedType)) {
+				if (isDate) {
+					ifmd.setFieldType(IFieldMetaData.FieldType.ATTRIBUTE);
+					Class type = Class.forName("java.util.Date");
+					ifmd.setType(type);
+				} else if ("Integer".equalsIgnoreCase(guessedType)) {
+					ifmd.setFieldType(IFieldMetaData.FieldType.MEASURE);
+					Class type = Class.forName("java.lang.Integer");
+					ifmd.setType(type);
+				} else if ("Double".equalsIgnoreCase(guessedType)) {
 					ifmd.setFieldType(IFieldMetaData.FieldType.MEASURE);
 					Class type = Class.forName("java.lang.Double");
 					ifmd.setType(type);
@@ -1777,7 +1823,7 @@ public class SelfServiceDataSetCRUD {
 							} else if (propertyValue.equalsIgnoreCase("ATTRIBUTE")) {
 								ifmd.setFieldType(IFieldMetaData.FieldType.ATTRIBUTE);
 							} else {
-								if ("Double".equalsIgnoreCase(gussedType)) {
+								if ("Double".equalsIgnoreCase(guessedType) || "Integer".equalsIgnoreCase(guessedType)) {
 									ifmd.setFieldType(IFieldMetaData.FieldType.MEASURE);
 								} else {
 									ifmd.setFieldType(IFieldMetaData.FieldType.ATTRIBUTE);
@@ -1802,9 +1848,15 @@ public class SelfServiceDataSetCRUD {
 							} else if (propertyValue.equalsIgnoreCase("String") || propertyValue.equalsIgnoreCase("java.lang.String")) {
 								Class type = Class.forName("java.lang.String");
 								ifmd.setType(type);
+							} else if (propertyValue.equalsIgnoreCase("Date") || propertyValue.equalsIgnoreCase("java.util.Date")) {
+								Class type = Class.forName("java.util.Date");
+								ifmd.setType(type);
 							} else {
-								if ("Double".equalsIgnoreCase(gussedType)) {
+								if ("Double".equalsIgnoreCase(guessedType)) {
 									Class type = Class.forName("java.lang.Double");
+									ifmd.setType(type);
+								} else if ("Integer".equalsIgnoreCase(guessedType)) {
+									Class type = Class.forName("java.lang.Integer");
 									ifmd.setType(type);
 								} else {
 									Class type = Class.forName("java.lang.String");
@@ -1836,25 +1888,80 @@ public class SelfServiceDataSetCRUD {
 	}
 
 	/**
+	 * This is an heuristic to guess the column type of a column in a datastore created with a file dataset. The method analyses just a portion of the entire
+	 * datastore so the result is not guaranteed at 100%.
+	 * 
 	 * @param dataStore
-	 * @param i
-	 * @return
+	 *            the datastore to scan
+	 * @param columnIndex
+	 *            the index of the column to check
+	 * @return the guessed type of the column
 	 */
 	private String guessColumnType(IDataStore dataStore, int columnIndex) {
-		boolean isNumeric = true;
+		/// boolean isNumeric = true;
+		boolean foundDouble = false;
+		boolean foundInteger = false;
+		for (int i = 0; i < Math.min(ROWS_LIMIT_GUESS_TYPE_HEURISTIC, dataStore.getRecordsCount()); i++) {
+			IRecord record = dataStore.getRecordAt(i);
+			IField field = record.getFieldAt(columnIndex);
+			Object value = field.getValue();
+			if ((value == null) || (value.toString().isEmpty())) {
+				continue;
+			}
+			try {
+				// found an integer, so the column COULD be a integer
+				Integer.parseInt(value.toString());
+				foundInteger = true;
+			} catch (NumberFormatException e) {
+				try {
+					// found a double, so the column COULD be a double
+					Double.parseDouble(value.toString());
+					foundDouble = true;
+				} catch (NumberFormatException e2) {
+					// found a string, so the entire column MUST be a string we can stop the search
+					return "String";
+				}
+			}
+		}
+		// Double has priority to Integer
+		if (foundDouble) {
+			return "Double";
+		} else if (foundInteger) {
+			return "Integer";
+		} else {
+			return "String";
+		}
+
+	}
+
+	private boolean isADate(IDataSet dataSet, IDataStore dataStore, int columnIndex) throws JSONException {
+		String dsConfiguration = dataSet.getConfiguration();
+		JSONObject jsonConf = new JSONObject(dsConfiguration);
+		String dateFormat = jsonConf.get(DataSetConstants.FILE_DATE_FORMAT).toString();
 		for (int i = 0; i < Math.min(10, dataStore.getRecordsCount()); i++) {
 			IRecord record = dataStore.getRecordAt(i);
 			IField field = record.getFieldAt(columnIndex);
 			Object value = field.getValue();
+			if (value instanceof Date) {
+				// it's already a Date, skip the check
+				continue;
+			}
 			try {
-				Double.parseDouble(value.toString());
-			} catch (Throwable t) {
-				isNumeric = false;
-				break;
+				// JDK 8 version
+				/*
+				 * DateTimeFormatter formatter = DateTimeFormatter.ofPattern(dateFormat); LocalDate localDate = LocalDate.parse((String) field.getValue(),
+				 * formatter); Date date = Date.from(localDate.atStartOfDay(ZoneId.systemDefault()).toInstant());
+				 */
+				DateTimeFormatter formatter = DateTimeFormat.forPattern(dateFormat);
+				LocalDate localDate = LocalDate.parse((String) field.getValue(), formatter);
+				localDate.toDate();
+
+			} catch (Exception ex) {
+				logger.debug(field.getValue() + " is not a date");
+				return false;
 			}
 		}
-
-		return isNumeric ? "Double" : "String";
+		return true;
 	}
 
 	public JSONArray getDatasetColumns(IDataSet dataSet, IEngUserProfile profile) throws Exception {

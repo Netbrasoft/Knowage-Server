@@ -5,7 +5,7 @@
 	<parent>
 		<groupId>it.eng.knowage</groupId>
 		<artifactId>knowage-ce-parent</artifactId>
-		<version>6.1.1-SNAPSHOT</version>
+		<version>6.2.0</version>
 		<relativePath>../knowage-ce-parent/pom.xml</relativePath>
 	</parent>
 
@@ -26,12 +26,53 @@
 	    </plugins>
 	</build>
 	
+	<profiles>	
+
+		<profile>
+			<id>hsql</id>
+			<build>
+			<plugins>
+				<plugin>
+					<artifactId>maven-resources-plugin</artifactId>
+					<version>2.7</version>
+					<configuration>
+						<encoding>UTF-8</encoding>
+					</configuration>
+					<executions>
+						<execution>
+							<id>copy-hibernate</id>
+							<phase>prepare-package</phase>
+							<goals>
+								<goal>copy-resources</goal>
+							</goals>
+							<configuration>		
+								<outputDirectory>src/main/resources</outputDirectory>	
+								<resources>
+									<resource>
+										<directory>src/main/resources/hsql</directory>
+										<includes>
+											<include>hibernate.cfg.xml</include>
+											<include>quartz.properties</include>
+											<include>hazelcast.xml</include>
+										</includes>	
+									</resource>
+								</resources>
+								<overwrite>true</overwrite>
+							</configuration>
+						</execution>
+					</executions>
+				</plugin>
+				</plugins>
+			</build>
+		</profile>
+	</profiles>
+	
 	<dependencies>
 		
 		<dependency>
 			<groupId>it.eng.knowage</groupId>
 			<artifactId>knowage-core</artifactId>
-			<version>6.1.1-SNAPSHOT</version>
+			<version>6.2.0</version>
 			<scope>compile</scope>
 			<exclusions>
 				<exclusion>
@@ -54,6 +95,23 @@
 		</dependency>
 		
 		<dependency>
+			<groupId>it.eng.knowage</groupId>
+			<artifactId>knowage-utils</artifactId>
+			<version>6.2.0</version>
+			<scope>compile</scope>
+			<exclusions>
+				<exclusion>
+					<groupId>org.apache.hadoop</groupId>
+					<artifactId>hadoop-hdfs</artifactId>
+				</exclusion>
+				<exclusion>
+					<groupId>org.apache.hadoop</groupId>
+					<artifactId>hadoop-common</artifactId>
+				</exclusion>
+			</exclusions>
+		</dependency>
+		
+		<dependency>
 			<groupId>xalan</groupId>
 			<artifactId>xalan</artifactId>
 			<version>2.7.2</version>
@@ -70,7 +128,14 @@
 		<dependency>
 			<groupId>it.eng.knowage</groupId>
 			<artifactId>knowageoauth2securityprovider</artifactId>
-			<version>6.1.1-SNAPSHOT</version>
+			<version>6.2.0</version>
+			<scope>runtime</scope>
+		</dependency>
+		
+		<dependency>
+			<groupId>it.eng.knowage</groupId>
+			<artifactId>knowageldapsecurityprovider</artifactId>
+			<version>6.2.0</version>
 			<scope>runtime</scope>
 		</dependency>
 		
@@ -84,6 +149,13 @@
 		<dependency>
 			<groupId>org.jboss.resteasy</groupId>
 			<artifactId>resteasy-jaxrs</artifactId>
+			<version>3.1.2.Final</version>
+			<scope>runtime</scope>
+        </dependency>
+        
+		<dependency>
+			<groupId>org.jboss.resteasy</groupId>
+			<artifactId>resteasy-validator-provider-11</artifactId>
 			<version>3.1.2.Final</version>
 			<scope>runtime</scope>
         </dependency>
@@ -105,7 +177,7 @@
 		<dependency>
 		    <groupId>com.fasterxml.jackson.jaxrs</groupId>
 		    <artifactId>jackson-jaxrs-json-provider</artifactId>
-		    <version>2.0.2</version>
+		    <version>2.9.2</version>
 		    <scope>runtime</scope>
 		</dependency>
 		
@@ -115,7 +187,38 @@
 			<version>3.1.0</version> <!-- WebLogic uses 3.1.0, Tomcat 7 uses 3.0 -->
 			<scope>provided</scope>
 		</dependency>
-		
+
+		<dependency>
+			<groupId>com.jamonapi</groupId>
+			<artifactId>jamon</artifactId>
+			<version>2.80</version>
+		</dependency>
+
+		<dependency>
+  			<groupId>com.fdsapi</groupId>
+  			<artifactId>fdsapi</artifactId>
+  			<version>1.2</version>
+		</dependency>
+
+		<dependency>
+			<groupId>oro</groupId>
+			<artifactId>oro</artifactId>
+			<version>2.0.8</version>
+		</dependency>
+
+		<dependency>
+			<groupId>net.sf.xss-html-filter</groupId>
+			<artifactId>xss-html-filter</artifactId>
+			<version>1.5</version>
+		</dependency>
+
+		<dependency>
+			<groupId>commons-lang</groupId>
+			<artifactId>commons-lang</artifactId>
+			<version>2.5</version>
+			<scope>compile</scope>
+		</dependency>
+		   
 	</dependencies>
 	
 </project>

@@ -17,32 +17,6 @@
  */
 package it.eng.spagobi.api;
 
-import it.eng.spago.error.EMFUserError;
-import it.eng.spagobi.commons.bo.UserProfile;
-import it.eng.spagobi.commons.constants.SpagoBIConstants;
-import it.eng.spagobi.commons.dao.DAOFactory;
-import it.eng.spagobi.commons.dao.IDomainDAO;
-import it.eng.spagobi.commons.utilities.GeneralUtilities;
-import it.eng.spagobi.commons.utilities.UserUtilities;
-import it.eng.spagobi.functions.dao.ICatalogFunctionDAO;
-import it.eng.spagobi.functions.metadata.SbiCatalogFunction;
-import it.eng.spagobi.functions.metadata.SbiFunctionInputDataset;
-import it.eng.spagobi.functions.metadata.SbiFunctionInputFile;
-import it.eng.spagobi.functions.metadata.SbiFunctionInputVariable;
-import it.eng.spagobi.functions.metadata.SbiFunctionOutput;
-import it.eng.spagobi.services.rest.annotations.ManageAuthorization;
-import it.eng.spagobi.services.rest.annotations.UserConstraint;
-import it.eng.spagobi.tools.dataset.bo.IDataSet;
-import it.eng.spagobi.tools.dataset.dao.IDataSetDAO;
-import it.eng.spagobi.utilities.CatalogFunction;
-import it.eng.spagobi.utilities.CatalogFunctionInputFile;
-import it.eng.spagobi.utilities.engines.SpagoBIEngineRuntimeException;
-import it.eng.spagobi.utilities.exceptions.SpagoBIRuntimeException;
-import it.eng.spagobi.utilities.exceptions.SpagoBIServiceException;
-import it.eng.spagobi.utilities.rest.RestUtilities;
-import it.eng.spagobi.utilities.rest.RestUtilities.HttpMethod;
-import it.eng.spagobi.utilities.rest.RestUtilities.Response;
-
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
@@ -68,6 +42,32 @@ import org.apache.log4j.Logger;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+
+import it.eng.spago.error.EMFUserError;
+import it.eng.spagobi.commons.bo.UserProfile;
+import it.eng.spagobi.commons.constants.SpagoBIConstants;
+import it.eng.spagobi.commons.dao.DAOFactory;
+import it.eng.spagobi.commons.dao.IDomainDAO;
+import it.eng.spagobi.commons.utilities.GeneralUtilities;
+import it.eng.spagobi.commons.utilities.UserUtilities;
+import it.eng.spagobi.functions.dao.ICatalogFunctionDAO;
+import it.eng.spagobi.functions.metadata.SbiCatalogFunction;
+import it.eng.spagobi.functions.metadata.SbiFunctionInputDataset;
+import it.eng.spagobi.functions.metadata.SbiFunctionInputFile;
+import it.eng.spagobi.functions.metadata.SbiFunctionInputVariable;
+import it.eng.spagobi.functions.metadata.SbiFunctionOutput;
+import it.eng.spagobi.services.rest.annotations.ManageAuthorization;
+import it.eng.spagobi.services.rest.annotations.UserConstraint;
+import it.eng.spagobi.tools.dataset.bo.IDataSet;
+import it.eng.spagobi.tools.dataset.dao.IDataSetDAO;
+import it.eng.spagobi.utilities.CatalogFunction;
+import it.eng.spagobi.utilities.CatalogFunctionInputFile;
+import it.eng.spagobi.utilities.engines.SpagoBIEngineRuntimeException;
+import it.eng.spagobi.utilities.exceptions.SpagoBIRuntimeException;
+import it.eng.spagobi.utilities.exceptions.SpagoBIServiceException;
+import it.eng.spagobi.utilities.rest.RestUtilities;
+import it.eng.spagobi.utilities.rest.RestUtilities.HttpMethod;
+import it.eng.spagobi.utilities.rest.RestUtilities.Response;
 
 @Path("/1.0/functions-catalog")
 @ManageAuthorization
@@ -551,7 +551,7 @@ public class FunctionsCatalogResource extends AbstractSpagoBIResource {
 			String description = jsonObj.getString("description");
 			String language = jsonObj.getString("language");
 			String script = jsonObj.getString("script");
-			String owner = (String) getUserProfile().getUserUniqueIdentifier();
+			String owner = (String) getUserProfile().getUserId();
 			String label = jsonObj.getString("label");
 			String type = jsonObj.getString("type");
 			if (jsonObj.has("url")) {
@@ -743,7 +743,7 @@ public class FunctionsCatalogResource extends AbstractSpagoBIResource {
 			String description = jsonObj.getString("description");
 			String language = jsonObj.getString("language");
 			String script = jsonObj.getString("script");
-			String owner = (String) getUserProfile().getUserUniqueIdentifier();
+			String owner = (String) getUserProfile().getUserId();
 			String label = jsonObj.getString("label");
 			String type = jsonObj.getString("type");
 			String url = "";
@@ -1041,7 +1041,7 @@ public class FunctionsCatalogResource extends AbstractSpagoBIResource {
 				if (function == null) {
 					throw new SpagoBIRuntimeException("Impossible to find a function with ID [" + functionId + "]. Cannot update or delete.");
 				} else {
-					String userId = (String) profile.getUserUniqueIdentifier();
+					String userId = (String) profile.getUserId();
 					if (function.getOwner().equals(userId)) {
 						return true;
 					} else
@@ -1137,7 +1137,7 @@ public class FunctionsCatalogResource extends AbstractSpagoBIResource {
 	@GET
 	@Path("/execute/sample/{id}")
 	@Produces(MediaType.APPLICATION_JSON)
-	@UserConstraint(functionalities = { SpagoBIConstants.FUNCTIONS_CATALOG_USAGE })
+	@UserConstraint(functionalities = { SpagoBIConstants.FUNCTIONS_CATALOG_USAGE, SpagoBIConstants.FUNCTIONS_CATALOG_MANAGEMENT })
 	public String executeSampleCatalogFunctionById(@PathParam("id") int id) {
 		logger.debug("IN");
 		logger.debug("Received request for executing function with id [" + id + "]");
@@ -1204,7 +1204,7 @@ public class FunctionsCatalogResource extends AbstractSpagoBIResource {
 	@GET
 	@Path("/execute/sample")
 	@Produces(MediaType.APPLICATION_JSON)
-	@UserConstraint(functionalities = { SpagoBIConstants.FUNCTIONS_CATALOG_USAGE })
+	@UserConstraint(functionalities = { SpagoBIConstants.FUNCTIONS_CATALOG_USAGE, SpagoBIConstants.FUNCTIONS_CATALOG_MANAGEMENT })
 	public String executeSampleCatalogFunctionByLabel(@QueryParam("label") String label) {
 		logger.debug("IN");
 		logger.debug("Received request for executing function with label [" + label + "]");
@@ -1320,7 +1320,7 @@ public class FunctionsCatalogResource extends AbstractSpagoBIResource {
 	@POST
 	@Path("/execute/new/{id}")
 	@Produces(MediaType.APPLICATION_JSON)
-	@UserConstraint(functionalities = { SpagoBIConstants.FUNCTIONS_CATALOG_USAGE })
+	@UserConstraint(functionalities = { SpagoBIConstants.FUNCTIONS_CATALOG_USAGE, SpagoBIConstants.FUNCTIONS_CATALOG_MANAGEMENT })
 	public String executeCatalogFunctionById(String body, @PathParam("id") int id) {
 		logger.debug("IN");
 		logger.debug("Received request for executing function with id [" + id + "]");
@@ -1405,7 +1405,7 @@ public class FunctionsCatalogResource extends AbstractSpagoBIResource {
 	@POST
 	@Path("/execute/new")
 	@Produces(MediaType.APPLICATION_JSON)
-	@UserConstraint(functionalities = { SpagoBIConstants.FUNCTIONS_CATALOG_USAGE })
+	@UserConstraint(functionalities = { SpagoBIConstants.FUNCTIONS_CATALOG_USAGE, SpagoBIConstants.FUNCTIONS_CATALOG_MANAGEMENT })
 	public String executeCatalogFunctionByLabel(String body, @QueryParam("label") String label) {
 		logger.debug("IN");
 		logger.debug("Received request for executing function with label [" + label + "]");
@@ -1424,7 +1424,7 @@ public class FunctionsCatalogResource extends AbstractSpagoBIResource {
 
 	private Map<String, String> getHeadersToForward(HttpServletRequest request) throws UnsupportedEncodingException {
 		Map<String, String> headers = RestUtilities.toHeaders(request);
-		String userId = (String) getUserProfile().getUserId();
+		String userId = (String) getUserProfile().getUserUniqueIdentifier();
 		logger.debug("Adding auth for user " + userId);
 		String encodedBytes = Base64.encode(userId.getBytes("UTF-8"));
 		headers.put("Authorization", "Direct " + encodedBytes);

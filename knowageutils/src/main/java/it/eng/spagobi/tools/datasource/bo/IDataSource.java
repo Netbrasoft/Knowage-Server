@@ -17,15 +17,21 @@
  */
 package it.eng.spagobi.tools.datasource.bo;
 
-import it.eng.spagobi.services.datasource.bo.SpagoBiDataSource;
-import it.eng.spagobi.tools.dataset.common.datastore.IDataStore;
-
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.Set;
 
 import javax.naming.NamingException;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+
+import it.eng.spagobi.services.datasource.bo.SpagoBiDataSource;
+import it.eng.spagobi.tools.dataset.cache.query.SelectQuery;
+import it.eng.spagobi.tools.dataset.common.datastore.IDataStore;
+import it.eng.spagobi.utilities.database.DataBaseException;
+
+@JsonDeserialize(as = DataSource.class)
 public interface IDataSource {
 
 	public abstract SpagoBiDataSource toSpagoBiDataSource();
@@ -42,6 +48,7 @@ public interface IDataSource {
 
 	public void setMultiSchema(Boolean multiSchema);
 
+	@JsonIgnore
 	public Connection getConnection() throws NamingException, SQLException, ClassNotFoundException;
 
 	public Connection getConnection(String schema) throws NamingException, SQLException, ClassNotFoundException;
@@ -167,19 +174,19 @@ public interface IDataSource {
 	public abstract void setDriver(String driver);
 
 	/**
-	 * Gets the dialect id.
+	 * Gets the dialect name.
 	 *
-	 * @return the dialect id
+	 * @return the dialect name
 	 */
-	public abstract Integer getDialectId();
+	public abstract String getDialectName();
 
 	/**
-	 * Sets the dialect id.
+	 * Sets the dialect name.
 	 *
-	 * @param dialectId
-	 *            the new dialect id
+	 * @param dialectName
+	 *            the new dialect name
 	 */
-	public abstract void setDialectId(Integer dialectId);
+	public abstract void setDialectName(String dialectName);
 
 	/**
 	 * Gets the engines.
@@ -211,13 +218,17 @@ public interface IDataSource {
 	 */
 	public abstract void setObjects(Set objects);
 
+	public abstract JDBCDataSourcePoolConfiguration getJdbcPoolConfiguration();
+
+	public abstract void setJdbcPoolConfiguration(JDBCDataSourcePoolConfiguration jDBCPoolConfiguration);
+
+	public abstract String getOwner();
+
+	public abstract void setOwner(String owner);
+
 	public String getHibDialectClass();
 
 	public void setHibDialectClass(String hibDialectClass);
-
-	public String getHibDialectName();
-
-	public void setHibDialectName(String hibDialectName);
 
 	public Boolean checkIsReadOnly();
 
@@ -230,5 +241,7 @@ public interface IDataSource {
 	public IDataStore executeStatement(String statement, Integer start, Integer limit);
 
 	public IDataStore executeStatement(String statement, Integer start, Integer limit, Integer maxRowCount);
+
+	public IDataStore executeStatement(SelectQuery selectQuery, Integer start, Integer limit, Integer maxRowCount) throws DataBaseException;
 
 }

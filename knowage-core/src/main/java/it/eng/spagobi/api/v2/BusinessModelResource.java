@@ -71,7 +71,7 @@ public class BusinessModelResource extends AbstractSpagoBIResource {
 	 *
 	 */
 	public static enum FILETYPE {
-		JAR, LOG, SBIMODULE
+		JAR, LOG, SBIMODEL
 	};
 
 	private static final String LOG_SUFFIX = ".log";
@@ -97,13 +97,15 @@ public class BusinessModelResource extends AbstractSpagoBIResource {
 			} else {
 				IRoleDAO roleDao = DAOFactory.getRoleDAO();
 				roleDao.setUserProfile(getUserProfile());
-				List<Integer> categories = roleDao.getMetaModelCategoriesForRoles(getUserProfile().getRoles());
+
+				List<String> roleNames = UserUtilities.getCurrentRoleNames(getUserProfile());
+				List<Integer> categories = roleDao.getMetaModelCategoriesForRoles(roleNames);
 				logger.debug("Found the following categories [" + categories + "].");
 				if (categories != null && !categories.isEmpty()) {
 					businessModelList = businessModelsDAO.loadMetaModelByCategories(categories);
 				}
 			}
-			
+
 			List<MetaModel> filteredBusinessModels = new ArrayList<MetaModel>();
 			if (fileExtension != null) {
 				for (MetaModel bm : businessModelList) {
@@ -125,7 +127,7 @@ public class BusinessModelResource extends AbstractSpagoBIResource {
 		}
 
 	}
-	
+
 	@GET
 	@Path("/bmCategories")
 	@Produces(MediaType.APPLICATION_JSON + "; charset=UTF-8")
@@ -164,8 +166,6 @@ public class BusinessModelResource extends AbstractSpagoBIResource {
 		}
 
 	}
-
-
 
 	/**
 	 * Get all versions of business model with specified id
@@ -288,7 +288,14 @@ public class BusinessModelResource extends AbstractSpagoBIResource {
 
 		content.setFileName(file.getFileName());
 		bytes = file.getContent();
-		content.setContent(bytes);
+
+		if (file.getFileName().endsWith("sbimodel")) {
+			// .sbimodel file
+			content.setFileModel(bytes);
+		} else {
+			// .jar or other file
+			content.setContent(bytes);
+		}
 		content.setCreationDate(new Date());
 		content.setCreationUser(getUserProfile().getUserName().toString());
 
@@ -323,7 +330,7 @@ public class BusinessModelResource extends AbstractSpagoBIResource {
 			response = Response.ok(byteContent);
 			response.header("Content-Disposition", "attachment; filename=" + filename);
 			break;
-		case SBIMODULE:
+		case SBIMODEL:
 			byteContent = content.getFileModel();
 			response = Response.ok(byteContent);
 			response.header("Content-Disposition", "attachment; filename=" + filename);

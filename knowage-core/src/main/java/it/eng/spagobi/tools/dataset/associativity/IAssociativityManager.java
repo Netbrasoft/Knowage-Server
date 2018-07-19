@@ -18,6 +18,10 @@
 
 package it.eng.spagobi.tools.dataset.associativity;
 
+import java.util.Map;
+import java.util.Set;
+
+import it.eng.spagobi.tools.dataset.graph.Tuple;
 import it.eng.spagobi.tools.dataset.graph.associativity.utils.AssociativeLogicResult;
 
 /**
@@ -27,6 +31,10 @@ import it.eng.spagobi.tools.dataset.graph.associativity.utils.AssociativeLogicRe
 
 public interface IAssociativityManager {
 
-	public AssociativeLogicResult process() throws Exception;
+	public void process() throws Exception;
+
+	public AssociativeLogicResult getResult();
+
+	public Map<String, Map<String, Set<Tuple>>> getSelections();
 
 }

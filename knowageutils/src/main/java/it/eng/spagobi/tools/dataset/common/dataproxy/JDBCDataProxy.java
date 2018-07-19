@@ -17,19 +17,21 @@
  */
 package it.eng.spagobi.tools.dataset.common.dataproxy;
 
-import it.eng.spago.error.EMFUserError;
-import it.eng.spagobi.tools.dataset.common.datareader.IDataReader;
-import it.eng.spagobi.tools.dataset.common.datastore.IDataStore;
-import it.eng.spagobi.tools.datasource.bo.IDataSource;
-import it.eng.spagobi.utilities.exceptions.SpagoBIRuntimeException;
-import it.eng.spagobi.utilities.sql.SqlUtils;
-
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 
 import org.apache.log4j.Logger;
+
+import it.eng.spago.error.EMFUserError;
+import it.eng.spagobi.tools.dataset.cache.query.DatabaseDialect;
+import it.eng.spagobi.tools.dataset.common.datareader.IDataReader;
+import it.eng.spagobi.tools.dataset.common.datastore.IDataStore;
+import it.eng.spagobi.tools.datasource.bo.IDataSource;
+import it.eng.spagobi.utilities.assertion.Assert;
+import it.eng.spagobi.utilities.exceptions.SpagoBIRuntimeException;
+import it.eng.spagobi.utilities.sql.SqlUtils;
 
 /**
  * @author Andrea Gioia (andrea.gioia@eng.it)
@@ -95,16 +97,17 @@ public class JDBCDataProxy extends AbstractDataProxy {
 				throw new SpagoBIRuntimeException("An error occurred while creating connection", t);
 			}
 			String dialect = dataSource.getHibDialectClass();
-			if (dialect == null) {
-				dialect = dataSource.getHibDialectName();
-			}
+			DatabaseDialect databaseDialect = DatabaseDialect.get(dialect);
+			Assert.assertNotNull(dialect, "Database dialect cannot be null");
 			try {
 				// ATTENTION: For the most db sets the stmt as a scrollable
 				// stmt, only for the compatibility with Ingres sets
 				// a stmt forward only
-				if (dialect.contains("Ingres")) {
+				if (databaseDialect.equals(DatabaseDialect.VERTICA)) {
 					stmt = connection.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
-				} else if (dialect.contains("hbase") || SqlUtils.isHiveLikeDialect(dialect) || dialect.contains("SAP")) {
+				} else if (databaseDialect.equals(DatabaseDialect.HIVE) || databaseDialect.equals(DatabaseDialect.HIVE2)
+						|| databaseDialect.equals(DatabaseDialect.CASSANDRA) || databaseDialect.equals(DatabaseDialect.IMPALA)
+						|| databaseDialect.equals(DatabaseDialect.ORIENT) || databaseDialect.equals(DatabaseDialect.SPARKSQL)) {
 					stmt = connection.createStatement();
 				} else {
 					stmt = connection.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
@@ -196,7 +199,7 @@ public class JDBCDataProxy extends AbstractDataProxy {
 		String statement = this.getStatement();
 		// if db is SQL server the query nees to be modified in case it contains ORDER BY clause
 
-		String dialect = dataSource.getHibDialectName();
+		String dialect = dataSource.getHibDialectClass();
 		logger.debug("Dialect is " + dialect);
 
 		if (dialect.toUpperCase().contains("SQLSERVER") && statement.toUpperCase().contains("ORDER BY")) {
@@ -205,7 +208,11 @@ public class JDBCDataProxy extends AbstractDataProxy {
 		}
 
 		try {
-			String sqlQuery = "SELECT COUNT(*) FROM (" + statement + ") temptable";
+			String tableAlias = "";
+			if (!dialect.toLowerCase().contains("orient")) {
+				tableAlias = "temptable";
+			}
+			String sqlQuery = "SELECT COUNT(*) FROM (" + statement + ") " + tableAlias;
 			logger.info("Executing query " + sqlQuery + " ...");
 			stmt = connection.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
 			rs = stmt.executeQuery(sqlQuery);

@@ -18,33 +18,47 @@
 
 package it.eng.spagobi.tools.dataset.bo;
 
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.List;
+import java.util.Map;
+
+import javax.naming.NamingException;
+
+import org.apache.log4j.Logger;
+import org.json.JSONObject;
+
 import it.eng.spagobi.container.ObjectUtils;
 import it.eng.spagobi.services.dataset.bo.SpagoBiDataSet;
+import it.eng.spagobi.tools.dataset.cache.query.SelectQuery;
 import it.eng.spagobi.tools.dataset.common.behaviour.QuerableBehaviour;
 import it.eng.spagobi.tools.dataset.common.dataproxy.IDataProxy;
 import it.eng.spagobi.tools.dataset.common.dataproxy.JDBCDataProxy;
 import it.eng.spagobi.tools.dataset.common.datareader.JDBCStandardDataReader;
 import it.eng.spagobi.tools.dataset.common.datastore.IDataStore;
+import it.eng.spagobi.tools.dataset.common.iterator.DataIterator;
+import it.eng.spagobi.tools.dataset.common.iterator.ResultSetIterator;
 import it.eng.spagobi.tools.dataset.common.metadata.IMetaData;
 import it.eng.spagobi.tools.dataset.persist.IDataSetTableDescriptor;
 import it.eng.spagobi.tools.dataset.utils.DatasetMetadataParser;
 import it.eng.spagobi.tools.datasource.bo.DataSourceFactory;
 import it.eng.spagobi.tools.datasource.bo.IDataSource;
+import it.eng.spagobi.utilities.assertion.Assert;
 import it.eng.spagobi.utilities.database.AbstractDataBase;
+import it.eng.spagobi.utilities.database.DataBaseException;
 import it.eng.spagobi.utilities.database.temporarytable.TemporaryTableManager;
 import it.eng.spagobi.utilities.engines.SpagoBIEngineRuntimeException;
 import it.eng.spagobi.utilities.exceptions.SpagoBIRuntimeException;
 import it.eng.spagobi.utilities.json.JSONUtils;
 
-import java.util.List;
-import java.util.Map;
-
-import org.apache.log4j.Logger;
-import org.json.JSONObject;
-
 public abstract class AbstractJDBCDataset extends ConfigurableDataSet {
 
 	public static String DS_TYPE = "SbiQueryDataSet";
+
+	protected SelectQuery selectQuery;
+
 	private static final String QUERY = "query";
 	private static final String QUERY_SCRIPT = "queryScript";
 	private static final String QUERY_SCRIPT_LANGUAGE = "queryScriptLanguage";
@@ -204,36 +218,23 @@ public abstract class AbstractJDBCDataset extends ConfigurableDataSet {
 
 	public static String encapsulateColumnName(String columnName, IDataSource dataSource) {
 		logger.debug("IN");
-		String toReturn = columnName;
-		if (columnName != null) {
-			String aliasDelimiter = TemporaryTableManager.getAliasDelimiter(dataSource);
-			logger.debug("Alias delimiter is [" + aliasDelimiter + "]");
-			if (!columnName.startsWith(aliasDelimiter) || !columnName.endsWith(aliasDelimiter)) {
-				toReturn = aliasDelimiter + columnName + aliasDelimiter;
+		try {
+			String toReturn = columnName;
+			if (columnName != null) {
+				String aliasDelimiter = TemporaryTableManager.getAliasDelimiter(dataSource);
+				logger.debug("Alias delimiter is [" + aliasDelimiter + "]");
+				if (!columnName.startsWith(aliasDelimiter) || !columnName.endsWith(aliasDelimiter)) {
+					toReturn = aliasDelimiter + columnName + aliasDelimiter;
+				}
 			}
+			logger.debug("OUT: returning " + toReturn);
+			return toReturn;
+		} catch (DataBaseException e) {
+			throw new SpagoBIRuntimeException(e);
 		}
-		logger.debug("OUT: returning " + toReturn);
-		return toReturn;
 	}
 
-	/**
-	 * @param string
-	 * @param dataSource
-	 * @return
-	 */
-	public static String encapsulateColumnAlaias(String columnAlias, IDataSource dataSource) {
-		logger.debug("IN");
-		String toReturn = null;
-		if (columnAlias != null) {
-			String aliasDelimiter = TemporaryTableManager.getAliasDelimiter(dataSource);
-			logger.debug("Alias delimiter is [" + aliasDelimiter + "]");
-			toReturn = aliasDelimiter + columnAlias + aliasDelimiter;
-		}
-		logger.debug("OUT: returning " + toReturn);
-		return toReturn;
-	}
-
-	public static String substituteStandardWithDatasourceDelimiter(String columnName, IDataSource dataSource) {
+	public static String substituteStandardWithDatasourceDelimiter(String columnName, IDataSource dataSource) throws DataBaseException {
 		logger.debug("IN");
 		if (columnName != null) {
 			logger.debug("Column name is [" + columnName + "]");
@@ -244,5 +245,42 @@ public abstract class AbstractJDBCDataset extends ConfigurableDataSet {
 		}
 		logger.debug("OUT");
 		return columnName;
+	}
+
+	@Override
+	public DataIterator iterator() {
+		logger.debug("IN");
+		try {
+			QuerableBehaviour querableBehaviour = (QuerableBehaviour) getBehaviour(QuerableBehaviour.class.getName());
+			String statement = querableBehaviour.getStatement();
+			logger.debug("Obtained statement [" + statement + "]");
+			dataProxy.setStatement(statement);
+			JDBCDataProxy jdbcDataProxy = (JDBCDataProxy) dataProxy;
+			IDataSource dataSource = jdbcDataProxy.getDataSource();
+			Assert.assertNotNull(dataSource, "Invalid datasource");
+			Connection connection = dataSource.getConnection(jdbcDataProxy.getSchema());
+			Statement stmt = connection.createStatement();
+			stmt.setFetchSize(5000);
+			ResultSet rs = (ResultSet) dataProxy.getData(dataReader, stmt);
+			DataIterator iterator = new ResultSetIterator(connection, stmt, rs);
+			return iterator;
+		} catch (ClassNotFoundException | SQLException | NamingException e) {
+			throw new SpagoBIRuntimeException(e);
+		} finally {
+			logger.debug("OUT");
+		}
+	}
+
+	@Override
+	public boolean isIterable() {
+		return true;
+	}
+
+	public SelectQuery getSelectQuery() {
+		return selectQuery;
+	}
+
+	public void setSelectQuery(SelectQuery selectQuery) {
+		this.selectQuery = selectQuery;
 	}
 }

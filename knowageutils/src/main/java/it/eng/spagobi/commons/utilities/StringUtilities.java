@@ -17,12 +17,6 @@
  */
 package it.eng.spagobi.commons.utilities;
 
-import it.eng.spago.base.SourceBean;
-import it.eng.spago.security.IEngUserProfile;
-import it.eng.spagobi.commons.SingletonConfig;
-import it.eng.spagobi.services.common.EnginConf;
-import it.eng.spagobi.tools.dataset.common.behaviour.UserProfileUtils;
-
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -47,11 +41,20 @@ import java.util.Random;
 
 import org.apache.log4j.Logger;
 
+import it.eng.spago.base.SourceBean;
+import it.eng.spago.security.IEngUserProfile;
+import it.eng.spagobi.commons.SingletonConfig;
+import it.eng.spagobi.services.common.EnginConf;
+import it.eng.spagobi.tools.dataset.common.behaviour.UserProfileUtils;
+import it.eng.spagobi.utilities.exceptions.SpagoBIRuntimeException;
+
 /**
  * @author Andrea Gioia (andrea.gioia@eng.it)
  *
  */
 public class StringUtilities {
+
+	// this should be moved to ParametersUtilities.java
 	public static final String START_PARAMETER = "$P{";
 
 	public static final String START_USER_PROFILE_ATTRIBUTE = "${";
@@ -190,7 +193,8 @@ public class StringUtilities {
 		} else {
 			if (attributeValue.startsWith("{")) {
 				// the profile attribute is multi-value
-				logger.warn("The attribute value seems to be a multi value attribute; trying considering it as a multi value using its own splitter and no prefix and suffix.");
+				logger.warn(
+						"The attribute value seems to be a multi value attribute; trying considering it as a multi value using its own splitter and no prefix and suffix.");
 				try {
 					// checks the sintax
 					String[] values = findAttributeValues(attributeValue);
@@ -440,7 +444,8 @@ public class StringUtilities {
 			} else {
 				if (value.startsWith("{")) {
 					// the profile attribute is multi-value
-					logger.warn("The attribute value seems to be a multi value parameter; trying considering it as a multi value using its own splitter and no prefix and suffix.");
+					logger.warn(
+							"The attribute value seems to be a multi value parameter; trying considering it as a multi value using its own splitter and no prefix and suffix.");
 					try {
 						// checks the sintax
 						String[] values = findAttributeValues(value);
@@ -627,7 +632,8 @@ public class StringUtilities {
 		} else {
 			if (value.startsWith("{")) {
 				// the profile attribute is multi-value
-				logger.warn("The attribute value seems to be a multi value parameter; trying considering it as a multi value using its own splitter and no prefix and suffix.");
+				logger.warn(
+						"The attribute value seems to be a multi value parameter; trying considering it as a multi value using its own splitter and no prefix and suffix.");
 				try {
 					// checks the sintax
 					String[] values = findAttributeValues(value);
@@ -939,4 +945,36 @@ public class StringUtilities {
 		});
 	}
 
+	/**
+	 * Parse substrings between delimiter.
+	 */
+	public static String[] getSubstringsBetween(String values, String delimiter) {
+		try {
+			ArrayList<String> arrayList = new ArrayList<>();
+			int start = values.indexOf(delimiter);
+			int delimiterLength = delimiter.length();
+			while (start > -1) {
+				int end = values.indexOf(delimiter, start + delimiterLength);
+				arrayList.add(values.substring(start + delimiterLength, end));
+				start = values.indexOf(delimiter, end + delimiterLength);
+			}
+			return arrayList.toArray(new String[0]);
+		} catch (IndexOutOfBoundsException e) {
+			throw new SpagoBIRuntimeException("Unable to tokenize string [" + values + "] with delimiter [" + delimiter + "]", e);
+		}
+	}
+
+	/**
+	 * Parse substrings between prefix, delimiter and suffix.
+	 */
+	public static String[] splitBetween(String values, String prefix, String delimiter, String suffix) {
+		int prefixIndex = values.indexOf(prefix);
+		int suffixIndex = values.lastIndexOf(suffix);
+		if (prefixIndex > -1 && suffixIndex > -1) {
+			int prefixLength = prefix.length();
+			return values.substring(prefixIndex + prefixLength, suffixIndex).split("\\Q" + delimiter + "\\E");
+		} else {
+			throw new SpagoBIRuntimeException("Unable to tokenize string [" + values + "] with delimiters [" + prefix + "," + delimiter + "," + suffix + "]");
+		}
+	}
 }

@@ -25,10 +25,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import javax.ws.rs.GET;
+import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
-import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 
 import org.apache.log4j.Logger;
@@ -36,50 +35,74 @@ import org.jgrapht.graph.Pseudograph;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import it.eng.spagobi.api.common.DataSetResourceAbstractResource;
+import com.jamonapi.Monitor;
+import com.jamonapi.MonitorFactory;
+
+import it.eng.spagobi.api.common.AbstractDataSetResource;
 import it.eng.spagobi.commons.SingletonConfig;
 import it.eng.spagobi.commons.constants.ConfigurationConstants;
 import it.eng.spagobi.commons.constants.SpagoBIConstants;
+import it.eng.spagobi.commons.utilities.StringUtilities;
 import it.eng.spagobi.services.rest.annotations.UserConstraint;
 import it.eng.spagobi.services.serialization.JsonConverter;
 import it.eng.spagobi.tools.dataset.associativity.IAssociativityManager;
 import it.eng.spagobi.tools.dataset.associativity.strategy.AssociativeStrategyFactory;
 import it.eng.spagobi.tools.dataset.bo.IDataSet;
-import it.eng.spagobi.tools.dataset.cache.SpagoBICacheConfiguration;
+import it.eng.spagobi.tools.dataset.cache.query.item.InFilter;
+import it.eng.spagobi.tools.dataset.cache.query.item.Projection;
+import it.eng.spagobi.tools.dataset.cache.query.item.SimpleFilter;
 import it.eng.spagobi.tools.dataset.common.association.Association;
 import it.eng.spagobi.tools.dataset.common.association.Association.Field;
 import it.eng.spagobi.tools.dataset.common.association.AssociationGroup;
 import it.eng.spagobi.tools.dataset.common.association.AssociationGroupJSONSerializer;
-import it.eng.spagobi.tools.dataset.common.datawriter.CockpitJSONDataWriter;
 import it.eng.spagobi.tools.dataset.common.metadata.IFieldMetaData;
 import it.eng.spagobi.tools.dataset.common.metadata.IMetaData;
 import it.eng.spagobi.tools.dataset.dao.IDataSetDAO;
 import it.eng.spagobi.tools.dataset.graph.AssociationAnalyzer;
 import it.eng.spagobi.tools.dataset.graph.LabeledEdge;
+import it.eng.spagobi.tools.dataset.graph.Tuple;
 import it.eng.spagobi.tools.dataset.graph.associativity.Config;
-import it.eng.spagobi.tools.dataset.graph.associativity.Selection;
-import it.eng.spagobi.tools.dataset.graph.associativity.utils.AssociativeLogicResult;
 import it.eng.spagobi.tools.dataset.graph.associativity.utils.AssociativeLogicUtils;
-import it.eng.spagobi.tools.datasource.bo.IDataSource;
-import it.eng.spagobi.utilities.StringUtils;
+import it.eng.spagobi.tools.dataset.utils.DataSetUtilities;
 import it.eng.spagobi.utilities.assertion.Assert;
 import it.eng.spagobi.utilities.exceptions.SpagoBIRestServiceException;
 import it.eng.spagobi.utilities.exceptions.SpagoBIServiceParameterException;
 import it.eng.spagobi.utilities.sql.SqlUtils;
 
 @Path("/2.0/associativeSelections")
-public class AssociativeSelectionsResource extends DataSetResourceAbstractResource {
+public class AssociativeSelectionsResource extends AbstractDataSetResource {
 
 	static protected Logger logger = Logger.getLogger(AssociativeSelectionsResource.class);
-	
-	@GET
+
+	@POST
 	@Produces(MediaType.APPLICATION_JSON)
 	@UserConstraint(functionalities = { SpagoBIConstants.SELF_SERVICE_DATASET_MANAGEMENT })
-	public String getAssociativeSelections(@QueryParam("associationGroup") String associationGroupString, @QueryParam("selections") String selectionsString,
-			@QueryParam("datasets") String datasetsString, @QueryParam("nearRealtime") String nearRealtimeDatasetsString) {
+	public String getAssociativeSelections(String body) {
 		logger.debug("IN");
 
+		Monitor start = MonitorFactory.start("Knowage.AssociativeSelectionsResource.getAssociativeSelections:total");
+
+		String associationGroupString = null;
+		String selectionsString = null;
+		String datasetsString = null;
+		String nearRealtimeDatasetsString = null;
 		try {
+			if (StringUtilities.isNotEmpty(body)) {
+				JSONObject jsonBody = new JSONObject(body);
+
+				JSONObject jsonAssociationGroup = jsonBody.optJSONObject("associationGroup");
+				associationGroupString = jsonAssociationGroup != null ? jsonAssociationGroup.toString() : null;
+
+				JSONObject jsonSelections = jsonBody.optJSONObject("selections");
+				selectionsString = jsonSelections != null ? jsonSelections.toString() : null;
+
+				JSONObject jsonDatasets = jsonBody.optJSONObject("datasets");
+				datasetsString = jsonDatasets != null ? jsonDatasets.toString() : null;
+
+				JSONArray jsonNearRealtime = jsonBody.optJSONArray("nearRealtime");
+				nearRealtimeDatasetsString = jsonNearRealtime != null ? jsonNearRealtime.toString() : null;
+			}
+
 			IDataSetDAO dataSetDAO = getDataSetDAO();
 			dataSetDAO.setUserProfile(getUserProfile());
 
@@ -121,27 +144,6 @@ public class AssociativeSelectionsResource extends DataSetResourceAbstractResour
 				}
 			}
 
-			JSONObject associationGroupObjectWithoutParams = new JSONObject(associationGroupString);
-			JSONArray associationsWithoutParams = associationGroupObjectWithoutParams.optJSONArray("associations");
-			if (associationsWithoutParams != null) {
-				for (int associationIndex = associationsWithoutParams.length() - 1; associationIndex >= 0; associationIndex--) {
-					JSONObject association = associationsWithoutParams.getJSONObject(associationIndex);
-					JSONArray fields = association.getJSONArray("fields");
-					for (int fieldIndex = fields.length() - 1; fieldIndex >= 0; fieldIndex--) {
-						JSONObject field = fields.getJSONObject(fieldIndex);
-						String column = field.getString("column");
-						String store = field.getString("store");
-						String type = field.optString("type");
-						if (("document".equalsIgnoreCase(type)) || (column.startsWith("$P{") && column.endsWith("}"))
-								|| dataSetDAO.loadDataSetByLabel(store).isRealtime()) {
-							fields.remove(fieldIndex);
-						}
-					}
-				}
-			}
-			AssociationGroup associationGroupWithoutParams = serializer.deserialize(associationGroupObjectWithoutParams);
-			fixAssociationGroup(associationGroupWithoutParams);
-
 			// parse dataset parameters
 			Map<String, Map<String, String>> datasetParameters = new HashMap<>();
 			if (datasetsString != null && !datasetsString.isEmpty()) {
@@ -172,19 +174,14 @@ public class AssociativeSelectionsResource extends DataSetResourceAbstractResour
 				}
 			}
 
-			AssociationAnalyzer analyzerWithoutParams = new AssociationAnalyzer(associationGroupWithoutParams.getAssociations());
-			analyzerWithoutParams.process();
-			Map<String, Map<String, String>> datasetToAssociationToColumnMap = analyzerWithoutParams.getDatasetToAssociationToColumnMap();
-
 			AssociationAnalyzer analyzer = new AssociationAnalyzer(associationGroup.getAssociations());
 			analyzer.process();
+			Map<String, Map<String, String>> datasetToAssociationToColumnMap = analyzer.getDatasetToAssociationToColumnMap();
 			Pseudograph<String, LabeledEdge<String>> graph = analyzer.getGraph();
 
-			IDataSource cacheDataSource = SpagoBICacheConfiguration.getInstance().getCacheDataSource();
-
 			// get datasets from selections
-			List<Selection> filters = new ArrayList<>();
-			Map<String, Map<String, Set<String>>> selectionsMap = new HashMap<>();
+			List<SimpleFilter> filters = new ArrayList<>();
+			Map<String, Map<String, Set<Tuple>>> selectionsMap = new HashMap<>();
 
 			Iterator<String> it = selectionsObject.keys();
 			while (it.hasNext()) {
@@ -198,55 +195,42 @@ public class AssociativeSelectionsResource extends DataSetResourceAbstractResour
 
 				Assert.assertNotNull(datasetLabel, "A dataset label in selections is null");
 				Assert.assertTrue(!datasetLabel.isEmpty(), "A dataset label in selections is empty");
-				Assert.assertNotNull(column, "A column for dataset " + datasetLabel + "  in selections is null");
-				Assert.assertTrue(!column.isEmpty(), "A column for dataset " + datasetLabel + " in selections is empty");
+				Assert.assertNotNull(column, "A column for dataset [" + datasetLabel + "]  in selections is null");
+				Assert.assertTrue(!column.isEmpty(), "A column for dataset [" + datasetLabel + "] in selections is empty");
 
-				IDataSet dataset = getDataSetDAO().loadDataSetByLabel(datasetLabel);
-				boolean isNearRealtime = nearRealtimeDatasets.contains(datasetLabel);
-				IDataSource dataSource = getDataSource(dataset, isNearRealtime);
-				boolean isDateColumn = isDateColumn(column, dataset);
+				IDataSet dataSet = getDataSetDAO().loadDataSetByLabel(datasetLabel);
 
-				String values = null;
-				String valuesForQuery = null;
+				Projection projection = new Projection(dataSet, column);
+				List<Object> valueObjects = new ArrayList<>();
+
 				Object object = selectionsObject.getJSONArray(datasetDotColumn).get(0);
 				if (object instanceof JSONArray) {
-					if (isDateColumn) {
-						JSONArray jsonArray = (JSONArray) object;
-						List<String> valueList = new ArrayList<>();
-						List<String> valueForQueryList = new ArrayList<>();
-						for (int i = 0; i < jsonArray.length(); i++) {
-							String value = convertDateString(jsonArray.getString(i), CockpitJSONDataWriter.DATE_TIME_FORMAT,
-									CockpitJSONDataWriter.CACHE_DATE_TIME_FORMAT);
-							valueForQueryList.add(getDateForQuery(value, dataSource));
-							valueList.add("'" + value + "'");
-						}
-						values = StringUtils.join(valueList, ",");
-						valuesForQuery = StringUtils.join(valueForQueryList, ",");
-					} else {
-						values = ("\"" + ((JSONArray) object).join("\",\"") + "\"").replace("\"\"", "'").replace("\"", "'");
-						valuesForQuery = values;
+
+					JSONArray jsonArray = (JSONArray) object;
+					for (int i = 0; i < jsonArray.length(); i++) {
+						Object valueForQuery = DataSetUtilities.getValue(jsonArray.get(i).toString(), projection.getType());
+						valueObjects.add(valueForQuery);
 					}
 				} else {
-					if (isDateColumn) {
-						values = convertDateString(object.toString(), CockpitJSONDataWriter.DATE_TIME_FORMAT, CockpitJSONDataWriter.CACHE_DATE_TIME_FORMAT);
-						valuesForQuery = getDateForQuery(values, dataSource);
-						values = "'" + values + "'";
-					} else {
-						values = "'" + object.toString() + "'";
-						valuesForQuery = values;
-					}
+					Object valueForQuery = DataSetUtilities.getValue(object.toString(), projection.getType());
+					valueObjects.add(valueForQuery);
 				}
 
-				filters.add(new Selection(datasetLabel, getFilter(dataset, isNearRealtime, column, valuesForQuery)));
+				filters.add(new InFilter(projection, valueObjects));
 
 				if (!selectionsMap.containsKey(datasetLabel)) {
-					selectionsMap.put(datasetLabel, new HashMap<String, Set<String>>());
+					selectionsMap.put(datasetLabel, new HashMap<String, Set<Tuple>>());
 				}
-				Map<String, Set<String>> selection = selectionsMap.get(datasetLabel);
+				Map<String, Set<Tuple>> selection = selectionsMap.get(datasetLabel);
 				if (!selection.containsKey(column)) {
-					selection.put(column, new HashSet<String>());
+					selection.put(column, new HashSet<Tuple>());
 				}
-				selection.get(column).add("(" + values + ")");
+				Set<Tuple> tupleSet = selection.get(column);
+				for (Object value : valueObjects) {
+					Tuple tuple = new Tuple();
+					tuple.add(value);
+					tupleSet.add(tuple);
+				}
 			}
 
 			logger.debug("Filter list: " + filters);
@@ -256,15 +240,26 @@ public class AssociativeSelectionsResource extends DataSetResourceAbstractResour
 					datasetParameters, documents);
 
 			IAssociativityManager manager = AssociativeStrategyFactory.createStrategyInstance(config, getUserProfile());
-			AssociativeLogicResult result = manager.process();
+			manager.process();
 
-			Map<String, Map<String, Set<String>>> selections = AssociationAnalyzer.getSelections(associationGroup, graph, result);
+			Map<String, Map<String, Set<Tuple>>> selections = manager.getSelections();
 
 			for (String d : selectionsMap.keySet()) {
 				if (!selections.containsKey(d)) {
-					selections.put(d, new HashMap<String, Set<String>>());
+					selections.put(d, new HashMap<String, Set<Tuple>>());
 				}
-				selections.get(d).putAll(selectionsMap.get(d));
+				Map<String, Set<Tuple>> calcSelections = selections.get(d);
+				Map<String, Set<Tuple>> inputSelections = selectionsMap.get(d);
+				for (String selectionKey : inputSelections.keySet()) {
+					if (calcSelections.containsKey(selectionKey)) { // intersect tuples
+						Set<Tuple> oldSelectionTuples = calcSelections.get(selectionKey);
+						Set<Tuple> newSelectionTuples = inputSelections.get(selectionKey);
+						newSelectionTuples.retainAll(oldSelectionTuples);
+						calcSelections.put(selectionKey, newSelectionTuples);
+					} else { // add tuples
+						calcSelections.put(selectionKey, inputSelections.get(selectionKey));
+					}
+				}
 			}
 
 			String stringFeed = JsonConverter.objectToJson(selections, Map.class);
@@ -274,10 +269,11 @@ public class AssociativeSelectionsResource extends DataSetResourceAbstractResour
 			logger.error(errorMessage, e);
 			throw new SpagoBIRestServiceException(errorMessage, buildLocaleFromSession(), e);
 		} finally {
+			start.stop();
 			logger.debug("OUT");
 		}
 	}
-	
+
 	private void fixAssociationGroup(AssociationGroup associationGroup) {
 		IDataSetDAO dataSetDAO = getDataSetDAO();
 
@@ -287,7 +283,7 @@ public class AssociativeSelectionsResource extends DataSetResourceAbstractResour
 				for (Field field : association.getFields()) {
 					String fieldName = field.getFieldName();
 					if (fieldName.contains(":")) {
-						String dataSetLabel = field.getDataSetLabel();
+						String dataSetLabel = field.getLabel();
 
 						IMetaData metadata = null;
 						if (dataSetLabelToMedaData.containsKey(dataSetLabel)) {
@@ -311,5 +307,5 @@ public class AssociativeSelectionsResource extends DataSetResourceAbstractResour
 			}
 		}
 	}
-	
+
 }

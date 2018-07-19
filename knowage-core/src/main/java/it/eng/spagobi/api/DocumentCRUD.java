@@ -19,7 +19,6 @@ package it.eng.spagobi.api;
 
 import java.security.Security;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -170,10 +169,7 @@ public class DocumentCRUD extends AbstractSpagoBIResource {
 
 			// 4 - User sending the feedback (from session)
 			IEngUserProfile profile = this.getUserProfile();
-			String userSendingFeedback = null;
-			if (profile.getUserUniqueIdentifier() instanceof String) {
-				userSendingFeedback = (String) profile.getUserUniqueIdentifier();
-			}
+			String userSendingFeedback = ((UserProfile) profile).getUserId().toString();
 
 			// Check if all the informations to send a mail are valorized
 			if ((emailAddressdocumentCreationUser != null) && (!emailAddressdocumentCreationUser.isEmpty())) {
@@ -238,6 +234,7 @@ public class DocumentCRUD extends AbstractSpagoBIResource {
 			if (personalFolder != null) {
 				Engine geoEngine = null;
 				Engine cockpitEngine = null;
+				Engine kpiEngine = null;
 
 				try {
 					geoEngine = ExecuteAdHocUtility.getGeoreportEngine();
@@ -253,6 +250,13 @@ public class DocumentCRUD extends AbstractSpagoBIResource {
 					logger.info("Engine not found. ", r);
 				}
 
+				try {
+					kpiEngine = ExecuteAdHocUtility.getKPIEngine();
+				} catch (SpagoBIRuntimeException r) {
+					// the kpi engine is not found
+					logger.info("Engine not found. ", r);
+				}
+
 				// return all documents inside the personal folder
 				if ((docType == null) || (docType.equalsIgnoreCase("ALL"))) {
 					List filteredMyObjects = new ArrayList();
@@ -262,7 +266,8 @@ public class DocumentCRUD extends AbstractSpagoBIResource {
 						BIObject biObject = (BIObject) it.next();
 						String biObjectType = biObject.getBiObjectTypeCode();
 						if ((geoEngine != null && biObject.getEngine().getId().equals(geoEngine.getId()))
-								|| (cockpitEngine != null && biObject.getEngine().getId().equals(cockpitEngine.getId()))) {
+								|| (cockpitEngine != null && biObject.getEngine().getId().equals(cockpitEngine.getId()))
+								|| (kpiEngine != null && biObject.getEngine().getId().equals(kpiEngine.getId()))) {
 							filteredMyObjects.add(biObject);
 						}
 					}
@@ -317,7 +322,7 @@ public class DocumentCRUD extends AbstractSpagoBIResource {
 	@POST
 	@Path("/share")
 	@Produces(MediaType.APPLICATION_JSON + "; charset=UTF-8")
-	public String shareDocument(@Context HttpServletRequest req, @QueryParam("functs") Integer[] functs) {
+	public String shareDocument(@Context HttpServletRequest req, @QueryParam("functs") List<Integer> functs) {
 
 		logger.debug("IN");
 		String ids = req.getParameter(OBJECT_ID);
@@ -340,7 +345,7 @@ public class DocumentCRUD extends AbstractSpagoBIResource {
 
 			if ("true".equalsIgnoreCase(isShare)) {
 
-				JSONArray mJSONArray = new JSONArray(Arrays.asList(functs));
+				JSONArray mJSONArray = new JSONArray(functs);
 				lstFuncts = JSONUtils.asList(mJSONArray);
 			}
 			// add personal folder for default

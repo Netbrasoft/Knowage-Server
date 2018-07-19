@@ -33,6 +33,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   boolean isTechnicalUser =  UserUtilities.isTechnicalUser(userProfile);
   boolean isDeveloper =  UserUtilities.hasDeveloperRole(userProfile);
   SingletonConfig serverConfig1 = SingletonConfig.getInstance();
+  
+  String initialOptionMainMenu = request.getParameter("currentOptionMainMenu");
   String maxSizeStr = serverConfig1.getConfigValue("SPAGOBI.DATASET_FILE_MAX_SIZE");
    
 %>
@@ -46,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 		<%@include file="/WEB-INF/jsp/commons/workspace/workspaceImport.jsp"%>
 		
 		<!-- Styles -->
-		<link rel="stylesheet" type="text/css"	href="${pageContext.request.contextPath}/themes/commons/css/customStyle.css"> 
+		<link rel="stylesheet" type="text/css"	href="<%=urlBuilder.getResourceLink(request, "themes/commons/css/customStyle.css")%>"> 
 		
 	
 		<script language="javascript" type="text/javascript">		   
@@ -59,8 +61,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 		   var isAdmin =<%=isAdmin%>;
 		   var isTechnicalUser = <%=isTechnicalUser%>;
 		   var isDeveloper = <%=isDeveloper%>;
-		   var maxSizeStr = <%=maxSizeStr%>;
-		</script>
+		   var maxSizeStr = <%=maxSizeStr%>; 
+		   var initialOptionMainMenu = '<%=initialOptionMainMenu != null ? initialOptionMainMenu : ""%>';
+
+		   </script>
 		
 	</head>
 	
@@ -112,16 +116,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 							<!-- 
 								Pages for all items available in the left menu (table), e.g. Recent, Favorites, Documents, etc. 
 								@commentBy Danilo Ristovski (danristo, danilo.ristovski@mht.net) 
-							-->						
+							-->			
+										
 							<recent-view-workspace 			ng-show="currentOptionMainMenu.length==0 
-																|| currentOptionMainMenu=='recent'">			</recent-view-workspace>	
-							<documents-view-workspace 		ng-show="currentOptionMainMenu=='documents'">		</documents-view-workspace>			
+																|| currentOptionMainMenu=='recent'">			</recent-view-workspace>
+			
 							<datasets-view-workspace 		ng-show="currentOptionMainMenu=='datasets'">		</datasets-view-workspace>
 							<models-view-workspace			ng-show="currentOptionMainMenu=='models'">	    	</models-view-workspace>
-							<smartfilters-view-workspace	ng-show="currentOptionMainMenu=='smartfilters'">	</smartfilters-view-workspace>
 							<analysis-view-workspace 		ng-show="currentOptionMainMenu=='analysis'">		</analysis-view-workspace>
-							<schedulation-view-workspace 		ng-show="currentOptionMainMenu=='schedulation'">		</schedulation-view-workspace>	
-							
+							<schedulation-view-workspace 	ng-show="currentOptionMainMenu=='schedulation'">		</schedulation-view-workspace>	
+							<smartfilters-view-workspace	ng-show="currentOptionMainMenu=='smartfilters'">	</smartfilters-view-workspace>							
+							<documents-view-workspace 		ng-show="currentOptionMainMenu=='documents'">		</documents-view-workspace>	
+
 					</md-content>
 					
 				</md-content>

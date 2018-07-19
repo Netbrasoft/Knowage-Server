@@ -114,24 +114,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 			return;
 		}
 
-		var panel = new Ext.ux.IFrame({
-			border : false,
-			bodyBorder : false,
-			height : '100%',
-			src : '<%=contextName %>/restful-services/publish?PUBLISHER=/WEB-INF/jsp/tools/glossary/finaluser/glossaryHelpOnline.jsp?'+ getItem,
-		});
-
-		var dialogBox = new Ext.Window({
-			title : 'Help Online',
-			modal : true,
-			width : '90%',
-			height : Ext.getBody().getViewSize().height * 0.9,
-			closable : true,
-			items : [ panel ],
-		});
-
-		dialogBox.show();
-			
 <% } %>
 	    	  
    	}
@@ -268,7 +250,7 @@ sessionExpiredSpagoBIJS = 'sessionExpiredSpagoBIJS';
 			
 			if(objId!=null){
 				firstUrlToCall = contextName+"/servlet/AdapterHTTP?ACTION_NAME=MENU_BEFORE_EXEC&MENU_ID="+firtsItem.getMenuId();
-			}else if(firtsItem.getStaticPage()!=null){
+			}else if(firtsItem.getStaticPage()!=null && !firtsItem.getStaticPage().equals("")){
 				firstUrlToCall = contextName+"/servlet/AdapterHTTP?ACTION_NAME=READ_HTML_FILE&MENU_ID="+firtsItem.getMenuId();
 			}else if(firtsItem.getFunctionality()!=null){
 				firstUrlToCall = DetailMenuModule.findFunctionalityUrl(firtsItem, contextName);
@@ -300,11 +282,9 @@ sessionExpiredSpagoBIJS = 'sessionExpiredSpagoBIJS';
 		
 	}
  %>
- <!-- Include Ext stylesheets here: -->
-<link id="extall"     	 rel="styleSheet" href ="<%=contextName %>/js/lib/ext-4.1.1a/resources/css/ext-all.css" type="text/css" />
-<link id="theme-gray" 	 rel="styleSheet" href ="<%=contextName %>/js/lib/ext-4.1.1a/resources/css/ext-all-gray.css" type="text/css" />
-<link id="spagobi-ext-4" rel="styleSheet" href ="<%=contextName %>/js/lib/ext-4.1.1a/overrides/resources/css/spagobi.css" type="text/css" />
 
-<script type="text/javascript" src="<%=contextName %>/js/lib/ext-4.1.1a/overrides/overrides.js"></script>
 
+
+<!--
 <script type="text/javascript" src='<%=urlBuilder.getResourceLink(request, "/js/src/ext4/sbi/wapp/HomeBase.js")%>'></script>
+-->

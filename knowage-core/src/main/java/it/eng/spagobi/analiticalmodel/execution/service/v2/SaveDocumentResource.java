@@ -17,6 +17,28 @@
  */
 package it.eng.spagobi.analiticalmodel.execution.service.v2;
 
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Set;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.ws.rs.POST;
+import javax.ws.rs.Path;
+import javax.ws.rs.Produces;
+import javax.ws.rs.core.Context;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
+import javax.xml.parsers.ParserConfigurationException;
+
+import org.apache.log4j.Logger;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import it.eng.spago.error.EMFUserError;
 import it.eng.spago.security.IEngUserProfile;
 import it.eng.spagobi.analiticalmodel.document.AnalyticalModelDocumentManagementAPI;
@@ -31,6 +53,7 @@ import it.eng.spagobi.commons.bo.Domain;
 import it.eng.spagobi.commons.bo.UserProfile;
 import it.eng.spagobi.commons.constants.SpagoBIConstants;
 import it.eng.spagobi.commons.dao.DAOFactory;
+import it.eng.spagobi.commons.utilities.JSONTemplateUtilities;
 import it.eng.spagobi.commons.utilities.StringUtilities;
 import it.eng.spagobi.commons.utilities.UserUtilities;
 import it.eng.spagobi.engines.config.bo.Engine;
@@ -47,26 +70,6 @@ import it.eng.spagobi.utilities.exceptions.SpagoBIRuntimeException;
 import it.eng.spagobi.utilities.exceptions.SpagoBIServiceException;
 import it.eng.spagobi.utilities.rest.RestUtilities;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Set;
-
-import javax.servlet.http.HttpServletRequest;
-import javax.ws.rs.POST;
-import javax.ws.rs.Path;
-import javax.ws.rs.Produces;
-import javax.ws.rs.core.Context;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
-
-import org.apache.log4j.Logger;
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
-
 @Path("/2.0/saveDocument")
 @ManageAuthorization
 public class SaveDocumentResource extends AbstractSpagoBIResource {
@@ -79,6 +82,7 @@ public class SaveDocumentResource extends AbstractSpagoBIResource {
 	private static final String DOC_UPDATE = "DOC_UPDATE";
 	private static final String MODIFY_GEOREPORT = "MODIFY_GEOREPORT";
 	private static final String MODIFY_COCKPIT = "MODIFY_COCKPIT";
+	private static final String MODIFY_KPI = "MODIFY_KPI";
 
 	// RES detail
 	private static final String ID = "id";
@@ -126,7 +130,7 @@ public class SaveDocumentResource extends AbstractSpagoBIResource {
 			} else if (DOC_UPDATE.equalsIgnoreCase(action)) {
 				logger.error("DOC_UPDATE action is no more supported");
 				throw new SpagoBIServiceException(req.getPathInfo(), "sbi.document.unsupported.udpateaction");
-			} else if (MODIFY_GEOREPORT.equalsIgnoreCase(action) || MODIFY_COCKPIT.equalsIgnoreCase(action)) {
+			} else if (MODIFY_GEOREPORT.equalsIgnoreCase(action) || MODIFY_COCKPIT.equalsIgnoreCase(action) || MODIFY_KPI.equalsIgnoreCase(action)) {
 				id = doModifyDocument(request, action, error);
 			} else {
 				throw new SpagoBIServiceException(req.getPathInfo(), "sbi.document.unsupported.action");
@@ -154,7 +158,6 @@ public class SaveDocumentResource extends AbstractSpagoBIResource {
 		AnalyticalModelDocumentManagementAPI documentManagementAPI = null;
 		try {
 			documentManagementAPI = new AnalyticalModelDocumentManagementAPI(getUserProfile());
-			documentJSON.put("label", documentJSON.getString("name"));// TODO remove this
 			if (documentManagementAPI.getDocument(documentJSON.getString("label")) != null) {
 				logger.error("sbi.document.labelAlreadyExistent");
 				error.addErrorKey("sbi.document.labelAlreadyExistent");
@@ -164,6 +167,8 @@ public class SaveDocumentResource extends AbstractSpagoBIResource {
 					insertGeoreportDocument(request, documentManagementAPI);
 				} else if ("DOCUMENT_COMPOSITE".equalsIgnoreCase(type)) {
 					id = insertCockpitDocument(request, documentManagementAPI);
+				} else if ("KPI".equalsIgnoreCase(type)) {
+					id = insertKPIDocument(request, documentManagementAPI);
 				} else {
 					error.addErrorKey("Impossible to create a document of type [" + type + "]");
 				}
@@ -209,7 +214,7 @@ public class SaveDocumentResource extends AbstractSpagoBIResource {
 				logger.debug("as default case put document in user home folder");
 				LowFunctionality userFunc = null;
 				try {
-					userFunc = functionalitiesDAO.loadLowFunctionalityByPath("/" + profile.getUserUniqueIdentifier(), false);
+					userFunc = functionalitiesDAO.loadLowFunctionalityByPath("/" + ((UserProfile) profile).getUserId(), false);
 				} catch (Exception e) {
 					logger.error("Error on insertion of the document.. Impossible to get the id of the personal folder ", e);
 					throw new SpagoBIRuntimeException("Error on insertion of the document.. Impossible to get the id of the personal folder ", e);
@@ -226,6 +231,17 @@ public class SaveDocumentResource extends AbstractSpagoBIResource {
 
 		String tempalteName = (MODIFY_GEOREPORT.equalsIgnoreCase(action)) ? "template.georeport" : "template.sbicockpit";
 		String templateContent = customDataJSON.optString("templateContent");
+		if (MODIFY_KPI.equalsIgnoreCase(action)) {
+			tempalteName = "template.xml";
+			JSONObject json = new JSONObject(templateContent);
+			try {
+				String xml = JSONTemplateUtilities.convertJsonToXML(json);
+				customDataJSON.put("templateContent", xml);
+			} catch (ParserConfigurationException | IOException e) {
+				logger.error("Error converting JSON Template to XML...", e);
+				throw new SpagoBIServiceException(this.request.getPathInfo(), "An unexpected error occured while executing service", e);
+			}
+		}
 		ObjTemplate template = buildDocumentTemplate(tempalteName, templateContent, document, null, null, null);
 		AnalyticalModelDocumentManagementAPI documentManagementAPI = null;
 		try {
@@ -292,6 +308,42 @@ public class SaveDocumentResource extends AbstractSpagoBIResource {
 			// "Impossible to create geo document because both sourceModel and sourceDataset are null");
 		}
 		return new JSError();
+	}
+
+	private Integer insertKPIDocument(JSONObject request, AnalyticalModelDocumentManagementAPI documentManagementAPI) throws JSONException, EMFUserError {
+		JSONObject documentJSON = request.optJSONObject("document");
+		JSONArray filteredFoldersJSON = new JSONArray();
+		if (request.optJSONArray("folders") == null || request.optJSONArray("folders").length() == 0) {
+			IEngUserProfile profile = getUserProfile();
+			// add personal folder for default
+			LowFunctionality userFunc = null;
+			try {
+				userFunc = UserUtilities.loadUserFunctionalityRoot((UserProfile) profile, true);
+			} catch (Exception e) {
+				logger.error("Error on insertion of the document.. Impossible to get the id of the personal folder ", e);
+				throw new SpagoBIRuntimeException("Error on insertion of the document.. Impossible to get the id of the personal folder ", e);
+			}
+			filteredFoldersJSON.put(userFunc.getId());
+		} else {
+			filteredFoldersJSON = filterFolders(request.optJSONArray("folders"));
+		}
+		JSONObject customDataJSON = request.optJSONObject("customData");
+		JSONObject json = new JSONObject(customDataJSON.optString("templateContent"));
+		try {
+			String xml = JSONTemplateUtilities.convertJsonToXML(json);
+			customDataJSON.put("templateContent", xml);
+		} catch (ParserConfigurationException | IOException e) {
+			logger.error("Error converting JSON Template to XML...", e);
+			throw new SpagoBIServiceException(this.request.getPathInfo(), "An unexpected error occured while executing service", e);
+		}
+
+		Assert.assertNotNull(customDataJSON, "Custom data object cannot be null");
+
+		BIObject document = createBaseDocument(documentJSON, null, filteredFoldersJSON, documentManagementAPI);
+		ObjTemplate template = buildDocumentTemplate("template.xml", customDataJSON, null);
+
+		documentManagementAPI.saveDocument(document, template);
+		return document.getId();
 	}
 
 	private Integer insertCockpitDocument(JSONObject request, AnalyticalModelDocumentManagementAPI documentManagementAPI) throws EMFUserError, JSONException {
@@ -556,8 +608,8 @@ public class SaveDocumentResource extends AbstractSpagoBIResource {
 			template = documentTemplateBuilder.buildDocumentTemplate(templateName, templateAuthor, templateContent);
 		} else if (smartFilterData != null) {
 			// TODO check if it works
-			template = documentTemplateBuilder
-					.buildSmartFilterDocumentTemplate(templateName, templateAuthor, sourceDocument, query, smartFilterData, modelName);
+			template = documentTemplateBuilder.buildSmartFilterDocumentTemplate(templateName, templateAuthor, sourceDocument, query, smartFilterData,
+					modelName);
 
 		} else {
 			throw new SpagoBIServiceException("buildDocumentTemplate", "sbi.document.saveError");

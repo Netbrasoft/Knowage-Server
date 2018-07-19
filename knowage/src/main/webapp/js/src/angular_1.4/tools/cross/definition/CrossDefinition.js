@@ -7,7 +7,7 @@ angular.module('crossDefinition', ['angular_table','ng-context-menu','ngMaterial
     $mdThemingProvider.setDefaultTheme('knowage');
 }])
 .controller('navigationController'
-		,['$scope','sbiModule_restServices','sbiModule_translate','$angularListDetail','$mdDialog','$mdToast',function($scope, sbiModule_restServices, sbiModule_translate,$angularListDetail, $mdDialog, $mdToast){
+		,['$scope','sbiModule_restServices','sbiModule_translate','$angularListDetail','$mdDialog','$mdToast', 'sbiModule_i18n', 'sbiModule_messaging',function($scope, sbiModule_restServices, sbiModule_translate,$angularListDetail, $mdDialog, $mdToast, sbiModule_i18n, sbiModule_messaging){
 			var ctr = this;
 			var s = $scope;
 
@@ -20,11 +20,12 @@ angular.module('crossDefinition', ['angular_table','ng-context-menu','ngMaterial
 
 
 			s.translate = sbiModule_translate;
+			s.i18n = sbiModule_i18n;
 
 			$scope.crossModes = [{label:s.translate.load("sbi.crossnavigation.modality.normal"),value:0},
 								 {label:s.translate.load("sbi.crossnavigation.modality.popup"),value:1},
 			                    ];
-			
+
 
 			ctr.list = [];
 			ctr.detail = newRecord();
@@ -51,6 +52,16 @@ angular.module('crossDefinition', ['angular_table','ng-context-menu','ngMaterial
 					.then(function(response) {
 						ctr.navigationList.loadingSpinner = false;
 						ctr.list = response.data;
+
+						$scope.i18n.loadI18nMap().then(function() {
+
+							for (var i = 0 ; i < ctr.list.length; i ++ ){
+								ctr.list[i].name = s.i18n.getI18n(ctr.list[i].name);
+							}
+
+						}); // end of load I 18n
+
+
 					},function(response){
 						ctr.navigationList.loadingSpinner = false;
 					});
@@ -92,7 +103,11 @@ angular.module('crossDefinition', ['angular_table','ng-context-menu','ngMaterial
 				$angularListDetail.goToDetail();
 
 			};
+
+
+
 			ctr.saveFunc = function(){
+
 				ctr.detail.simpleNavigation.type = ctr.crossmodality.value;
 				sbiModule_restServices.promisePost('1.0/crossNavigation/save', "", ctr.detail)
 				.then(function(response){
@@ -117,7 +132,7 @@ angular.module('crossDefinition', ['angular_table','ng-context-menu','ngMaterial
 					var data = response.data;
 					var parameters = [];
 					for(var i=0;i<data.results.length;i++){
-						parameters.push({'id':data.results[i].id,'name':data.results[i].label,'type':1});
+						parameters.push({'id':data.results[i].id,'name':data.results[i].label,'type':1, 'parType':data.results[i].parType});
 					}
 					callbackFunction(parameters);
 				},function(response){});
@@ -129,7 +144,7 @@ angular.module('crossDefinition', ['angular_table','ng-context-menu','ngMaterial
 					var data = response.data;
 					var parameters = [];
 					for(var i=0;i<data.length;i++){
-						parameters.push({'id':data[i].id,'name':data[i].name,'type':0});
+						parameters.push({'id':data[i].id,'name':data[i].name,'type':0, 'parType':data[i].type.valueCd});
 					}
 					callbackFunction(parameters);
 				},function(response){});
@@ -206,17 +221,27 @@ angular.module('crossDefinition', ['angular_table','ng-context-menu','ngMaterial
 			};
 
 			ctr.treeOptions = {
-				beforeDrop: function(event) {
-					if(ctr.selectedItem >= 0){
-						//if(ctr.selectedItem != ""){
-							ctr.detail.toPars[ctr.selectedItem].links = [event.source.cloneModel];
-						//}
+					beforeDrop: function(event) {
+						if(ctr.selectedItem >= 0){
+							//if(ctr.selectedItem != ""){
+							var fromType =  event.source.cloneModel.parType;
+							var fromName = event.source.cloneModel.name;
+							var toType = ctr.detail.toPars[ctr.selectedItem].parType;
+							var toName = ctr.detail.toPars[ctr.selectedItem].name;
+
+							if(fromType && toType && fromType == 'NUM' && toType == 'STRING'){
+								sbiModule_messaging.showErrorMessage(fromName +' '+ sbiModule_translate.load("sbi.crossnavigation.crossparameters.typeProblem") + ' ' +toName);
+							}
+							else{
+								ctr.detail.toPars[ctr.selectedItem].links = [event.source.cloneModel];
+							}
+							//}
+						}
+						return false;
+					},
+					dragStop: function(){
+						ctr.unselectAll();
 					}
-					return false;
-				},
-				dragStop: function(){
-					ctr.unselectAll();
-				}
 			};
 
 			ctr.treeOptions2 = {

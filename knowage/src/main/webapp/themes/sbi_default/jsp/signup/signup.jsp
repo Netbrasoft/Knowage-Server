@@ -25,6 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <%@page import="java.util.Map" %>
 <%@page import="org.json.JSONObject"%>
 
+<%@include file="/WEB-INF/jsp/commons/angular/angularResource.jspf"%>
 
 <!DOCTYPE html>
 <html>
@@ -36,8 +37,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <meta name="apple-mobile-web-app-title" content="Knowage">
     <title>Knowage - Signup</title>
     
-    <link rel="stylesheet" href="${pageContext.request.contextPath}/js/lib/angular/angular-material_1.1.0/angular-material.min.css">
-    <link rel="stylesheet" href="${pageContext.request.contextPath}/themes/commons/css/customStyle.css">
+    <link rel="stylesheet" href="<%=urlBuilder.getResourceLink(request, "js/lib/angular/angular-material_1.1.0/angular-material.min.css")%>">
+    
+    <link rel="stylesheet" href="<%=urlBuilder.getResourceLink(request, "themes/commons/css/customStyle.css")%>">
   </head>
 
   <body class="kn-login" ng-app="signUp" ng-controller="signUpCtrl" ng-cloak>
@@ -48,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <md-card flex=50 flex-xs=100>
       <form name="signUpForm">
         <md-card-content layout="column" layout-align="start center">
-        	<img class="headerLogoImg" src="${pageContext.request.contextPath}/themes/sbi_default/img/wapp/logo.png">
+        	<img class="headerLogoImg" src="<%=urlBuilder.getResourceLink(request, "themes/sbi_default/img/wapp/logo.png")%>">
         	<h3>SignUp</h3>
         	<div layout="row" layout-wrap>
         		<md-input-container class="md-block" flex=50 flex-xs=100>
@@ -76,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 			        <input ng-model="newUser.confirmPassword" name="confirmPassword" type="password" required>
 			      </md-input-container>
 			      <div flex=50 flex-xs=100>
-			      	<div id="sticky" style="background-image:url('${pageContext.request.contextPath}/stickyImg')">
+			      	<div id="sticky" style="background-image:url('<%=urlBuilder.getResourceLink(request, "stickyImg")%>')">
 			      	</div>
 			      	</div>
 			      <md-input-container class="md-block" flex=50 flex-xs=100>
@@ -97,31 +99,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
      
      </div>
   
-	<link rel="stylesheet" href="${pageContext.request.contextPath}/themes/sbi_default/fonts/font-awesome-4.4.0/css/font-awesome.min.css">
-
+	<link rel="stylesheet" href="<%=urlBuilder.getResourceLink(request, "themes/sbi_default/fonts/font-awesome-4.4.0/css/font-awesome.min.css")%>">
+	
 	<!-- angular reference-->
 	<!-- START-DEBUG -->
-	<script type="text/javascript" src="${pageContext.request.contextPath}/js/lib/angular/angular_1.4/angular.js"></script> 
+	<script type="text/javascript" src="<%=urlBuilder.getResourceLink(request, "js/lib/angular/angular_1.4/angular.js")%>"></script> 
 	<!-- END-DEBUG -->
 	
+	
 	<!-- START-PRODUCTION 
-	<script type="text/javascript" src="${pageContext.request.contextPath}/js/lib/angular/angular_1.4/angular.min.js"></script> 
+	<script type="text/javascript" src="<%=urlBuilder.getResourceLink(request, "js/lib/angular/angular_1.4/angular.min.js")%>"</script> 
 	END-PRODUCTION -->
-	<script type="text/javascript" src="${pageContext.request.contextPath}/js/lib/angular/angular_1.4/angular-animate.min.js"></script> 
-	<script type="text/javascript" src="${pageContext.request.contextPath}/js/lib/angular/angular_1.4/angular-aria.min.js"></script> 
-	<script type="text/javascript" src="${pageContext.request.contextPath}/js/lib/angular/angular_1.4/angular-sanitize.min.js"></script> 
-	<script type="text/javascript" src="${pageContext.request.contextPath}/js/lib/angular/angular_1.4/angular-messages.min.js"></script> 
-	<script type="text/javascript" src="${pageContext.request.contextPath}/js/lib/angular/angular_1.4/angular-cookies.js"></script> 
+	<script type="text/javascript" src="<%=urlBuilder.getResourceLink(request, "js/lib/angular/angular_1.4/angular-animate.min.js")%>"></script> 
+	<script type="text/javascript" src="<%=urlBuilder.getResourceLink(request, "js/lib/angular/angular_1.4/angular-aria.min.js")%>"></script> 
+	<script type="text/javascript" src="<%=urlBuilder.getResourceLink(request, "js/lib/angular/angular_1.4/angular-sanitize.min.js")%>"></script> 
+	<script type="text/javascript" src="<%=urlBuilder.getResourceLink(request, "js/lib/angular/angular_1.4/angular-messages.min.js")%>"></script> 
+	<script type="text/javascript" src="<%=urlBuilder.getResourceLink(request, "js/lib/angular/angular_1.4/angular-cookies.js")%>"></script> 
+
 
   	<!-- Angular Material Library -->
-  	<script src="https://ajax.googleapis.com/ajax/libs/angular_material/1.1.0/angular-material.min.js"></script>
+  	<script type="text/javascript" src="<%=urlBuilder.getResourceLink(request,"/js/lib/angular/angular-material_1.1.0/angular-material.min.js")%>"></script>
   
   	<!-- Your application bootstrap  -->
   	<script type="text/javascript">    
 
     angular.module('signUp', ['ngMaterial'])
     .controller('signUpCtrl', function($scope,$http,$window,$mdToast,$timeout) {
-	  $scope.helloworld = 'hello World';
 	  $scope.newUser = {};
 	  $scope.emailFormat = /^[a-z]+[a-z0-9._]+@[a-z]+\.[a-z.]{2,5}$/;
 	  $scope.$watch("newUser.confirmPassword", function(newValue, oldValue) {
@@ -132,7 +135,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 		    }
 		});
 	  $scope.goToLogin = function(){
-		  $window.location.href = '${pageContext.request.contextPath}/servlet/AdapterHTTP?PAGE=LoginPage&NEW_SESSION=TRUE';
+		  $window.location.href = '<%=urlBuilder.getResourceLink(request, "servlet/AdapterHTTP?PAGE=LoginPage&NEW_SESSION=TRUE")%>';
+		  
 	  }
 	  $scope.register = function(){
 		  if($scope.signUpForm.$valid){
@@ -141,27 +145,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 				  $mdToast.show(
 				    $mdToast.simple()
 				      .textContent('the password inserted are different')
-				      .hideDelay(10000)
 				  );
 				  return;
 			  }
-			  $http.post('${pageContext.request.contextPath}/restful-services/signup/create?SBI_EXECUTION_ID=-1', $scope.newUser)
+			  $http.post('<%=urlBuilder.getResourceLink(request, "restful-services/signup/create?SBI_EXECUTION_ID=-1")%>'
+					  , $scope.newUser)
 			  .then(function(response) {
 				  if(response.data.errors){
 						$mdToast.show(
 						    $mdToast.simple()
 						      .textContent(response.data.errors[0].message)
-						      .hideDelay(10000)
 						  );
 				  }else{
 					  $mdToast.show(
 					    $mdToast.simple()
 					      .textContent(response.message)
-					      .hideDelay(10000)
 					  );
 					  $timeout(function(){
-						  $window.location.href = '${pageContext.request.contextPath}/servlet/AdapterHTTP?PAGE=LoginPage&NEW_SESSION=TRUE';
-					  }, 10000);
+						  $window.parent.location.href = '<%=urlBuilder.getResourceLink(request, "servlet/AdapterHTTP?PAGE=LoginPage&NEW_SESSION=TRUE")%>';
+					  }, 1000);
 					  
 				  }
 			  });

@@ -67,24 +67,8 @@ angular.module('cockpitModule').factory('cockpitModule_generalOptions',function(
 									value:'bold'
 								},
 								{
-									label:sbiModule_translate.load("sbi.cockpit.style.fontWeight.bolder"),
-									value:'bolder'
-								},
-								{
-									label:sbiModule_translate.load("sbi.cockpit.style.fontWeight.lighter"),
-									value:'lighter'
-								},
-								{
-									label:sbiModule_translate.load("sbi.cockpit.style.fontWeight.number"),
-									value:'number'
-								},
-								{
-									label:sbiModule_translate.load("sbi.cockpit.style.fontWeight.initial"),
-									value:'initial'
-								},
-								{
-									label:sbiModule_translate.load("sbi.cockpit.style.fontWeight.inherit"),
-									value:'inherit'
+									label:sbiModule_translate.load("sbi.cockpit.style.fontWeight.light"),
+									value:'light'
 								}
 							],
 	fontType:			[
@@ -164,6 +148,24 @@ angular.module('cockpitModule').factory('cockpitModule_generalOptions',function(
 						label:sbiModule_translate.load("sbi.cockpit.style.textAlign.center"),
 						value:'center'
 					}
-				]
+				],
+    textVerticalAlign:	[
+		{
+			label:"",
+			value:''
+		 },
+		{
+			label:sbiModule_translate.load("sbi.cockpit.style.textVerticalAlign.top"),
+			value:'top'
+		},
+		{
+			label:sbiModule_translate.load("sbi.cockpit.style.textVerticalAlign.middle"),
+			value:'middle'
+		},
+		{
+			label:sbiModule_translate.load("sbi.cockpit.style.textVerticalAlign.bottom"),
+			value:'bottom'
+		}
+	]
 	}
 });

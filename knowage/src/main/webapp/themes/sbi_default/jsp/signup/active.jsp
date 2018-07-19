@@ -6,6 +6,8 @@
          import="it.eng.spago.base.*,
                  it.eng.spagobi.commons.constants.SpagoBIConstants"
 %>
+<%@include file="/WEB-INF/jsp/commons/angular/angularResource.jspf"%>	
+
 <%@page import="it.eng.spagobi.commons.utilities.ChannelUtilities"%>
 <%@page import="it.eng.spagobi.commons.utilities.messages.IMessageBuilder"%>
 <%@page import="it.eng.spagobi.commons.utilities.messages.MessageBuilderFactory"%>
@@ -19,22 +21,18 @@
 <%@page import="java.util.Enumeration"%>
 <%@page import="java.util.Locale"%>
 
-<script type="text/javascript" src='${pageContext.request.contextPath}/js/lib/ext-4.1.1a/ext-all-debug.js'></script>
-<script type="text/javascript" src='${pageContext.request.contextPath}/js/lib/ext-4.1.1a/examples/ux/IFrame.js'></script>
-<script type="text/javascript" src='${pageContext.request.contextPath}/js/lib/ext-4.1.1a/ux/RowExpander.js'></script>
+<script type="text/javascript" src='<%=urlBuilder.getResourceLink(request, "js/lib/ext-4.1.1a/ext-all-debug.js")%>'></script>
+<script type="text/javascript" src='<%=urlBuilder.getResourceLink(request, "js/lib/ext-4.1.1a/examples/ux/IFrame.js")%>'></script>
+<script type="text/javascript" src='<%=urlBuilder.getResourceLink(request, "js/lib/ext-4.1.1a/ux/RowExpander.js")%>'></script>
+
+
+
+
 
 <% 
 
-String sbiMode = "WEB";
-IUrlBuilder urlBuilder = null;
-urlBuilder = UrlBuilderFactory.getUrlBuilder(sbiMode);
 
 String strLocale = request.getParameter("locale"); 	
-Locale locale=new Locale(strLocale.substring(0,strLocale.indexOf("_")), strLocale.substring(strLocale.indexOf("_")+1), "");
-String accountId = request.getParameter("accountId"); 
-	
-IMessageBuilder msgBuilder = MessageBuilderFactory
-		.getMessageBuilder();
 %>
 
 
@@ -88,7 +86,9 @@ IMessageBuilder msgBuilder = MessageBuilderFactory
 	    
 	    setTimeout(
 	    		function(){
-	    			window.location.href = '${pageContext.request.contextPath}/servlet/AdapterHTTP?PAGE=LoginPage&NEW_SESSION=TRUE';	
+	    			window.location.href = '<%=urlBuilder.getResourceLink(request, "servlet/AdapterHTTP?PAGE=LoginPage&NEW_SESSION=TRUE")%>';	
+	    			
+	    			
 	    	}, 3000);
 	    
 	    
@@ -101,12 +101,12 @@ IMessageBuilder msgBuilder = MessageBuilderFactory
   active('<%= request.getParameter("accountId") %>');
   
 </script>
-<script type="text/javascript" src='${pageContext.request.contextPath}/js/src/ext/sbi/service/ServiceRegistry.js'></script>
-<script type="text/javascript" src='${pageContext.request.contextPath}/js/src/ext/sbi/exception/ExceptionHandler.js'></script>
+<script type="text/javascript" src='<%=urlBuilder.getResourceLink(request, "js/src/ext/sbi/service/ServiceRegistry.js")%>'></script>
+<script type="text/javascript" src='<%=urlBuilder.getResourceLink(request, "js/src/ext/sbi/exception/ExceptionHandler.js")%>'></script>
 
-<link id="extall"     rel="styleSheet" href ="${pageContext.request.contextPath}/js/lib/ext-4.1.1a/resources/css/ext-all.css" type="text/css" />
-<link id="theme-gray" rel="styleSheet" href ="${pageContext.request.contextPath}/js/lib/ext-4.1.1a/resources/css/ext-all-gray.css" type="text/css" />
-<link id="spagobi-ext-4" rel="styleSheet" href ="${pageContext.request.contextPath}/js/lib/ext-4.1.1a/overrides/resources/css/spagobi.css" type="text/css" />
+<link id="extall"     rel="styleSheet" href ="<%=urlBuilder.getResourceLink(request, "js/lib/ext-4.1.1a/resources/css/ext-all.css")%>" type="text/css" />
+<link id="theme-gray" rel="styleSheet" href ="<%=urlBuilder.getResourceLink(request, "js/lib/ext-4.1.1a/resources/css/ext-all-gray.css")%>" type="text/css" />
+<link id="spagobi-ext-4" rel="styleSheet" href ="<%=urlBuilder.getResourceLink(request, "js/lib/ext-4.1.1a/overrides/resources/css/spagobi.css")%>" type="text/css" />
 
 <html>
   <head>
@@ -165,7 +165,8 @@ a:hover{
   <script type="text/javascript">
     function signup(){
     	var form = document.getElementById('formId');
-    	var act = '${pageContext.request.contextPath}/restful-services/signup/prepare';
+    	var act = '<%=urlBuilder.getResourceLink(request, "restful-services/signup/prepare")%>';
+    	
     	form.action = act;
     	form.submit();
     	
@@ -204,8 +205,9 @@ a:hover{
   <body onload="javascript:active('<%= request.getParameter("accountId") %>')">
   
   <LINK rel='StyleSheet' 
-    href='${pageContext.request.contextPath}/css/spagobi_shared.css' 
+    href='<%=urlBuilder.getResourceLink(request, "css/spagobi_shared.css")%>' 
     type='text/css' />
+    
     
   </body>
 </html>

@@ -61,7 +61,7 @@ function cockpitToolbarControllerFunction($scope,cockpitModule_widgetServices,co
 	}
 
 
-	$scope.saveCockpit=function(){
+	$scope.saveCockpit=function(event){
 		var haveSel=false;
 		for(var i=0;i<cockpitModule_template.configuration.aggregations.length;i++){
 			if(Object.keys(cockpitModule_template.configuration.aggregations[i].selection).length>0){
@@ -80,16 +80,16 @@ function cockpitToolbarControllerFunction($scope,cockpitModule_widgetServices,co
 			.ok(sbiModule_translate.load('sbi.qbe.messagewin.yes'))
 			.cancel(sbiModule_translate.load('sbi.qbe.messagewin.no'));
 			$mdDialog.show(confirm).then(function() {
-				cockpitModule_generalServices.saveCockpit();
+				cockpitModule_generalServices.saveCockpit(event);
 			}, function() {
 				for(var i=0;i<cockpitModule_template.configuration.aggregations.length;i++){
 					cockpitModule_template.configuration.aggregations[i].selection = {};
 				}
 				cockpitModule_template.configuration.filters={};
-				cockpitModule_generalServices.saveCockpit();
+				cockpitModule_generalServices.saveCockpit(event);
 			});
 		}else{
-			cockpitModule_generalServices.saveCockpit();
+			cockpitModule_generalServices.saveCockpit(event);
 		}
 	};
 
@@ -118,7 +118,7 @@ function cockpitToolbarControllerFunction($scope,cockpitModule_widgetServices,co
 		      escapeToClose :true,
 	          preserveScope: true,
 		      fullscreen: true,
-		      controller: function($scope,sbiModule_translate,cockpitModule_template,cockpitModule_properties){
+		      controller: function($scope,sbiModule_translate,cockpitModule_template,cockpitModule_properties,cockpitModule_widgetServices){
 		    	  $scope.translate=sbiModule_translate;
 		    	  $scope.addWidget=function(type){
 		    		  var tmpWidget={
@@ -141,7 +141,7 @@ function cockpitToolbarControllerFunction($scope,cockpitModule_widgetServices,co
 
 		    			  }
 		    		  }
-		    		  cockpitModule_template.sheets[cockpitModule_properties.CURRENT_SHEET].widgets.push(tmpWidget);
+		    		  cockpitModule_widgetServices.addWidget(cockpitModule_properties.CURRENT_SHEET,tmpWidget);
 		    		  $mdDialog.hide();
 
 		    	  };
@@ -169,6 +169,14 @@ function cockpitToolbarControllerFunction($scope,cockpitModule_widgetServices,co
 		    	        			img : "4.png",
 		    	        			class: "fa fa-bar-chart",
 		    	        			type : "chart"
+		    	        		},
+		    	        		{
+		    	        			name:"Html",
+		    	        			description: $scope.translate.load("sbi.cockpit.editor.newwidget.description.html"),
+		    	        			tags : ["html"],
+		    	        			img : "4.png",
+		    	        			class: "fa fa-code",
+		    	        			type : "html"
 		    	        		},{
 		    	        			name:"Table",
 		    	        			description: $scope.translate.load("sbi.cockpit.editor.newwidget.description.table"),
@@ -192,12 +200,19 @@ function cockpitToolbarControllerFunction($scope,cockpitModule_widgetServices,co
 							    	  class: "fa fa-file",
 							    	  type : "document"
 							      },{
-							    	  name:"Selection",
+							    	  name:"Active Selections",
 							    	  description: $scope.translate.load("sbi.cockpit.editor.newwidget.description.selection"),
 							    	  tags : ["selection"],
 							    	  class: "fa fa-check-square-o",
 							    	  img : "8.png",
 							    	  type : "selection"
+							      },{
+							    	  name:"Selector",
+							    	  description: $scope.translate.load("sbi.cockpit.editor.newwidget.description.selector"),
+							    	  tags : ["selector"],
+							    	  class: "fa fa-caret-square-o-down",
+							    	  img : "9.png",
+							    	  type : "selector"
 							      }
 		    	        	];
 

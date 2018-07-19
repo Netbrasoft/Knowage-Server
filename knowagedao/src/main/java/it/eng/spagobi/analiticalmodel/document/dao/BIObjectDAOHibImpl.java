@@ -17,6 +17,39 @@
  */
 package it.eng.spagobi.analiticalmodel.document.dao;
 
+import java.text.DateFormat;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import org.apache.log4j.Logger;
+import org.hibernate.Criteria;
+import org.hibernate.HibernateException;
+import org.hibernate.Query;
+import org.hibernate.Session;
+import org.hibernate.Transaction;
+import org.hibernate.criterion.Criterion;
+import org.hibernate.criterion.Disjunction;
+import org.hibernate.criterion.Expression;
+import org.hibernate.criterion.Order;
+import org.hibernate.criterion.Projections;
+import org.hibernate.criterion.Property;
+import org.hibernate.criterion.Restrictions;
+import org.hibernate.transform.Transformers;
+import org.safehaus.uuid.UUID;
+import org.safehaus.uuid.UUIDGenerator;
+
+import com.jamonapi.Monitor;
+import com.jamonapi.MonitorFactory;
+
 import it.eng.spago.base.RequestContainer;
 import it.eng.spago.base.SourceBean;
 import it.eng.spago.error.EMFErrorSeverity;
@@ -69,39 +102,6 @@ import it.eng.spagobi.tools.datasource.metadata.SbiDataSource;
 import it.eng.spagobi.tools.objmetadata.bo.ObjMetacontent;
 import it.eng.spagobi.tools.objmetadata.bo.ObjMetadata;
 import it.eng.spagobi.tools.objmetadata.dao.IObjMetacontentDAO;
-
-import java.text.DateFormat;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-
-import org.apache.log4j.Logger;
-import org.hibernate.Criteria;
-import org.hibernate.HibernateException;
-import org.hibernate.Query;
-import org.hibernate.Session;
-import org.hibernate.Transaction;
-import org.hibernate.criterion.Criterion;
-import org.hibernate.criterion.Disjunction;
-import org.hibernate.criterion.Expression;
-import org.hibernate.criterion.Order;
-import org.hibernate.criterion.Projections;
-import org.hibernate.criterion.Property;
-import org.hibernate.criterion.Restrictions;
-import org.hibernate.transform.Transformers;
-import org.safehaus.uuid.UUID;
-import org.safehaus.uuid.UUIDGenerator;
-
-import com.jamonapi.Monitor;
-import com.jamonapi.MonitorFactory;
 
 /**
  * Defines the Hibernate implementations for all DAO methods, for a BI Object.
@@ -984,7 +984,7 @@ public class BIObjectDAOHibImpl extends AbstractHibernateDAO implements IBIObjec
 	 */
 	@Override
 	public void insertBIObject(BIObject obj, ObjTemplate objTemp, boolean loadParsDC) throws EMFUserError {
-		internalInsertBIObject(obj, objTemp, loadParsDC);
+		internalInsertBIObject(obj, objTemp, loadParsDC, true);
 	}
 
 	/**
@@ -997,7 +997,7 @@ public class BIObjectDAOHibImpl extends AbstractHibernateDAO implements IBIObjec
 	 */
 	@Override
 	public void insertBIObject(BIObject obj) throws EMFUserError {
-		internalInsertBIObject(obj, null, false);
+		internalInsertBIObject(obj, null, false, true);
 	}
 
 	/**
@@ -1012,7 +1012,7 @@ public class BIObjectDAOHibImpl extends AbstractHibernateDAO implements IBIObjec
 	 */
 	@Override
 	public void insertBIObject(BIObject obj, boolean loadParsDC) throws EMFUserError {
-		internalInsertBIObject(obj, null, loadParsDC);
+		internalInsertBIObject(obj, null, loadParsDC, true);
 	}
 
 	/**
@@ -1027,10 +1027,25 @@ public class BIObjectDAOHibImpl extends AbstractHibernateDAO implements IBIObjec
 	 */
 	@Override
 	public Integer insertBIObject(BIObject obj, ObjTemplate objTemp) throws EMFUserError {
-		return internalInsertBIObject(obj, objTemp, false);
+		return internalInsertBIObject(obj, objTemp, false, true);
 	}
 
-	private Integer internalInsertBIObject(BIObject obj, ObjTemplate objTemp, boolean loadParsDC) throws EMFUserError {
+	/**
+	 * Implements the query to insert a BIObject. All information needed is stored into the input <code>BIObject</code> object.
+	 *
+	 * @param obj
+	 *            The object containing all insert information
+	 * @param loadParsDC
+	 *            boolean for management Document Composition params
+	 * @throws EMFUserError
+	 *             If an Exception occurred
+	 */
+	@Override
+	public Integer insertBIObjectForClone(BIObject obj, ObjTemplate objTemp) throws EMFUserError {
+		return internalInsertBIObject(obj, objTemp, false, false); // clone doesn't add default output parameter for each engine
+	}
+
+	private Integer internalInsertBIObject(BIObject obj, ObjTemplate objTemp, boolean loadParsDC, boolean loadOP) throws EMFUserError {
 		logger.debug("IN");
 		Session aSession = null;
 		Transaction tx = null;
@@ -1113,16 +1128,16 @@ public class BIObjectDAOHibImpl extends AbstractHibernateDAO implements IBIObjec
 			hibBIObject = (SbiObjects) aSession.load(SbiObjects.class, id);
 
 			// Saving output parameters
-			// hibBIObject.getSbiOutputParameters().addAll(loadDriverSpecificOutputParameters(hibBIObject));
-			List<SbiOutputParameter> op = loadDriverSpecificOutputParameters(hibBIObject);
+			if (loadOP) {
+				List<SbiOutputParameter> op = loadDriverSpecificOutputParameters(hibBIObject);
 
-			for (Iterator iterator = op.iterator(); iterator.hasNext();) {
-				SbiOutputParameter sbiOutputParameter = (SbiOutputParameter) iterator.next();
-				aSession.save(sbiOutputParameter);
+				for (Iterator iterator = op.iterator(); iterator.hasNext();) {
+					SbiOutputParameter sbiOutputParameter = (SbiOutputParameter) iterator.next();
+					aSession.save(sbiOutputParameter);
+				}
+
+				hibBIObject.getSbiOutputParameters().addAll(op);
 			}
-
-			hibBIObject.getSbiOutputParameters().addAll(op);
-
 			// functionalities storing
 			Set hibObjFunc = new HashSet();
 			List functionalities = obj.getFunctionalities();
@@ -1759,6 +1774,7 @@ public class BIObjectDAOHibImpl extends AbstractHibernateDAO implements IBIObjec
 		outp.setFormatCode(hiObjPar.getFormatCode());
 		outp.setFormatValue(hiObjPar.getFormatValue());
 		outp.setBiObjectId(hiObjPar.getBiobjId());
+		outp.setIsUserDefined(hiObjPar.getIsUserDefined());
 
 		return outp;
 	}
@@ -1810,7 +1826,7 @@ public class BIObjectDAOHibImpl extends AbstractHibernateDAO implements IBIObjec
 		// tx = aSession.beginTransaction();
 		//
 		// Query hibQuery =
-		// aSession.createQuery("select objects  from SbiObjects as objects, SbiObjFunc as objFuncs, SbiFunctions as functions "
+		// aSession.createQuery("select objects from SbiObjects as objects, SbiObjFunc as objFuncs, SbiFunctions as functions "
 		// +
 		// "where objects.biobjId = objFuncs.id.sbiObjects.biobjId and objFuncs.id.sbiFunctions.functId = functions.functId "
 		// + "and functions.functId=" + folderId);
@@ -1839,24 +1855,21 @@ public class BIObjectDAOHibImpl extends AbstractHibernateDAO implements IBIObjec
 
 			@Override
 			public List execute(Session session) throws Exception {
-				List sbiObjects = session
-						.createCriteria(SbiObjects.class)
-						.createAlias("sbiObjFuncs", "_sbiObjFunc")
-						.createAlias("state", "_sbiDomain")
+				List sbiObjects = session.createCriteria(SbiObjects.class).createAlias("sbiObjFuncs", "_sbiObjFunc").createAlias("state", "_sbiDomain")
 						.add(Restrictions.eq("_sbiObjFunc.id.sbiFunctions.functId", folderId))
-						.setProjection(
-								Projections.projectionList().add(org.hibernate.criterion.Property.forName("biobjId").as("biobjId"))
-										.add(org.hibernate.criterion.Property.forName("name").as("name"))
-										.add(org.hibernate.criterion.Property.forName("creationUser").as("creationUser"))
-										.add(org.hibernate.criterion.Property.forName("creationDate").as("creationDate"))
-										.add(org.hibernate.criterion.Property.forName("objectTypeCode").as("objectTypeCode"))
-										.add(org.hibernate.criterion.Property.forName("descr").as("descr"))
-										.add(org.hibernate.criterion.Property.forName("stateCode").as("stateCode"))
-										.add(org.hibernate.criterion.Property.forName("sbiEngines").as("sbiEngines"))
-										.add(org.hibernate.criterion.Property.forName("label").as("label"))
-										.add(org.hibernate.criterion.Property.forName("state").as("state"))
-										.add(org.hibernate.criterion.Property.forName("visible").as("visible"))
-										.add(org.hibernate.criterion.Property.forName("previewFile").as("previewFile")))
+						.setProjection(Projections.projectionList().add(org.hibernate.criterion.Property.forName("biobjId").as("biobjId"))
+								.add(org.hibernate.criterion.Property.forName("name").as("name"))
+								.add(org.hibernate.criterion.Property.forName("creationUser").as("creationUser"))
+								.add(org.hibernate.criterion.Property.forName("creationDate").as("creationDate"))
+								.add(org.hibernate.criterion.Property.forName("objectTypeCode").as("objectTypeCode"))
+								.add(org.hibernate.criterion.Property.forName("descr").as("descr"))
+								.add(org.hibernate.criterion.Property.forName("stateCode").as("stateCode"))
+								.add(org.hibernate.criterion.Property.forName("sbiEngines").as("sbiEngines"))
+								.add(org.hibernate.criterion.Property.forName("label").as("label"))
+								.add(org.hibernate.criterion.Property.forName("state").as("state"))
+								.add(org.hibernate.criterion.Property.forName("visible").as("visible"))
+								.add(org.hibernate.criterion.Property.forName("profiledVisibility").as("profiledVisibility"))
+								.add(org.hibernate.criterion.Property.forName("previewFile").as("previewFile")))
 						.setResultTransformer(Transformers.aliasToBean(SbiObjects.class)).list();
 
 				Iterator it = sbiObjects.iterator();
@@ -2008,10 +2021,14 @@ public class BIObjectDAOHibImpl extends AbstractHibernateDAO implements IBIObjec
 			hibQuery.setProjection(Property.forName("biobjId"));
 			hibQuery.addOrder(Order.asc("label"));
 
-			if (page != null && item_count != null) {
+			if (page != null && page > 1) {
 				hibQuery.setFirstResult((page - 1) * item_count);
+			}
+
+			if (item_count != null) {
 				hibQuery.setMaxResults(item_count);
 			}
+
 			List ids = hibQuery.list();
 			if (!ids.isEmpty()) {
 				Criteria mainC = aSession.createCriteria(SbiObjects.class);
@@ -2072,15 +2089,16 @@ public class BIObjectDAOHibImpl extends AbstractHibernateDAO implements IBIObjec
 			tx = aSession.beginTransaction();
 			/*
 			 * Query hibQuery = aSession.createQuery( "select " + "	distinct(objects) " + "from " +
-			 * "	SbiObjects as objects, SbiObjFunc as objFuncs, SbiFunctions as functions " + "where " + "	objects.biobjId = objFuncs.id.sbiObjects.biobjId " +
-			 * "	and objFuncs.id.sbiFunctions.functId = functions.functId " + "	and " + "		(functions.path = '" + initialPath + "' " +
-			 * "		 or functions.path like '" + initialPath + "/%' ) " + "order by " + "	objects.label");
+			 * "	SbiObjects as objects, SbiObjFunc as objFuncs, SbiFunctions as functions " + "where " +
+			 * "	objects.biobjId = objFuncs.id.sbiObjects.biobjId " + "	and objFuncs.id.sbiFunctions.functId = functions.functId " + "	and " +
+			 * "		(functions.path = '" + initialPath + "' " + "		 or functions.path like '" + initialPath + "/%' ) " + "order by " +
+			 * "	objects.label");
 			 */
 
-			Query hibQuery = aSession.createQuery("select " + "	distinct(objects) " + "from "
-					+ "	SbiObjects as objects, SbiObjFunc as objFuncs, SbiFunctions as functions " + "where "
-					+ "	objects.biobjId = objFuncs.id.sbiObjects.biobjId " + "	and objFuncs.id.sbiFunctions.functId = functions.functId " + "	and "
-					+ "		(functions.path = ? " + "		 or functions.path like ?) " + "order by " + "	objects.label");
+			Query hibQuery = aSession
+					.createQuery("select " + "	distinct(objects) " + "from " + "	SbiObjects as objects, SbiObjFunc as objFuncs, SbiFunctions as functions "
+							+ "where " + "	objects.biobjId = objFuncs.id.sbiObjects.biobjId " + "	and objFuncs.id.sbiFunctions.functId = functions.functId "
+							+ "	and " + "		(functions.path = ? " + "		 or functions.path like ?) " + "order by " + "	objects.label");
 
 			hibQuery.setString(0, initialPath);
 			hibQuery.setString(1, initialPath + "%");
@@ -2125,14 +2143,15 @@ public class BIObjectDAOHibImpl extends AbstractHibernateDAO implements IBIObjec
 			tx = aSession.beginTransaction();
 			/*
 			 * Query hibQuery = aSession.createQuery( "select " + "	distinct(objects) " + "from " +
-			 * "	SbiObjects as objects, SbiObjFunc as objFuncs, SbiFunctions as functions " + "where " + "	objects.biobjId = objFuncs.id.sbiObjects.biobjId " +
-			 * "	and objFuncs.id.sbiFunctions.functId = functions.functId " + "	and " + "		(functions.path = '" + initialPath + "' " +
-			 * "		 or functions.path like '" + initialPath + "/%' ) " + "order by " + "	objects." + filterOrder);
+			 * "	SbiObjects as objects, SbiObjFunc as objFuncs, SbiFunctions as functions " + "where " +
+			 * "	objects.biobjId = objFuncs.id.sbiObjects.biobjId " + "	and objFuncs.id.sbiFunctions.functId = functions.functId " + "	and " +
+			 * "		(functions.path = '" + initialPath + "' " + "		 or functions.path like '" + initialPath + "/%' ) " + "order by " + "	objects." +
+			 * filterOrder);
 			 */
-			Query hibQuery = aSession.createQuery("select " + "	distinct(objects) " + "from "
-					+ "	SbiObjects as objects, SbiObjFunc as objFuncs, SbiFunctions as functions " + "where "
-					+ "	objects.biobjId = objFuncs.id.sbiObjects.biobjId " + "	and objFuncs.id.sbiFunctions.functId = functions.functId " + "	and "
-					+ "		(functions.path = ? " + "		 or functions.path like ? " + "order by ? ");
+			Query hibQuery = aSession
+					.createQuery("select " + "	distinct(objects) " + "from " + "	SbiObjects as objects, SbiObjFunc as objFuncs, SbiFunctions as functions "
+							+ "where " + "	objects.biobjId = objFuncs.id.sbiObjects.biobjId " + "	and objFuncs.id.sbiFunctions.functId = functions.functId "
+							+ "	and " + "		(functions.path = ? " + "		 or functions.path like ? " + "order by ? ");
 			hibQuery.setString(0, initialPath);
 			hibQuery.setString(1, initialPath + "%");
 			hibQuery.setString(2, "	objects." + filterOrder);
@@ -2547,14 +2566,15 @@ public class BIObjectDAOHibImpl extends AbstractHibernateDAO implements IBIObjec
 						buffer.append(" and (" + "(fr.id.state.valueCd = '" + SpagoBIConstants.PERMISSION_ON_FOLDER_TO_DEVELOP + "' AND o.state.valueCd = '"
 								+ SpagoBIConstants.DOC_STATE_DEV + "') OR" + "(fr.id.state.valueCd = '" + SpagoBIConstants.PERMISSION_ON_FOLDER_TO_TEST
 								+ "' AND o.state.valueCd = '" + SpagoBIConstants.DOC_STATE_TEST + "') OR " + "(fr.id.state.valueCd = '"
-								+ SpagoBIConstants.PERMISSION_ON_FOLDER_TO_EXECUTE + "' AND o.state.valueCd = '" + SpagoBIConstants.DOC_STATE_REL + "')" + ") ");
+								+ SpagoBIConstants.PERMISSION_ON_FOLDER_TO_EXECUTE + "' AND o.state.valueCd = '" + SpagoBIConstants.DOC_STATE_REL + "')"
+								+ ") ");
 					}
 
 					if (!profile.isAbleToExecuteAction(SpagoBIConstants.DOCUMENT_MANAGEMENT_ADMIN)
 							&& !profile.isAbleToExecuteAction(SpagoBIConstants.DOCUMENT_MANAGEMENT_DEV)) {
 						// only visible objects (1 means true) and object
 						// created by the current user
-						buffer.append(" and ((o.visible = 0 and o.creationUser = '" + profile.getUserUniqueIdentifier() + "') OR (o.visible = 1)) ");
+						buffer.append(" and ((o.visible = 0 and o.creationUser = '" + ((UserProfile) profile).getUserId() + "') OR (o.visible = 1)) ");
 					}
 					buffer.append(" order by o.name");
 				} else {
@@ -2569,7 +2589,7 @@ public class BIObjectDAOHibImpl extends AbstractHibernateDAO implements IBIObjec
 							&& !profile.isAbleToExecuteAction(SpagoBIConstants.DOCUMENT_MANAGEMENT_DEV)) {
 						// only visible objects (1 means true) and object
 						// created by the current user
-						buffer.append(" and ((o.visible = 0 and o.creationUser = '" + profile.getUserUniqueIdentifier() + "') OR (o.visible = 1)) ");
+						buffer.append(" and ((o.visible = 0 and o.creationUser = '" + ((UserProfile) profile).getUserId() + "') OR (o.visible = 1)) ");
 					}
 					buffer.append(" order by o.name");
 				}
@@ -2626,9 +2646,9 @@ public class BIObjectDAOHibImpl extends AbstractHibernateDAO implements IBIObjec
 		try {
 			aSession = getSession();
 			tx = aSession.beginTransaction();
-			Query hibQuery = aSession.createQuery("select distinct obj from   SbiObjects as obj " + "inner join obj.sbiObjPars as objPars "
-					+ "inner join objPars.sbiParameter as param " + "inner join param.sbiParuses as paruses " + "inner join paruses.sbiLov as lov "
-					+ "where  lov.lovId = " + idLov);
+			Query hibQuery = aSession.createQuery(
+					"select distinct obj from   SbiObjects as obj " + "inner join obj.sbiObjPars as objPars " + "inner join objPars.sbiParameter as param "
+							+ "inner join param.sbiParuses as paruses " + "inner join paruses.sbiLov as lov " + "where  lov.lovId = " + idLov);
 
 			List hibList = hibQuery.list();
 
@@ -2900,7 +2920,7 @@ public class BIObjectDAOHibImpl extends AbstractHibernateDAO implements IBIObjec
 				// hql += " and ";
 				// }
 				// if (user != null) {
-				// hql += "  creationUser='" + user + "'";
+				// hql += " creationUser='" + user + "'";
 				// }
 
 			}
@@ -2996,7 +3016,7 @@ public class BIObjectDAOHibImpl extends AbstractHibernateDAO implements IBIObjec
 			if (hibObject == null)
 				return null;
 
-			String currentUser = (String) getUserProfile().getUserUniqueIdentifier();
+			String currentUser = (String) ((UserProfile) getUserProfile()).getUserId();
 
 			boolean isLocked = false;
 			if (hibObject.getLockedByUser() != null && !hibObject.getLockedByUser().equals(""))

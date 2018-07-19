@@ -18,6 +18,7 @@
 package it.eng.spagobi.engines.whatif.calculatedmember;
 
 import java.io.File;
+import java.net.URL;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -27,6 +28,7 @@ import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBException;
 import javax.xml.bind.Unmarshaller;
 
+import org.apache.log4j.Logger;
 import org.olap4j.OlapException;
 import org.olap4j.metadata.Dimension;
 import org.olap4j.metadata.Hierarchy;
@@ -38,7 +40,8 @@ import it.eng.spagobi.engines.whatif.model.SpagoBIPivotModel;
 
 public class MDXFormulaHandler {
 
-	private static String xmlPath;
+	private static final String SERVER_RESOURCE_FILE_PATH = WhatIfEngineConfig.getInstance().getEngineResourcePath() + "Olap/formulas.xml";;
+	private static final String JAVA_RESOURCE_FILE_PATH = File.separatorChar + "calculated_fields_formulas" + File.separatorChar + "formulas.xml";
 	private static File xmlFile;
 	private static MDXFormulas formulas;
 	private static Map<String, String> placeHolders = new HashMap<String, String>();
@@ -46,6 +49,12 @@ public class MDXFormulaHandler {
 	private static SpagoBIPivotModel model;
 	private static ModelConfig modelConfig;
 	private static ClassLoader classLoader = MDXFormulaHandler.class.getClassLoader();
+	private static Logger logger = Logger.getLogger(MDXFormulaHandler.class);
+
+	public static void main(String[] args) throws JAXBException, InstantiationException, IllegalAccessException {
+		loadFile();
+		getFormulasFromXML2();
+	}
 
 	public static SpagoBIPivotModel getModel() {
 		return model;
@@ -63,15 +72,19 @@ public class MDXFormulaHandler {
 		MDXFormulaHandler.modelConfig = modelConfig;
 	}
 
-	public MDXFormulaHandler() {
-
-	}
-
 	private static boolean loadFile() {
 
-		xmlFile = new File(WhatIfEngineConfig.getInstance().getEngineResourcePath() + "Olap/formulas.xml");
-		if (!xmlFile.exists()) {
-			xmlFile = new File(classLoader.getResource(File.separatorChar + "calculated_fields_formulas" + File.separatorChar + "formulas.xml").getPath());
+		xmlFile = new File(SERVER_RESOURCE_FILE_PATH);
+		try {
+			if (!xmlFile.exists()) {
+				URL resource = classLoader.getResource(JAVA_RESOURCE_FILE_PATH);
+				if (resource != null) {
+					xmlFile = new File(resource.getPath());
+				}
+
+			}
+		} catch (Exception e) {
+			logger.error("Can not load MDX formulas", e);
 		}
 
 		return xmlFile.exists();
@@ -86,9 +99,15 @@ public class MDXFormulaHandler {
 			Unmarshaller unmarshaller = jc.createUnmarshaller();
 			formulas = (MDXFormulas) unmarshaller.unmarshal(xmlFile);
 		}
-
 		return formulas;
+
 	};
+
+	private static MDXFormulas getFormulasFromXML2() throws JAXBException, InstantiationException, IllegalAccessException {
+		Box<MDXFormulas> box = new Box<MDXFormulas>();
+		formulas = box.unmarshalFile(xmlFile, MDXFormulas.class);
+		return formulas;
+	}
 
 	public static MDXFormulas getFormulas() throws JAXBException {
 
@@ -173,4 +192,16 @@ public class MDXFormulaHandler {
 		}
 	}
 
+}
+
+class Box<T> {
+
+	@SuppressWarnings("unchecked")
+	public T unmarshalFile(File file, Class<T> clazz) throws JAXBException {
+
+		JAXBContext jc = JAXBContext.newInstance(clazz);
+		Unmarshaller unmarshaller = jc.createUnmarshaller();
+		return (T) unmarshaller.unmarshal(file);
+
+	}
 }

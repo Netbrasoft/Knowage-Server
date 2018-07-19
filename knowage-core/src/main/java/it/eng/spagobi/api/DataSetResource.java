@@ -21,7 +21,6 @@ import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -41,6 +40,8 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.Response.ResponseBuilder;
+import javax.ws.rs.core.StreamingOutput;
 
 import org.apache.log4j.Logger;
 import org.json.JSONArray;
@@ -50,12 +51,9 @@ import org.json.JSONObject;
 import com.jamonapi.Monitor;
 import com.jamonapi.MonitorFactory;
 
-import it.eng.qbe.dataset.QbeDataSet;
 import it.eng.spago.error.EMFInternalError;
 import it.eng.spago.error.EMFUserError;
-import it.eng.spago.security.IEngUserProfile;
-import it.eng.spagobi.analiticalmodel.execution.service.ExecuteAdHocUtility;
-import it.eng.spagobi.api.common.DataSetResourceAbstractResource;
+import it.eng.spagobi.api.common.AbstractDataSetResource;
 import it.eng.spagobi.commons.constants.SpagoBIConstants;
 import it.eng.spagobi.commons.dao.DAOFactory;
 import it.eng.spagobi.commons.deserializer.DeserializerFactory;
@@ -63,36 +61,26 @@ import it.eng.spagobi.commons.serializer.SerializationException;
 import it.eng.spagobi.commons.serializer.SerializerFactory;
 import it.eng.spagobi.commons.utilities.UserUtilities;
 import it.eng.spagobi.container.ObjectUtils;
-import it.eng.spagobi.engines.config.bo.Engine;
-import it.eng.spagobi.sdk.datasets.bo.SDKDataSetParameter;
 import it.eng.spagobi.services.rest.annotations.ManageAuthorization;
 import it.eng.spagobi.services.rest.annotations.UserConstraint;
 import it.eng.spagobi.tools.dataset.DatasetManagementAPI;
 import it.eng.spagobi.tools.dataset.bo.IDataSet;
-import it.eng.spagobi.tools.dataset.bo.VersionedDataSet;
-import it.eng.spagobi.tools.dataset.cache.FilterCriteria;
-import it.eng.spagobi.tools.dataset.cache.GroupCriteria;
 import it.eng.spagobi.tools.dataset.cache.ICache;
-import it.eng.spagobi.tools.dataset.cache.Operand;
-import it.eng.spagobi.tools.dataset.cache.ProjectionCriteria;
 import it.eng.spagobi.tools.dataset.cache.SpagoBICacheManager;
 import it.eng.spagobi.tools.dataset.cache.impl.sqldbcache.SQLDBCache;
 import it.eng.spagobi.tools.dataset.common.datastore.IDataStore;
-import it.eng.spagobi.tools.dataset.common.datawriter.JSONDataWriter;
+import it.eng.spagobi.tools.dataset.common.iterator.CsvStreamingOutput;
+import it.eng.spagobi.tools.dataset.common.iterator.DataIterator;
 import it.eng.spagobi.tools.dataset.common.metadata.IFieldMetaData;
 import it.eng.spagobi.tools.dataset.common.metadata.IFieldMetaData.FieldType;
 import it.eng.spagobi.tools.dataset.common.query.AggregationFunctions;
-import it.eng.spagobi.tools.dataset.common.query.IAggregationFunction;
 import it.eng.spagobi.tools.dataset.constants.DataSetConstants;
 import it.eng.spagobi.tools.dataset.crosstab.CrossTab;
 import it.eng.spagobi.tools.dataset.crosstab.CrosstabDefinition;
-import it.eng.spagobi.tools.dataset.dao.DataSetFactory;
 import it.eng.spagobi.tools.dataset.dao.IDataSetDAO;
-import it.eng.spagobi.tools.dataset.exceptions.DatasetInUseException;
 import it.eng.spagobi.tools.dataset.exceptions.ParametersNotValorizedException;
 import it.eng.spagobi.tools.dataset.service.ManageDataSetsForREST;
 import it.eng.spagobi.tools.dataset.utils.DataSetUtilities;
-import it.eng.spagobi.tools.dataset.utils.datamart.SpagoBICoreDatamartRetriever;
 import it.eng.spagobi.tools.scheduler.bo.Trigger;
 import it.eng.spagobi.tools.scheduler.dao.ISchedulerDAO;
 import it.eng.spagobi.utilities.assertion.Assert;
@@ -100,7 +88,6 @@ import it.eng.spagobi.utilities.exceptions.SpagoBIRestServiceException;
 import it.eng.spagobi.utilities.exceptions.SpagoBIRuntimeException;
 import it.eng.spagobi.utilities.exceptions.SpagoBIServiceException;
 import it.eng.spagobi.utilities.exceptions.SpagoBIServiceParameterException;
-import it.eng.spagobi.utilities.json.JSONUtils;
 import it.eng.spagobi.utilities.rest.RestUtilities;
 
 /**
@@ -108,7 +95,7 @@ import it.eng.spagobi.utilities.rest.RestUtilities;
  */
 @Path("/1.0/datasets")
 @ManageAuthorization
-public class DataSetResource extends DataSetResourceAbstractResource {
+public class DataSetResource extends AbstractDataSetResource {
 
 	static protected Logger logger = Logger.getLogger(DataSetResource.class);
 
@@ -249,8 +236,6 @@ public class DataSetResource extends DataSetResourceAbstractResource {
 			IDataSetDAO dsDao = DAOFactory.getDataSetDAO();
 			dsDao.setUserProfile(getUserProfile());
 			ManageDataSetsForREST mdsfr = new ManageDataSetsForREST();
-			// List<IDataSet> dataSets = mdsfr.loadDataSetList(jsonString, userProfile)
-			// List<IDataSet> dataSets = dsDao.loadPagedDatasetList(offset, fetchSize);
 
 			List<IDataSet> dataSets = getListOfGenericDatasets(dsDao, offset, fetchSize, filters, ordering);
 
@@ -320,6 +305,7 @@ public class DataSetResource extends DataSetResourceAbstractResource {
 		}
 	}
 
+	@Override
 	@GET
 	@Path("/{label}")
 	@Produces(MediaType.APPLICATION_JSON)
@@ -491,6 +477,7 @@ public class DataSetResource extends DataSetResourceAbstractResource {
 
 	}
 
+	@Override
 	@GET
 	@Path("/{label}/content")
 	@Produces(MediaType.APPLICATION_JSON)
@@ -499,19 +486,36 @@ public class DataSetResource extends DataSetResourceAbstractResource {
 		return super.execute(label, body);
 	}
 
-	// @POST
-	// @Path("/{label}/content")
-	// @Produces(MediaType.APPLICATION_JSON + "; charset=UTF-8")
-	// @UserConstraint(functionalities = { SpagoBIConstants.SELF_SERVICE_DATASET_MANAGEMENT })
-	// public Response execute(@PathParam("label") String label, String body) {
-	// SDKDataSetParameter[] parameters = null;
-	// if (body != null && !body.equals("")) {
-	// parameters = (SDKDataSetParameter[]) JsonConverter.jsonToValidObject(body, SDKDataSetParameter[].class);
-	// }
-	//
-	// return Response.ok(executeDataSet(label, parameters)).build();
-	// }
+	@GET
+	@Path("/{id}/export")
+	@Produces(MediaType.TEXT_PLAIN)
+	@UserConstraint(functionalities = { SpagoBIConstants.SELF_SERVICE_DATASET_MANAGEMENT })
+	public Response export(@PathParam("id") int id, @QueryParam("outputType") @DefaultValue("csv") String outputType) {
 
+		IDataSet dataSet = getDataSetDAO().loadDataSetById(id);
+		dataSet.setUserProfileAttributes(getUserProfile().getUserAttributes());
+		Assert.assertNotNull(dataSet, "Impossible to find a dataset with id [" + id + "]");
+		// Assert.assertTrue(dataSet.getParamsMap() == null || dataSet.getParamsMap().isEmpty(), "Impossible to export a dataset with parameters");
+		Assert.assertTrue(dataSet.isIterable(), "Impossible to export a non-iterable data set");
+		DataIterator iterator = null;
+		try {
+			logger.debug("Starting iteration to transfer data");
+			iterator = dataSet.iterator();
+
+			StreamingOutput stream = new CsvStreamingOutput(iterator);
+
+			ResponseBuilder response = Response.ok(stream);
+			response.header("Content-Disposition", "attachment;filename=" + dataSet.getName() + "." + outputType);
+			return response.build();
+		} catch (Exception e) {
+			if (iterator != null) {
+				iterator.close();
+			}
+			throw e;
+		}
+	}
+
+	@Override
 	@DELETE
 	@Path("/{label}")
 	@UserConstraint(functionalities = { SpagoBIConstants.SELF_SERVICE_DATASET_MANAGEMENT })
@@ -655,10 +659,8 @@ public class DataSetResource extends DataSetResourceAbstractResource {
 			// serialize crosstab
 			CrossTab crossTab;
 			if (crosstabDefinition.isPivotTable()) {
-
 				// TODO: see the implementation in LoadCrosstabAction
 				throw new SpagoBIServiceException(this.request.getPathInfo(), "Crosstable Pivot not yet managed");
-
 			} else {
 				// load the crosstab data structure for all other widgets
 				crossTab = new CrossTab(dataStore, crosstabDefinition);
@@ -676,180 +678,6 @@ public class DataSetResource extends DataSetResourceAbstractResource {
 		}
 	}
 
-	@Override
-	@GET
-	@Path("/{label}/data")
-	@Produces(MediaType.APPLICATION_JSON)
-	@UserConstraint(functionalities = { SpagoBIConstants.SELF_SERVICE_DATASET_MANAGEMENT })
-	public String getDataStore(@PathParam("label") String label, @QueryParam("parameters") String parameters, @QueryParam("selections") String selections,
-			@QueryParam("likeSelections") String likeSelections, @DefaultValue("-1") @QueryParam("limit") int maxRowCount,
-			@QueryParam("aggregations") String aggregations, @QueryParam("summaryRow") String summaryRow, @QueryParam("offset") int offset,
-			@QueryParam("size") int fetchSize, @QueryParam("realtime") boolean isRealtime) {
-		logger.debug("IN");
-
-		return super.getDataStore(label, parameters, selections, likeSelections, maxRowCount, aggregations, summaryRow, offset, fetchSize, isRealtime);
-
-	}
-
-	@Override
-	protected List<ProjectionCriteria> getProjectionCriteria(String dataset, JSONArray categoriesObject, JSONArray measuresObject) throws JSONException {
-		List<ProjectionCriteria> projectionCriterias = new ArrayList<ProjectionCriteria>();
-		for (int i = 0; i < categoriesObject.length(); i++) {
-			JSONObject categoryObject = categoriesObject.getJSONObject(i);
-
-			// In the Cockpit Engine, table, you can insert many times the same category.
-			// To manage this, it's not possibile to use the alias as column name.
-			// So in the category object there is also a "columnName" field
-			String columnName;
-			if (!categoryObject.isNull("columnName")) {
-				columnName = categoryObject.getString("columnName");
-			} else {
-				columnName = categoryObject.getString("alias");
-			}
-
-			String aliasName = categoryObject.getString("alias");
-
-			String orderTypeFinal = (String) categoryObject.opt("orderType");
-			if (orderTypeFinal != null) {
-				orderTypeFinal = orderTypeFinal.toUpperCase();
-			}
-
-			String orderColumnFinal = (String) categoryObject.opt("orderColumn");
-
-			ProjectionCriteria aProjectionCriteria = new ProjectionCriteria(dataset, columnName, null, aliasName, orderTypeFinal, orderColumnFinal);
-			projectionCriterias.add(aProjectionCriteria);
-		}
-		for (int i = 0; i < measuresObject.length(); i++) {
-			JSONObject measureObject = measuresObject.getJSONObject(i);
-
-			// In the Cockpit Engine, table, you can insert many times the same measure.
-			// To manage this, it's not possibile to use the alias as column name.
-			// So in the measure object there is also a "columnName" field.
-			String columnName;
-			if (!measureObject.isNull("columnName")) {
-				columnName = measureObject.getString("columnName");
-			} else {
-				columnName = measureObject.getString("alias");
-			}
-
-			String aliasName = measureObject.getString("alias");
-
-			// https://production.eng.it/jira/browse/KNOWAGE-149
-			String orderTypeFinal = (String) measureObject.opt("orderType");
-			if (orderTypeFinal != null) {
-				orderTypeFinal = orderTypeFinal.toUpperCase();
-			}
-
-			IAggregationFunction function = AggregationFunctions.get(measureObject.getString("funct"));
-			if (function != AggregationFunctions.NONE_FUNCTION) {
-				ProjectionCriteria aProjectionCriteria = new ProjectionCriteria(dataset, columnName, function.getName(), aliasName, orderTypeFinal);
-				projectionCriterias.add(aProjectionCriteria);
-			} else {
-				ProjectionCriteria aProjectionCriteria = new ProjectionCriteria(dataset, columnName, null, aliasName, orderTypeFinal);
-				projectionCriterias.add(aProjectionCriteria);
-			}
-		}
-		return projectionCriterias;
-	}
-
-	@Override
-	protected List<GroupCriteria> getGroupCriteria(String dataset, JSONArray categoriesObject, JSONArray measuresObject) throws JSONException {
-		List<GroupCriteria> groupCriterias = new ArrayList<GroupCriteria>();
-
-		boolean isAggregationPresentOnMeasures = false;
-		for (int i = 0; i < measuresObject.length(); i++) {
-			JSONObject measureObject = measuresObject.getJSONObject(i);
-			String aggregationFunction = measureObject.optString("funct");
-			if (aggregationFunction != null && !aggregationFunction.isEmpty() && !aggregationFunction.toUpperCase().equals("NONE")) {
-				isAggregationPresentOnMeasures = true;
-				break;
-			}
-		}
-
-		if (isAggregationPresentOnMeasures) {
-			for (int i = 0; i < categoriesObject.length(); i++) {
-				JSONObject categoryObject = categoriesObject.getJSONObject(i);
-
-				String columnName;
-
-				// In the table of Cockpit Engine you can insert many times the same measure.
-				// To manage this, it's not possibile to use the alias as column name.
-				// So in the measure object there is also a "columnName" field.
-
-				if (!categoryObject.isNull("columnName")) {
-					columnName = categoryObject.getString("columnName");
-				} else {
-					columnName = categoryObject.getString("alias");
-				}
-
-				GroupCriteria groupCriteria = new GroupCriteria(dataset, columnName, null);
-				groupCriterias.add(groupCriteria);
-			}
-		}
-
-		return groupCriterias;
-	}
-
-	@Override
-	@Deprecated
-	protected List<FilterCriteria> getFilterCriteria(String dataset, JSONObject selectionsObject, boolean isNearRealtime, Map<String, String> columnAliasToName)
-			throws JSONException {
-		List<FilterCriteria> filterCriterias = new ArrayList<FilterCriteria>();
-
-		JSONObject datasetSelectionObject = selectionsObject.getJSONObject(dataset);
-		Iterator<String> it = datasetSelectionObject.keys();
-		while (it.hasNext()) {
-			String datasetColumn = it.next();
-
-			JSONArray values = datasetSelectionObject.getJSONArray(datasetColumn);
-			if (values.length() == 0)
-				continue;
-			List<String> valuesList = new ArrayList<String>();
-			for (int i = 0; i < values.length(); i++) {
-				valuesList.add(values.getString(i));
-			}
-
-			Operand leftOperand = new Operand(dataset, datasetColumn);
-			Operand rightOperand = new Operand(valuesList);
-			FilterCriteria filterCriteria = new FilterCriteria(leftOperand, "=", rightOperand);
-			filterCriterias.add(filterCriteria);
-		}
-
-		return filterCriterias;
-	}
-
-	@Override
-	@Deprecated
-	protected List<FilterCriteria> getLikeFilterCriteria(String datasetLabel, JSONObject likeSelectionsObject, boolean isNearRealtime,
-			Map<String, String> columnAliasToName, List<ProjectionCriteria> projectionCriteria, boolean getAttributes) throws JSONException {
-		List<FilterCriteria> likeFilterCriterias = new ArrayList<FilterCriteria>();
-		return likeFilterCriterias;
-	}
-
-	private static Map<String, Map<String, String>> getParametersMaps(String parameters) {
-		Map<String, Map<String, String>> toReturn = new HashMap<String, Map<String, String>>();
-
-		if (parameters == null) {
-			return toReturn;
-		}
-
-		try {
-			parameters = JSONUtils.escapeJsonString(parameters);
-			JSONObject parametersJSON = ObjectUtils.toJSONObject(parameters);
-			Iterator<String> datasetLabels = parametersJSON.keys();
-			while (datasetLabels.hasNext()) {
-				String datasetLabel = datasetLabels.next();
-				JSONObject datasetFilters = parametersJSON.getJSONObject(datasetLabel);
-				Map<String, String> filtersMap = DataSetUtilities.getParametersMap(datasetFilters);
-				toReturn.put(datasetLabel, filtersMap);
-			}
-		} catch (Throwable t) {
-			throw new SpagoBIRuntimeException("An unexpected exception occured while loading spagobi filters [" + parameters + "]", t);
-		}
-
-		return toReturn;
-	}
-
 	@GET
 	@Path("/federated")
 	@Produces(MediaType.APPLICATION_JSON)
@@ -863,7 +691,7 @@ public class DataSetResource extends DataSetResourceAbstractResource {
 			dsDao.setUserProfile(getUserProfile());
 			List<IDataSet> dataSets = getDatasetManagementAPI().getMyFederatedDataSets();
 
-			List<IDataSet> toBeReturned = new ArrayList<IDataSet>();
+			List<IDataSet> toBeReturned = new ArrayList<IDataSet>(0);
 
 			for (IDataSet dataset : dataSets) {
 				if (DataSetUtilities.isExecutableByUser(dataset, getUserProfile()))
@@ -971,7 +799,7 @@ public class DataSetResource extends DataSetResourceAbstractResource {
 		logger.debug("IN");
 		try {
 			List<IDataSet> dataSets;
-			List<IDataSet> dataSetsNoParams = new ArrayList<IDataSet>();
+			List<IDataSet> dataSetsNoParams = new ArrayList<IDataSet>(0);
 			if (UserUtilities.isAdministrator(getUserProfile())) {
 				dataSets = getDatasetManagementAPI().getAllDataSet();
 			} else {
@@ -998,7 +826,7 @@ public class DataSetResource extends DataSetResourceAbstractResource {
 
 	@POST
 	@Path("/")
-	@Produces(MediaType.APPLICATION_JSON + "; charset=UTF-8")
+	@Produces(MediaType.APPLICATION_JSON)
 	public String persistDataSets(@Context HttpServletRequest req) throws IOException, JSONException {
 		IDataSetDAO dsDao;
 		try {
@@ -1015,27 +843,12 @@ public class DataSetResource extends DataSetResourceAbstractResource {
 
 	@POST
 	@Path("/preview")
-	@Produces(MediaType.APPLICATION_JSON + "; charset=UTF-8")
+	@Produces(MediaType.APPLICATION_JSON)
 	public String previewDataSet(@Context HttpServletRequest req) throws IOException, JSONException {
 		JSONObject json = RestUtilities.readBodyAsJSONObject(req);
 		ManageDataSetsForREST mdsfr = new ManageDataSetsForREST();
 		String toReturnString = mdsfr.previewDataset(json.toString(), getUserProfile());
 		return toReturnString;
-	}
-
-	// ===================================================================
-	// UTILITY METHODS
-	// ===================================================================
-
-	@Override
-	public String getUserId() {
-		return getUserProfile().getUserUniqueIdentifier().toString();
-	}
-
-	@Override
-	protected DatasetManagementAPI getDatasetManagementAPI() {
-		DatasetManagementAPI managementAPI = new DatasetManagementAPI(getUserProfile());
-		return managementAPI;
 	}
 
 	// ==========================================================================================
@@ -1094,8 +907,7 @@ public class DataSetResource extends DataSetResourceAbstractResource {
 			case ATTRIBUTE:
 				Object isSegmentAttributeObj = fieldMetaData.getProperty(PROPERTY_IS_SEGMENT_ATTRIBUTE);
 				logger.debug("Read property " + PROPERTY_IS_SEGMENT_ATTRIBUTE + ": its value is [" + propertyRawValue + "]");
-				String attributeNature = (isSegmentAttributeObj != null && (Boolean.parseBoolean(isSegmentAttributeObj.toString()) == true))
-						? "segment_attribute"
+				String attributeNature = (isSegmentAttributeObj != null && Boolean.parseBoolean(isSegmentAttributeObj.toString())) ? "segment_attribute"
 						: "attribute";
 
 				logger.debug("The nature of the attribute is recognized as " + attributeNature);
@@ -1157,11 +969,8 @@ public class DataSetResource extends DataSetResourceAbstractResource {
 
 	protected String getFieldColumnType(IFieldMetaData fieldMetaData) {
 		String fieldColumnType = fieldMetaData.getType().toString();
-		fieldColumnType = fieldColumnType.substring(fieldColumnType.lastIndexOf(".") + 1); // clean
-																							// the
-																							// class
-																							// type
-																							// name
+		// clean the class type name
+		fieldColumnType = fieldColumnType.substring(fieldColumnType.lastIndexOf(".") + 1);
 		return fieldColumnType;
 	}
 
@@ -1187,8 +996,6 @@ public class DataSetResource extends DataSetResourceAbstractResource {
 
 		return paramsMetaDataJSON;
 	}
-
-
 
 	@POST
 	@Path("/{datasetLabel}/cleanCache")
@@ -1272,6 +1079,7 @@ public class DataSetResource extends DataSetResourceAbstractResource {
 		logger.debug("IN");
 		Monitor monitor = MonitorFactory.start("spagobi.dataset.persist");
 		JSONObject labelsJSON = new JSONObject();
+
 		Iterator<String> keys = labels.keys();
 		while (keys.hasNext()) {
 			String label = keys.next();
@@ -1339,7 +1147,7 @@ public class DataSetResource extends DataSetResourceAbstractResource {
 		if (true) {
 			filtersJSON = filters;
 			String hsql = filterList(filtersJSON, ordering);
-			items = dsDao.loadFilteredDatasetList(hsql, start, limit, getUserProfile().getUserUniqueIdentifier().toString());
+			items = dsDao.loadFilteredDatasetList(hsql, start, limit, getUserProfile().getUserId().toString());
 		} else {// not filtered
 			items = dsDao.loadPagedDatasetList(start, limit);
 			// items =
@@ -1378,6 +1186,9 @@ public class DataSetResource extends DataSetResourceAbstractResource {
 		if (ordering != null) {
 			boolean reverseOrdering = ordering.optBoolean("reverseOrdering");
 			String columnOrdering = ordering.optString("columnOrdering");
+			if(columnOrdering.equalsIgnoreCase("dsTypeCd")) {
+				columnOrdering = "type";
+			}
 			if (columnOrdering != null && !columnOrdering.isEmpty()) {
 				if (reverseOrdering) {
 					hsql += "order by h." + columnOrdering.toLowerCase() + " desc";

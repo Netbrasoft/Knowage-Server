@@ -17,30 +17,33 @@
  */
 package it.eng.spagobi.tools.datasource.bo;
 
-import it.eng.spagobi.services.datasource.bo.SpagoBiDataSource;
-import it.eng.spagobi.services.validation.Xss;
-import it.eng.spagobi.tools.dataset.bo.AbstractJDBCDataset;
-import it.eng.spagobi.tools.dataset.bo.IDataSet;
-import it.eng.spagobi.tools.dataset.bo.JDBCDatasetFactory;
-import it.eng.spagobi.tools.dataset.common.datastore.IDataStore;
-
 import java.io.Serializable;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.Set;
 
 import javax.naming.Context;
 import javax.naming.InitialContext;
 import javax.naming.NamingException;
-import javax.validation.constraints.Max;
 import javax.validation.constraints.NotNull;
+import javax.validation.constraints.Size;
 
 import org.apache.log4j.Logger;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonInclude.Include;
+
+import it.eng.spagobi.services.datasource.bo.SpagoBiDataSource;
+import it.eng.spagobi.services.validation.Xss;
+import it.eng.spagobi.tools.dataset.bo.AbstractJDBCDataset;
+import it.eng.spagobi.tools.dataset.bo.IDataSet;
+import it.eng.spagobi.tools.dataset.bo.JDBCDatasetFactory;
+import it.eng.spagobi.tools.dataset.common.datastore.IDataStore;
+import it.eng.spagobi.tools.dataset.cache.query.SelectQuery;
+import it.eng.spagobi.tools.datasource.DataSourceManager;
+import it.eng.spagobi.tools.datasource.bo.serializer.JDBCDataSourcePoolConfigurationJSONSerializer;
+import it.eng.spagobi.utilities.database.DataBaseException;
 
 /**
  * Defines an <code>DataSource</code> object
@@ -52,48 +55,46 @@ public class DataSource implements Serializable, IDataSource {
 	private static transient Logger logger = Logger.getLogger(DataSource.class);
 
 	@NotNull
-	@Max(11)
 	private int dsId;
 
 	@Xss
-	@Max(160)
+	@Size(max = 160)
 	private String descr;
 
 	@NotNull
 	@Xss
-	@Max(50)
+	@Size(max = 50)
 	private String label;
 
 	@Xss
-	@Max(50)
+	@Size(max = 50)
 	private String jndi;
 
 	@Xss
-	@Max(500)
+	@Size(max = 500)
 	private String urlConnection;
 
 	@Xss
-	@Max(50)
+	@Size(max = 50)
 	private String user;
 
 	@Xss
-	@Max(50)
+	@Size(max = 50)
 	private String pwd;
 
 	@Xss
-	@Max(160)
+	@Size(max = 160)
 	private String driver;
 
 	@NotNull
-	@Max(11)
-	private Integer dialectId;
+	@Size(max = 50)
+	private String dialectName;
 
 	private String hibDialectClass;
-	private String hibDialectName;
 	private Set engines = null;
 	private Set objects = null;
 
-	@Max(45)
+	@Size(max = 45)
 	private String schemaAttribute = null;
 
 	@NotNull
@@ -101,6 +102,13 @@ public class DataSource implements Serializable, IDataSource {
 
 	private Boolean readOnly;
 	private Boolean writeDefault;
+
+	// Advanced Options - JDBCPoolConfiguration
+	private JDBCDataSourcePoolConfiguration jdbcPoolConfiguration;
+	
+	// Owner of DataSource - UserIn column in Database
+	private String owner;
+
 
 	public Boolean getReadOnly() {
 		return readOnly;
@@ -132,7 +140,7 @@ public class DataSource implements Serializable, IDataSource {
 
 	/*
 	 * (non-Javadoc)
-	 * 
+	 *
 	 * @see it.eng.spagobi.tools.datasource.bo.IDataSource#toSpagoBiDataSource()
 	 */
 	@Override
@@ -141,18 +149,19 @@ public class DataSource implements Serializable, IDataSource {
 		sbd.setId(dsId);
 		sbd.setDriver(driver);
 		sbd.setHibDialectClass("");
-		sbd.setHibDialectName("");
 		sbd.setJndiName(jndi);
 		sbd.setLabel(label);
 		sbd.setPassword(pwd);
 		sbd.setUrl(urlConnection);
 		sbd.setUser(user);
 		sbd.setHibDialectClass(hibDialectClass);
-		sbd.setHibDialectName(hibDialectName);
 		sbd.setMultiSchema(multiSchema);
 		sbd.setSchemaAttribute(schemaAttribute);
 		sbd.setReadOnly(readOnly);
 		sbd.setWriteDefault(writeDefault);
+		if (jdbcPoolConfiguration != null) {
+			sbd.setJdbcPoolConfiguration((String) new JDBCDataSourcePoolConfigurationJSONSerializer().serialize(jdbcPoolConfiguration));
+		}
 		return sbd;
 	}
 
@@ -201,7 +210,7 @@ public class DataSource implements Serializable, IDataSource {
 		Context ctx;
 		String jndiName;
 
-		jndiName = (checkIsMultiSchema() && schema != null) ? getJndi() + schema : getJndi();
+		jndiName = (checkIsMultiSchema() && schema != null && getJndi().endsWith("/")) ? getJndi() + schema : getJndi();
 
 		ctx = new InitialContext();
 		javax.sql.DataSource ds = (javax.sql.DataSource) ctx.lookup(jndiName);
@@ -222,21 +231,12 @@ public class DataSource implements Serializable, IDataSource {
 	 */
 	@JsonIgnore
 	private Connection getDirectConnection() throws ClassNotFoundException, SQLException {
-		Connection connection = null;
-
-		try {
-			Class.forName(getDriver());
-			connection = DriverManager.getConnection(getUrlConnection(), getUser(), getPwd());
-		} catch (Throwable t) {
-			throw new RuntimeException("Impossible to create a direct connection to database at host [" + getUrlConnection() + "] with user [" + getUser()
-					+ "]. Check if the database is running and if the password is correct.");
-		}
-		return connection;
+		return DataSourceManager.getConnection(this);
 	}
 
 	/*
 	 * (non-Javadoc)
-	 * 
+	 *
 	 * @see it.eng.spagobi.tools.datasource.bo.IDataSource#getDsId()
 	 */
 	@Override
@@ -246,7 +246,7 @@ public class DataSource implements Serializable, IDataSource {
 
 	/*
 	 * (non-Javadoc)
-	 * 
+	 *
 	 * @see it.eng.spagobi.tools.datasource.bo.IDataSource#setDsId(int)
 	 */
 	@Override
@@ -256,7 +256,7 @@ public class DataSource implements Serializable, IDataSource {
 
 	/*
 	 * (non-Javadoc)
-	 * 
+	 *
 	 * @see it.eng.spagobi.tools.datasource.bo.IDataSource#getDescr()
 	 */
 	@Override
@@ -266,7 +266,7 @@ public class DataSource implements Serializable, IDataSource {
 
 	/*
 	 * (non-Javadoc)
-	 * 
+	 *
 	 * @see it.eng.spagobi.tools.datasource.bo.IDataSource#setDescr(java.lang.String)
 	 */
 	@Override
@@ -276,7 +276,7 @@ public class DataSource implements Serializable, IDataSource {
 
 	/*
 	 * (non-Javadoc)
-	 * 
+	 *
 	 * @see it.eng.spagobi.tools.datasource.bo.IDataSource#getLabel()
 	 */
 	@Override
@@ -286,7 +286,7 @@ public class DataSource implements Serializable, IDataSource {
 
 	/*
 	 * (non-Javadoc)
-	 * 
+	 *
 	 * @see it.eng.spagobi.tools.datasource.bo.IDataSource#setLabel(java.lang.String)
 	 */
 	@Override
@@ -296,7 +296,7 @@ public class DataSource implements Serializable, IDataSource {
 
 	/*
 	 * (non-Javadoc)
-	 * 
+	 *
 	 * @see it.eng.spagobi.tools.datasource.bo.IDataSource#getJndi()
 	 */
 	@Override
@@ -306,7 +306,7 @@ public class DataSource implements Serializable, IDataSource {
 
 	/*
 	 * (non-Javadoc)
-	 * 
+	 *
 	 * @see it.eng.spagobi.tools.datasource.bo.IDataSource#setJndi(java.lang.String)
 	 */
 	@Override
@@ -316,7 +316,7 @@ public class DataSource implements Serializable, IDataSource {
 
 	/*
 	 * (non-Javadoc)
-	 * 
+	 *
 	 * @see it.eng.spagobi.tools.datasource.bo.IDataSource#getUrlConnection()
 	 */
 	@Override
@@ -326,7 +326,7 @@ public class DataSource implements Serializable, IDataSource {
 
 	/*
 	 * (non-Javadoc)
-	 * 
+	 *
 	 * @see it.eng.spagobi.tools.datasource.bo.IDataSource#setUrlConnection(java. lang.String)
 	 */
 	@Override
@@ -336,7 +336,7 @@ public class DataSource implements Serializable, IDataSource {
 
 	/*
 	 * (non-Javadoc)
-	 * 
+	 *
 	 * @see it.eng.spagobi.tools.datasource.bo.IDataSource#getUser()
 	 */
 	@Override
@@ -346,7 +346,7 @@ public class DataSource implements Serializable, IDataSource {
 
 	/*
 	 * (non-Javadoc)
-	 * 
+	 *
 	 * @see it.eng.spagobi.tools.datasource.bo.IDataSource#setUser(java.lang.String)
 	 */
 	@Override
@@ -356,7 +356,7 @@ public class DataSource implements Serializable, IDataSource {
 
 	/*
 	 * (non-Javadoc)
-	 * 
+	 *
 	 * @see it.eng.spagobi.tools.datasource.bo.IDataSource#getPwd()
 	 */
 	@Override
@@ -366,7 +366,7 @@ public class DataSource implements Serializable, IDataSource {
 
 	/*
 	 * (non-Javadoc)
-	 * 
+	 *
 	 * @see it.eng.spagobi.tools.datasource.bo.IDataSource#setPwd(java.lang.String)
 	 */
 	@Override
@@ -376,7 +376,7 @@ public class DataSource implements Serializable, IDataSource {
 
 	/*
 	 * (non-Javadoc)
-	 * 
+	 *
 	 * @see it.eng.spagobi.tools.datasource.bo.IDataSource#getDriver()
 	 */
 	@Override
@@ -386,7 +386,7 @@ public class DataSource implements Serializable, IDataSource {
 
 	/*
 	 * (non-Javadoc)
-	 * 
+	 *
 	 * @see it.eng.spagobi.tools.datasource.bo.IDataSource#setDriver(java.lang.String )
 	 */
 	@Override
@@ -396,27 +396,27 @@ public class DataSource implements Serializable, IDataSource {
 
 	/*
 	 * (non-Javadoc)
-	 * 
-	 * @see it.eng.spagobi.tools.datasource.bo.IDataSource#getDialectId()
+	 *
+	 * @see it.eng.spagobi.tools.datasource.bo.IDataSource#getDialectName()
 	 */
 	@Override
-	public Integer getDialectId() {
-		return dialectId;
+	public String getDialectName() {
+		return dialectName;
 	}
 
 	/*
 	 * (non-Javadoc)
-	 * 
-	 * @see it.eng.spagobi.tools.datasource.bo.IDataSource#setDialectId(java.lang .Integer)
+	 *
+	 * @see it.eng.spagobi.tools.datasource.bo.IDataSource#setDialectName(java.lang.String)
 	 */
 	@Override
-	public void setDialectId(Integer dialectId) {
-		this.dialectId = dialectId;
+	public void setDialectName(String dialectName) {
+		this.dialectName = dialectName;
 	}
 
 	/*
 	 * (non-Javadoc)
-	 * 
+	 *
 	 * @see it.eng.spagobi.tools.datasource.bo.IDataSource#getEngines()
 	 */
 	@Override
@@ -427,7 +427,7 @@ public class DataSource implements Serializable, IDataSource {
 
 	/*
 	 * (non-Javadoc)
-	 * 
+	 *
 	 * @see it.eng.spagobi.tools.datasource.bo.IDataSource#setEngines(java.util.Set)
 	 */
 	@Override
@@ -437,7 +437,7 @@ public class DataSource implements Serializable, IDataSource {
 
 	/*
 	 * (non-Javadoc)
-	 * 
+	 *
 	 * @see it.eng.spagobi.tools.datasource.bo.IDataSource#getObjects()
 	 */
 	@Override
@@ -448,7 +448,7 @@ public class DataSource implements Serializable, IDataSource {
 
 	/*
 	 * (non-Javadoc)
-	 * 
+	 *
 	 * @see it.eng.spagobi.tools.datasource.bo.IDataSource#setObjects(java.util.Set)
 	 */
 	@Override
@@ -464,16 +464,6 @@ public class DataSource implements Serializable, IDataSource {
 	@Override
 	public void setHibDialectClass(String hibDialectClass) {
 		this.hibDialectClass = hibDialectClass;
-	}
-
-	@Override
-	public String getHibDialectName() {
-		return hibDialectName;
-	}
-
-	@Override
-	public void setHibDialectName(String hibDialectName) {
-		this.hibDialectName = hibDialectName;
 	}
 
 	@Override
@@ -507,14 +497,21 @@ public class DataSource implements Serializable, IDataSource {
 
 	@Override
 	public IDataStore executeStatement(String statement, Integer start, Integer limit, Integer maxRowCount) {
-		logger.debug("IN: Statement is [" + statement + "], start = [" + start + "], limit = [" + limit + "], maxResults = [" + maxRowCount + "]");
 		IDataSet dataSet = JDBCDatasetFactory.getJDBCDataSet(this);
+		return executeStatement(dataSet, statement, start, limit, maxRowCount);
+	}
+
+	@Override
+	public IDataStore executeStatement(SelectQuery selectQuery, Integer start, Integer limit, Integer maxRowCount) throws DataBaseException {
+		IDataSet dataSet = JDBCDatasetFactory.getJDBCDataSet(this);
+		((AbstractJDBCDataset) dataSet).setSelectQuery(selectQuery);
+		return executeStatement(dataSet, selectQuery.toSql(this), start, limit, maxRowCount);
+	}
+
+	private IDataStore executeStatement(IDataSet dataSet, String statement, Integer start, Integer limit, Integer maxRowCount) {
+		logger.debug("IN: Statement is [" + statement + "], start = [" + start + "], limit = [" + limit + "], maxResults = [" + maxRowCount + "]");
 		dataSet.setDataSource(this);
-		((AbstractJDBCDataset) dataSet).setQuery(statement); // all datasets
-																// retrieved by
-																// the factory
-																// extend
-																// AbstractJDBCDataset
+		((AbstractJDBCDataset) dataSet).setQuery(statement); // all datasets retrieved by the factory extend AbstractJDBCDataset
 		if (start == null && limit == null && maxRowCount == null) {
 			dataSet.loadData();
 		} else {
@@ -524,6 +521,118 @@ public class DataSource implements Serializable, IDataSource {
 		logger.debug("Data store retrieved successfully");
 		logger.debug("OUT");
 		return dataStore;
+	}
+
+	@Override
+	public int hashCode() {
+		final int prime = 31;
+		int result = 1;
+		result = prime * result + ((descr == null) ? 0 : descr.hashCode());
+		result = prime * result + ((dialectName == null) ? 0 : dialectName.hashCode());
+		result = prime * result + ((driver == null) ? 0 : driver.hashCode());
+		result = prime * result + dsId;
+		result = prime * result + ((engines == null) ? 0 : engines.hashCode());
+		result = prime * result + ((hibDialectClass == null) ? 0 : hibDialectClass.hashCode());
+		result = prime * result + ((jndi == null) ? 0 : jndi.hashCode());
+		result = prime * result + ((label == null) ? 0 : label.hashCode());
+		result = prime * result + ((multiSchema == null) ? 0 : multiSchema.hashCode());
+		result = prime * result + ((objects == null) ? 0 : objects.hashCode());
+		result = prime * result + ((pwd == null) ? 0 : pwd.hashCode());
+		result = prime * result + ((readOnly == null) ? 0 : readOnly.hashCode());
+		result = prime * result + ((schemaAttribute == null) ? 0 : schemaAttribute.hashCode());
+		result = prime * result + ((urlConnection == null) ? 0 : urlConnection.hashCode());
+		result = prime * result + ((user == null) ? 0 : user.hashCode());
+		result = prime * result + ((writeDefault == null) ? 0 : writeDefault.hashCode());
+		return result;
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (obj == null)
+			return false;
+		if (!(obj instanceof DataSource))
+			return false;
+		DataSource other = (DataSource) obj;
+		if (descr == null) {
+			if (other.descr != null)
+				return false;
+		} else if (!descr.equals(other.descr))
+			return false;
+		if (dialectName == null) {
+			if (other.dialectName != null)
+				return false;
+		} else if (!dialectName.equals(other.dialectName))
+			return false;
+		if (driver == null) {
+			if (other.driver != null)
+				return false;
+		} else if (!driver.equals(other.driver))
+			return false;
+		if (dsId != other.dsId)
+			return false;
+		if (hibDialectClass == null) {
+			if (other.hibDialectClass != null)
+				return false;
+		} else if (!hibDialectClass.equals(other.hibDialectClass))
+			return false;
+		if (jndi == null) {
+			if (other.jndi != null)
+				return false;
+		} else if (!jndi.equals(other.jndi))
+			return false;
+		if (label == null) {
+			if (other.label != null)
+				return false;
+		} else if (!label.equals(other.label))
+			return false;
+		if (multiSchema == null) {
+			if (other.multiSchema != null)
+				return false;
+		} else if (!multiSchema.equals(other.multiSchema))
+			return false;
+		if (pwd == null) {
+			if (other.pwd != null)
+				return false;
+		} else if (!pwd.equals(other.pwd))
+			return false;
+		if (schemaAttribute == null) {
+			if (other.schemaAttribute != null)
+				return false;
+		} else if (!schemaAttribute.equals(other.schemaAttribute))
+			return false;
+		if (urlConnection == null) {
+			if (other.urlConnection != null)
+				return false;
+		} else if (!urlConnection.equals(other.urlConnection))
+			return false;
+		if (user == null) {
+			if (other.user != null)
+				return false;
+		} else if (!user.equals(other.user))
+			return false;
+		return true;
+	}
+
+	@Override
+	public JDBCDataSourcePoolConfiguration getJdbcPoolConfiguration() {
+		return jdbcPoolConfiguration;
+	}
+
+	@Override
+	public void setJdbcPoolConfiguration(JDBCDataSourcePoolConfiguration jdbcPoolConfiguration) {
+		this.jdbcPoolConfiguration = jdbcPoolConfiguration;
+	}
+	
+	@Override
+	public String getOwner() {
+		return owner;
+	}
+
+	@Override
+	public void setOwner(String owner) {
+		this.owner = owner;
 	}
 
 }

@@ -17,6 +17,28 @@
  */
 package it.eng.spagobi.tools.dataset.common.datareader;
 
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.sql.Time;
+import java.sql.Timestamp;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeSet;
+
+import org.apache.log4j.Logger;
+import org.joda.time.Instant;
+import org.json.JSONArray;
+import org.json.JSONException;
+
+import com.jayway.jsonpath.JsonPath;
+import com.jayway.jsonpath.PathNotFoundException;
+
 import it.eng.spagobi.commons.utilities.StringUtilities;
 import it.eng.spagobi.tools.dataset.common.datastore.DataStore;
 import it.eng.spagobi.tools.dataset.common.datastore.Field;
@@ -30,26 +52,6 @@ import it.eng.spagobi.tools.dataset.common.metadata.MetaData;
 import it.eng.spagobi.utilities.Helper;
 import it.eng.spagobi.utilities.assertion.Assert;
 import it.eng.spagobi.utilities.json.JSONUtils;
-
-import java.math.BigDecimal;
-import java.math.BigInteger;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.TreeSet;
-
-import org.apache.log4j.Logger;
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
-
-import com.jayway.jsonpath.JsonPath;
-import com.jayway.jsonpath.PathNotFoundException;
 
 /**
  * This reader convert JSON string to an {@link IDataStore}. The JSON must contains the items to convert, they are found using {@link JsonPath}. The name of
@@ -73,7 +75,9 @@ public class JSONPathDataReader extends AbstractDataReader {
 
 	private static final String DEFAULT_TIME_PATTERN = "HH:mm:ss";
 
-	private static final String DEFAULT_TIMESTAMP_PATTERN = "yyyy-MM-dd'T'HH:mm:ss.SSSZ";
+	private static final String DEFAULT_TIMESTAMP_PATTERN_UNQUOTED = "yyyy-MM-ddTHH:mm:ss.SSSZ";
+
+	private static final String DEFAULT_TIMESTAMP_PATTERN = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'";
 
 	private static final String ATTRIBUTES_DIRECTLY = "attributesDirectly";
 
@@ -121,8 +125,7 @@ public class JSONPathDataReader extends AbstractDataReader {
 	private boolean ngsiDefaultItems;
 
 	public JSONPathDataReader(String jsonPathItems, List<JSONPathAttribute> jsonPathAttributes, boolean useDirectlyAttributes, boolean ngsi) {
-		Helper.checkWithoutNulls(jsonPathAttributes, "pathAttributes");
-		Helper.checkNotNull(jsonPathAttributes, "jsonPathAttributes");
+		// Helper.checkWithoutNulls(jsonPathAttributes, "pathAttributes");
 		this.jsonPathAttributes = jsonPathAttributes;
 		this.useDirectlyAttributes = useDirectlyAttributes;
 		this.ngsi = ngsi;
@@ -136,23 +139,23 @@ public class JSONPathDataReader extends AbstractDataReader {
 		}
 	}
 
-	private static JSONObject isJSON(String responseBody) {
+	private static boolean isJSON(String responseBody) {
 		try {
-			JSONObject res = JSONUtils.toJSONObject(responseBody);
-			return res;
+			JSONUtils.toJSONObject(responseBody);
+			return true;
 		} catch (Exception e) {
 			logger.debug("Error parsing input String as JSONObject", e);
-			return null;
+			return false;
 		}
 	}
 
-	private static org.json.JSONArray isJSONArray(String responseBody) {
+	private static boolean isJSONArray(String responseBody) {
 		try {
-			org.json.JSONArray res = JSONUtils.toJSONArray(responseBody);
-			return res;
+			JSONUtils.toJSONArray(responseBody);
+			return true;
 		} catch (Exception e) {
 			logger.debug("Error parsing input String as JSONObject", e);
-			return null;
+			return false;
 		}
 	}
 
@@ -164,12 +167,8 @@ public class JSONPathDataReader extends AbstractDataReader {
 		}
 
 		String d = (String) data;
-		if (ngsi) {
-			JSONArray jsonData = isJSONArray(d);
-			Assert.assertTrue(jsonData != null, String.format("Data must be a valid JSON Array: %s", d));
-		} else {
-			JSONObject jsonData = isJSON(d);
-			Assert.assertTrue(jsonData != null, String.format("Data must be a valid JSON: %s", d));
+		if (!isJSONArray(d) && !isJSON(d)) {
+			throw new JSONPathDataReaderException("Data is neither a JSON object nor a JSON array");
 		}
 
 		try {
@@ -178,7 +177,7 @@ public class JSONPathDataReader extends AbstractDataReader {
 			dataStore.setMetaData(dataStoreMeta);
 			List<Object> parsedData = getItems(d);
 			addFieldMetadata(dataStoreMeta, parsedData);
-			addData(d, dataStore, dataStoreMeta, parsedData);
+			addData(d, dataStore, dataStoreMeta, parsedData, false);
 			return dataStore;
 		} catch (ParseException e) {
 			throw new JSONPathDataReaderException(e);
@@ -189,7 +188,8 @@ public class JSONPathDataReader extends AbstractDataReader {
 		}
 	}
 
-	private void addData(String data, DataStore dataStore, MetaData dataStoreMeta, List<Object> parsedData) throws ParseException, JSONException {
+	protected void addData(String data, DataStore dataStore, MetaData dataStoreMeta, List<Object> parsedData, boolean skipPagination)
+			throws ParseException, JSONException {
 
 		boolean checkMaxResults = false;
 		if ((maxResults > 0)) {
@@ -198,7 +198,7 @@ public class JSONPathDataReader extends AbstractDataReader {
 
 		boolean paginated = false;
 		logger.debug("Reading data ...");
-		if (isPaginationSupported() && getOffset() >= 0 && getFetchSize() >= 0) {
+		if ((isPaginationSupported() && getOffset() >= 0 && getFetchSize() >= 0)) {
 			logger.debug("Offset is equal to [" + getOffset() + "] and fetchSize is equal to [" + getFetchSize() + "]");
 			paginated = true;
 		} else {
@@ -207,8 +207,9 @@ public class JSONPathDataReader extends AbstractDataReader {
 
 		int rowFetched = 0;
 		for (Object o : parsedData) {
-			if ((!paginated && (!checkMaxResults || (rowFetched < maxResults)))
-					|| ((paginated && (rowFetched >= offset) && (rowFetched - offset < fetchSize)) && (!checkMaxResults || (rowFetched - offset < maxResults)))) {
+			if (skipPagination || (!paginated && (!checkMaxResults || (rowFetched < maxResults)))
+					|| ((paginated && (rowFetched >= offset) && (rowFetched - offset < fetchSize))
+							&& (!checkMaxResults || (rowFetched - offset < maxResults)))) {
 
 				IRecord record = new Record(dataStore);
 
@@ -231,7 +232,7 @@ public class JSONPathDataReader extends AbstractDataReader {
 						Assert.assertNotNull(typeString, "type of jsonpath type");
 						type = getType(typeString);
 						fm.setType(type);
-						if (type.equals(Date.class)) {
+						if (type.equals(Date.class) || type.equals(Timestamp.class)) {
 							setDateTypeFormat(fm, typeString);
 						}
 					}
@@ -260,7 +261,7 @@ public class JSONPathDataReader extends AbstractDataReader {
 	}
 
 	@SuppressWarnings("unchecked")
-	private List<Object> getItems(String data) {
+	protected List<Object> getItems(String data) {
 		Object parsed = JsonPath.read(data, jsonPathItems);
 		if (parsed == null) {
 			throw new JSONPathDataReaderException(String.format("Items not found in %s with json path %s", data, jsonPathItems));
@@ -307,6 +308,11 @@ public class JSONPathDataReader extends AbstractDataReader {
 				// already present,manged before
 				continue;
 			}
+
+			// if (key == null || key.trim().isEmpty()) {
+			// logger.error("Found an empy key in the json");
+			// throw new SpagoBIRuntimeException("knowage.rest.empty.field");
+			// }
 
 			// not found
 			Object value = jsonObject.get(key);
@@ -398,7 +404,7 @@ public class JSONPathDataReader extends AbstractDataReader {
 	 * @param parsedData
 	 *            list of json object (net.minidev)
 	 */
-	private void addFieldMetadata(MetaData dataStoreMeta, List<Object> parsedData) {
+	protected void addFieldMetadata(MetaData dataStoreMeta, List<Object> parsedData) {
 		boolean idSet = false;
 
 		manageNGSI(parsedData);
@@ -426,7 +432,7 @@ public class JSONPathDataReader extends AbstractDataReader {
 				Assert.assertNotNull(type, "type");
 				// type statically defined
 				fm.setType(type);
-				if (type.equals(Date.class)) {
+				if (type.equals(Date.class) || type.equals(Timestamp.class)) {
 					setDateTypeFormat(fm, jpa.jsonPathType);
 				}
 
@@ -512,6 +518,8 @@ public class JSONPathDataReader extends AbstractDataReader {
 			String dateFormat = (String) fmd.getProperty(DATE_FORMAT_FIELD_METADATA_PROPERTY);
 			Assert.assertNotNull(dateFormat != null, "dateFormat != null");
 			return getSimpleDateFormat(dateFormat).parse(value);
+		} else if (fieldType.equals(Timestamp.class)) {
+			return new Timestamp(Instant.parse(value).getMillis());
 		} else if (fieldType.equals(Boolean.class)) {
 			return Boolean.valueOf(value);
 		} else if (fieldType.equals(Long.class)) {
@@ -539,14 +547,17 @@ public class JSONPathDataReader extends AbstractDataReader {
 			while (typeString.charAt(index) == ' ') {
 				++index;
 			}
-			String res = typeString.substring(index).trim();
-			if (!res.isEmpty()) {
-				try {
-					new SimpleDateFormat(res); // try the pattern
-				} catch (IllegalArgumentException e) {
-					throw new JSONPathDataReaderException("Invalid pattern: " + res, e);
+			String format = typeString.substring(index).trim();
+			if (!format.isEmpty()) {
+				if (DEFAULT_TIMESTAMP_PATTERN_UNQUOTED.equals(format)) {
+					format = DEFAULT_TIMESTAMP_PATTERN;
 				}
-				return res;
+				try {
+					new SimpleDateFormat(format); // try the pattern
+				} catch (IllegalArgumentException e) {
+					throw new JSONPathDataReaderException("Invalid pattern: " + format, e);
+				}
+				return format;
 			}
 		}
 		if (typeString.toLowerCase().startsWith("datetime") || typeString.toLowerCase().startsWith("timestamp")) {
@@ -593,14 +604,16 @@ public class JSONPathDataReader extends AbstractDataReader {
 			return BigDecimal.class;
 		} else if (jsonPathType.equalsIgnoreCase("float") || jsonPathType.equalsIgnoreCase("double")) {
 			return Double.class;
+		} else if (jsonPathType.toLowerCase().startsWith("datetime")) {
+			return Timestamp.class;
 		} else if (jsonPathType.toLowerCase().startsWith("date")) {
 			return Date.class;
 		} else if (jsonPathType.toLowerCase().startsWith("timestamp")) {
-			return Date.class;
+			return Timestamp.class;
+		} else if (jsonPathType.toLowerCase().startsWith("iso8601")) {
+			return Timestamp.class;
 		} else if (jsonPathType.toLowerCase().startsWith("time")) {
-			return Date.class;
-		} else if (jsonPathType.toLowerCase().startsWith("datetime")) {
-			return Date.class;
+			return Time.class;
 		} else if (jsonPathType.equalsIgnoreCase("boolean")) {
 			return Boolean.class;
 		}
@@ -642,4 +655,5 @@ public class JSONPathDataReader extends AbstractDataReader {
 	public boolean isMaxResultsSupported() {
 		return true;
 	}
+
 }

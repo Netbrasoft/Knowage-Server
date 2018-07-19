@@ -17,10 +17,11 @@
  */
 package it.eng.spagobi.tools.dataset.constants;
 
-import it.eng.spagobi.tools.dataset.bo.RESTDataSet;
-
 import java.util.HashMap;
 import java.util.Map;
+
+import it.eng.spagobi.tools.dataset.bo.RESTDataSet;
+import it.eng.spagobi.tools.dataset.bo.SolrDataSet;
 
 /**
  * Defines all SpagoBI's constants.
@@ -88,6 +89,8 @@ public class DataSetConstants {
 	public static final String FEDERATED = "Federated";
 	public static final String FLAT = "Flat";
 	public static final String DS_REST_NAME = "REST";
+	public static final String DS_SOLR_NAME = "Solr";
+	public static final String SPARQL = "SPARQL";
 
 	public static final String TRASFORMER_TYPE_CD = "trasfTypeCd";
 	public static final String PIVOT_COL_NAME = "pivotColName";
@@ -97,7 +100,6 @@ public class DataSetConstants {
 
 	public static final String RECALCULATE_METADATA = "recalculateMetadata";
 
-	public static final String DS_WS = "SbiWSDataSet";
 	public static final String DS_FILE = "SbiFileDataSet";
 	public static final String DS_CKAN = "SbiCkanDataSet";
 	public static final String DS_JCLASS = "SbiJClassDataSet";
@@ -108,6 +110,8 @@ public class DataSetConstants {
 	public static final String DS_CUSTOM = "SbiCustomDataSet";
 	public static final String DS_FLAT = "SbiFlatDataSet";
 	public static final String DS_REST_TYPE = RESTDataSet.DATASET_TYPE;
+	public static final String DS_SOLR_TYPE = SolrDataSet.DATASET_TYPE;
+	public static final String DS_SPARQL = "SbiSPARQLDataSet";
 
 	public static final String QBE_DATA_SOURCE = "qbeDataSource";
 	public static final String QBE_DATAMARTS = "qbeDatamarts";
@@ -143,12 +147,15 @@ public class DataSetConstants {
 	public static final String XSL_FILE_LIMIT_ROWS = "limitRows";
 	public static final String XSL_FILE_SHEET_NUMBER = "xslSheetNumber";
 
+	public static final String FILE_DATE_FORMAT = "dateFormat";
+
 	// CKAN dataset constants
 
 	public static final String CKAN_FILE_TYPE = "ckanFileType";
 	public static final String CKAN_CSV_FILE_DELIMITER_CHARACTER = "ckanCsvDelimiter";
 	public static final String CKAN_CSV_FILE_QUOTE_CHARACTER = "ckanCsvQuote";
 	public static final String CKAN_CSV_FILE_ENCODING = "ckanCsvEncoding";
+	public static final String CKAN_CSV_DATE_FORMAT = "ckanDateFormat";
 
 	public static final String CKAN_XSL_FILE_SKIP_ROWS = "ckanSkipRows";
 	public static final String CKAN_XSL_FILE_LIMIT_ROWS = "ckanLimitRows";
@@ -172,18 +179,39 @@ public class DataSetConstants {
 	public static final String REST_OFFSET = "restOffset";
 	public static final String REST_FETCH_SIZE = "restFetchSize";
 	public static final String REST_MAX_RESULTS = "restMaxResults";
-	public static final String[] REST_STRING_ATTRIBUTES = { REST_ADDRESS, REST_REQUEST_BODY, REST_HTTP_METHOD, REST_JSON_PATH_ITEMS,
-			REST_JSON_DIRECTLY_ATTRIBUTES, REST_NGSI, REST_OFFSET, REST_FETCH_SIZE, REST_MAX_RESULTS };
+	public static final String[] REST_STRING_ATTRIBUTES = { REST_ADDRESS, REST_REQUEST_BODY, REST_HTTP_METHOD,
+			REST_JSON_PATH_ITEMS, REST_JSON_DIRECTLY_ATTRIBUTES, REST_NGSI, REST_OFFSET, REST_FETCH_SIZE,
+			REST_MAX_RESULTS };
 	public static final String[] REST_JSON_OBJECT_ATTRIBUTES = { REST_REQUEST_HEADERS };
 	public static final String[] REST_JSON_ARRAY_ATTRIBUTES = { REST_JSON_PATH_ATTRIBUTES };
-	public static final String[] REST_ALL_ATTRIBUTES = new String[REST_STRING_ATTRIBUTES.length + REST_JSON_OBJECT_ATTRIBUTES.length
-			+ REST_JSON_ARRAY_ATTRIBUTES.length];
+	public static final String[] REST_ALL_ATTRIBUTES = new String[REST_STRING_ATTRIBUTES.length
+			+ REST_JSON_OBJECT_ATTRIBUTES.length + REST_JSON_ARRAY_ATTRIBUTES.length];
+
+	// SOLR dataset constants
+	public static final String SOLR_TYPE = "solrType";
+	public static final String SOLR_TYPE_DOCUMENT = "DOCUMENTS";
+	public static final String SOLR_FACET_QUERY = "solrFacetQuery";
+	public static final String SOLR_FACET_FIELD = "solrFacetField";
+	public static final String SOLR_FACET_PREFIX = "solrFacetPrefix";
+	public static final String SOLR_ADDITIONAL_PARAMETERS = "restRequestAdditionalParameters";
+
+	// SPARQL dataset constants
+	public static final String SPARQL_ENDPOINT = "sparqlEndpoint";
+	public static final String SPARQL_QUERY = "sparqlQuery";
+	public static final String SPARQL_DEFAULT_GRAPH_IRI = "sparqlDefaultGraphIri";
+	public static final String SPARQL_EXECUTION_TIMEOUT = "sparqlExecutionTimeout";
+	public static final String[] SPARQL_ATTRIBUTES = { SPARQL_ENDPOINT, SPARQL_QUERY, SPARQL_DEFAULT_GRAPH_IRI, SPARQL_EXECUTION_TIMEOUT};
+
+	public static final String[] SOLR_STRING_ATTRIBUTES = { SOLR_TYPE, SOLR_FACET_QUERY, SOLR_FACET_FIELD,
+			SOLR_FACET_PREFIX };
+	public static final String[] SOLR_JSON_ARRAY_ATTRIBUTES = { SOLR_ADDITIONAL_PARAMETERS };
+	public static final String[] SOLR_ALL_ATTRIBUTES = new String[SOLR_STRING_ATTRIBUTES.length
+			+ SOLR_JSON_ARRAY_ATTRIBUTES.length];
 
 	public static final Map<String, String> name2Code;
 
 	static {
 		name2Code = new HashMap<String, String>();
-		name2Code.put("Web Service", DataSetConstants.DS_WS);
 		name2Code.put("File", DataSetConstants.DS_FILE);
 		name2Code.put("Ckan", DataSetConstants.DS_CKAN);
 		name2Code.put("Java Class", DataSetConstants.DS_JCLASS);
@@ -194,20 +222,28 @@ public class DataSetConstants {
 		name2Code.put("Flat", DataSetConstants.DS_FLAT);
 		name2Code.put("Federated", DataSetConstants.DS_FEDERATED);
 		name2Code.put(DS_REST_NAME, DS_REST_TYPE);
+		name2Code.put("SPARQL", DataSetConstants.DS_SPARQL);
 
 		// add all REST attributes
 		int curr = 0;
-		for (String[] a : new String[][] { REST_STRING_ATTRIBUTES, REST_JSON_OBJECT_ATTRIBUTES, REST_JSON_ARRAY_ATTRIBUTES }) {
+		for (String[] a : new String[][] { REST_STRING_ATTRIBUTES, REST_JSON_OBJECT_ATTRIBUTES,
+				REST_JSON_ARRAY_ATTRIBUTES }) {
 			System.arraycopy(a, 0, REST_ALL_ATTRIBUTES, curr, a.length);
 			curr += a.length;
 		}
+
+		curr = 0;
+		for (String[] a : new String[][] { SOLR_STRING_ATTRIBUTES, SOLR_JSON_ARRAY_ATTRIBUTES }) {
+			System.arraycopy(a, 0, SOLR_ALL_ATTRIBUTES, curr, a.length);
+			curr += a.length;
+		}
+
 	}
 
 	public static final Map<String, String> code2name;
 
 	static {
 		code2name = new HashMap<String, String>();
-		code2name.put(DataSetConstants.DS_WS, "Web Service");
 		code2name.put(DataSetConstants.DS_FILE, "File");
 		code2name.put(DataSetConstants.DS_CKAN, "Ckan");
 		code2name.put(DataSetConstants.DS_JCLASS, "Java Class");
@@ -218,6 +254,7 @@ public class DataSetConstants {
 		code2name.put(DataSetConstants.DS_FLAT, "Flat");
 		code2name.put(DataSetConstants.DS_FEDERATED, "Federated");
 		code2name.put(DS_REST_TYPE, DS_REST_NAME);
+		code2name.put(DataSetConstants.DS_SPARQL, "SPARQL");
 	}
 
 }

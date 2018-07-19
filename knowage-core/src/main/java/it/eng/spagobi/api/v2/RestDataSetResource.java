@@ -17,10 +17,6 @@
  */
 package it.eng.spagobi.api.v2;
 
-import it.eng.spagobi.api.common.DataSetResourceAbstractResource;
-import it.eng.spagobi.services.rest.annotations.ManageAuthorization;
-import it.eng.spagobi.utilities.exceptions.SpagoBIRuntimeException;
-
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -32,13 +28,17 @@ import javax.ws.rs.core.MediaType;
 
 import org.apache.log4j.Logger;
 
+import it.eng.spagobi.api.common.AbstractDataSetResource;
+import it.eng.spagobi.services.rest.annotations.ManageAuthorization;
+import it.eng.spagobi.utilities.exceptions.SpagoBIRuntimeException;
+
 /**
  * @author Francesco Lucchi (francesco.lucchi@eng.it)
  *
  */
-@Path("/2.0/datasets")
+@Path("/2.0/datasetsorion")
 @ManageAuthorization
-public class RestDataSetResource extends DataSetResourceAbstractResource {
+public class RestDataSetResource extends AbstractDataSetResource {
 
 	static protected Logger logger = Logger.getLogger(RestDataSetResource.class);
 

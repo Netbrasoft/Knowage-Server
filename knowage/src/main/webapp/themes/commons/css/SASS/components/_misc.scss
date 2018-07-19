@@ -1,5 +1,6 @@
 html{
-  height: 100%;
+  height: 100%; 
+  font-size: $rootFontSize;
 }
 
 #doc, #iframeDoc {
@@ -81,6 +82,16 @@ md-toolbar.ternaryToolbar.md-knowage-theme {
 }
 
 md-input-container.md-knowage-theme {
+  .hint {
+    position: absolute;
+    left: 2px;
+    bottom: -$headerFontSize;
+    right: auto;
+    font-size: $smallFontSize;
+    line-height: $headerFontSize;
+    transition: all 0.3s cubic-bezier(0.55, 0, 0.55, 0.2);
+    color: $smallTextColor;
+  }
   +label {
       padding: 0;
       line-height: $inputHeight;
@@ -142,9 +153,6 @@ md-toolbar.md-knowage-theme .md-toolbar-tools .md-button:not[disabled] {
 md-input-container.md-knowage-theme {
   &.noMarginBottom{
     margin-bottom: 0;
-  }
-  .md-errors-spacer {
-    min-height: 0;
   }
   &:not(.md-input-invalid) {
     &.md-input-focused {
@@ -255,8 +263,10 @@ a.md-button.md-knowage-theme.md-primary, .md-button.md-knowage-theme.md-primary 
 }
 a.md-button.md-knowage-theme.md-primary.md-raised, .md-button.md-knowage-theme.md-primary.md-raised {
     &:not([disabled]) {
+        color: $lightTextColor;
         background-color: $baseColor;
         &:focus {
+            color: $lightTextColor;
             background-color: $baseColor;
         }
     }
@@ -348,8 +358,47 @@ a.md-button.md-knowage-theme.md-primary.md-raised, .md-button.md-knowage-theme.m
     top: 5px;
 }
 
+.kn-noItems {
+    width: 60%;
+    margin: 8px !important;
+    border: 1px solid rgba($ternaryColor,.6);
+    padding: 8px;
+    background-color: lighten($ternaryColor, 10%);
+    text-align: center;
+    position: relative;
+    text-transform: uppercase;
+    font-size: $smallFontSize;
+}
+
+.kn-codeExample {
+    margin: 8px !important;
+    border: 1px solid rgba($baseColor,.1);
+    padding: 8px;
+    background-color: lighten($baseColor, 55%);
+    text-align: left;
+    position: relative;
+    font-size: $smallFontSize;
+    font-family:'courier';
+    textarea {
+      width: 100%;
+      background-color: transparent;
+      border: none;
+      resize: none;
+    }
+}
+
+
 .kn-list md-icon.fa {
   padding-left:0;
+}
+
+.zindexback{
+  z-index:0 !important;
+}
+.overflowVisible {
+  md-content {
+    overflow: visible;
+  }
 }
 
 .kn-checkInput {
@@ -655,10 +704,13 @@ md-menu-content._md-menu-bar-menu.md-dense {
      line-height: 20px;
   }
 }
+.md-errors-spacer {
+  min-height: 0 !important;
+}
 
-.noMdError {
+.mdError {
   .md-errors-spacer {
-    min-height: 0 !important;
+    min-height: 32px !important;
   }
 }
 .smallInputs {
@@ -744,13 +796,13 @@ md-tab-item {
   }
 }
 .kn-success {
-  color: $positiveColor;
+  color: $positiveColor !important;
 }
 
-.kn-danger {
-  color: $negativeColor;
+.kn-danger, .kn-dangerous {
+  color: $negativeColor !important;
+  border-color: red;
 }
-
 .kn-inputError {
   color: $negativeColor !important;
   border-bottom-color: $negativeColor !important;
@@ -801,8 +853,20 @@ md-tab-item {
   }
 }
 
-.codeMirrorScriptEditor .CodeMirror-gutter-wrapper {
-  left: -30px !important;
+.codeMirrorScriptEditor {
+  pre {
+    white-space: pre-wrap;
+    word-break: break-all;
+    word-wrap: break-word;
+  }
+  .CodeMirror-gutter-wrapper {
+    left: -30px !important;
+  }
+  md-card {
+    md-input-container{
+      margin: 0;
+    }
+  }
 }
 
 color-picker {
@@ -811,9 +875,30 @@ color-picker {
   display: block;
   .color-picker-wrapper {
     position: absolute;
-    //z-index:9999;
     width: 100%;
+    z-index:9000;
     .color-picker-panel {
+      
+    }
+  }
+}
+
+.text-line-through {
+  text-decoration: line-through  !important;
+}
+
+.rotate-transition {
+  transition: transform .3s ease-out, display 0s linear;
+}
+
+.rotate-180 {
+  transform: rotate(-180deg);
+}
+
+/* fix to have the selected color-picker always on top */
+.md-input-focused {
+  color-picker {
+    .color-picker-wrapper {
       z-index:9999;
     }
   }
@@ -823,12 +908,13 @@ color-picker {
 /* IE11 fix */
 
 @media all and (-ms-high-contrast: none), (-ms-high-contrast: active) {
+  html{
+    overflow: hidden;
+  }
   .itemboxGU {
     min-height: 100px;
   }
   md-checkbox.md-knowage-theme.md-checked ._md-icon:after {
-/*    transform: rotate(135deg);
-    top:10px;*/
     padding-top: 11px;
   }
   
@@ -838,3 +924,13 @@ color-picker {
   
 }
 
+/* print media */ 
+@media print {
+  @page {
+    size: auto;   /* auto is the initial value */
+    margin: 0;  /* this affects the margin in the printer settings */
+  }
+  .kn-cockpit .cockpitSheetTabsHook md-tabs-canvas md-tab-item.md-tab {
+    display: none !important; 
+  } 
+}

@@ -18,19 +18,6 @@
 package it.eng.spagobi.engine.chart.util;
 
 import static it.eng.spagobi.engine.chart.util.ChartEngineUtil.ve;
-import it.eng.qbe.query.Query;
-import it.eng.spago.security.IEngUserProfile;
-import it.eng.spagobi.commons.utilities.StringUtilities;
-import it.eng.spagobi.tools.dataset.bo.IDataSet;
-import it.eng.spagobi.tools.dataset.common.datastore.IDataStore;
-import it.eng.spagobi.tools.dataset.common.datawriter.JSONDataWriter;
-import it.eng.spagobi.tools.dataset.common.metadata.IFieldMetaData;
-import it.eng.spagobi.tools.dataset.common.metadata.IFieldMetaData.FieldType;
-import it.eng.spagobi.tools.dataset.common.metadata.IMetaData;
-import it.eng.spagobi.tools.dataset.common.query.AggregationFunctions;
-import it.eng.spagobi.tools.dataset.common.query.IQuery;
-import it.eng.spagobi.utilities.assertion.Assert;
-import it.eng.spagobi.utilities.exceptions.SpagoBIServiceException;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -51,18 +38,34 @@ import org.json.JSONObject;
 import com.jamonapi.Monitor;
 import com.jamonapi.MonitorFactory;
 
+import it.eng.knowage.engine.cockpit.api.CockpitExecutionClient;
+import it.eng.qbe.query.Query;
+import it.eng.spago.security.IEngUserProfile;
+import it.eng.spagobi.commons.utilities.StringUtilities;
+import it.eng.spagobi.tools.dataset.bo.IDataSet;
+import it.eng.spagobi.tools.dataset.common.datastore.IDataStore;
+import it.eng.spagobi.tools.dataset.common.datawriter.JSONDataWriter;
+import it.eng.spagobi.tools.dataset.common.metadata.IFieldMetaData;
+import it.eng.spagobi.tools.dataset.common.metadata.IFieldMetaData.FieldType;
+import it.eng.spagobi.tools.dataset.common.metadata.IMetaData;
+import it.eng.spagobi.tools.dataset.common.query.AggregationFunctions;
+import it.eng.spagobi.tools.dataset.common.query.IQuery;
+import it.eng.spagobi.utilities.assertion.Assert;
+import it.eng.spagobi.utilities.exceptions.SpagoBIServiceException;
+
 public class ChartEngineDataUtil {
 	public static transient Logger logger = Logger.getLogger(ChartEngineDataUtil.class);
 
 	@SuppressWarnings({ "rawtypes" })
 	public static String loadJsonData(String jsonTemplate, IDataSet dataSet, Map analyticalDrivers, Map userProfile, Locale locale) throws Throwable {
 		IQuery query = extractAggregatedQueryFromTemplate(jsonTemplate);
-		return loadJsonData(query, dataSet, analyticalDrivers, userProfile, locale);
+		return loadJsonData(query, dataSet, analyticalDrivers, userProfile, locale, null);
 	}
 
 	@SuppressWarnings({ "rawtypes" })
-	private static String loadJsonData(IQuery query, IDataSet dataSet, Map analyticalDrivers, Map userProfile, Locale locale) throws Throwable {
-		IDataStore dataStore = loadDatastore(query, dataSet, analyticalDrivers, userProfile, locale);
+	private static String loadJsonData(IQuery query, IDataSet dataSet, Map analyticalDrivers, Map userProfile, Locale locale, String dateFormatJava)
+			throws Throwable {
+		IDataStore dataStore = loadDatastore(query, dataSet, analyticalDrivers, userProfile, locale, dateFormatJava);
 
 		JSONObject dataSetJSON = new JSONObject();
 		try {
@@ -80,7 +83,8 @@ public class ChartEngineDataUtil {
 	}
 
 	@SuppressWarnings({ "unchecked", "rawtypes" })
-	private static IDataStore loadDatastore(IQuery query, IDataSet dataSet, Map analyticalDrivers, Map userProfile, Locale locale) throws JSONException {
+	private static IDataStore loadDatastore(IQuery query, IDataSet dataSet, Map analyticalDrivers, Map userProfile, Locale locale, String dateFormatJava)
+			throws JSONException {
 
 		analyticalDrivers.put("LOCALE", locale);
 		dataSet.setParamsMap(analyticalDrivers);
@@ -93,36 +97,46 @@ public class ChartEngineDataUtil {
 
 		monitorLD.stop();
 
-		IDataStore dataStore = dataSet.getDataStore().aggregateAndFilterRecords(query);
+		IDataStore dataStore = dataSet.getDataStore().aggregateAndFilterRecords(query, dateFormatJava);
 		return dataStore;
 	}
 
 	@SuppressWarnings("rawtypes")
 	public static String drilldown(String jsonTemplate, String breadcrumb, IDataSet dataSet, Map analyticalDrivers, Map userProfile, Locale locale,
-			String documentLabel, IEngUserProfile profile) throws Throwable {
+			String documentLabel, IEngUserProfile profile, String selections, String aggregations, String parameters, Map<String, Object> queryParams)
+			throws Throwable {
 
+		JSONObject parametersJson = null;
+		JSONObject aggregationsJson = null;
+		JSONObject selectionsJson = null;
 		String result = "";
-
+		if (!aggregations.equals("")) {
+			parametersJson = new JSONObject(parameters);
+			aggregationsJson = new JSONObject(aggregations);
+			selectionsJson = new JSONObject(selections);
+		}
 		JSONObject jo = new JSONObject(jsonTemplate);
 		JSONObject category = jo.getJSONObject("CHART").getJSONObject("VALUES").getJSONObject("CATEGORY");
 		String groupBys = category.optString("groupby");
 		String groupByNames = category.optString("groupbyNames");
-
+		Map<String, Object> mapTemplate = null;
 		JSONArray jaBreadcrumb = new JSONArray(breadcrumb);
 		if (groupBys != null) {
 			String drilldownSerie = "";
+			String dateFormatJava = "";
 			Map<String, Object> drilldownParams = new LinkedHashMap<>();
 			String drilldownCategory = category.getString("column");
 			String drilldownCategoryName = category.getString("name");
-			String selectedCategory = "";
-			String[] gbys = groupBys.split(",");
+			Object selectedCategory = null;
+			String[] gbys = groupBys.split(", ");
 			String[] gbyNames = (groupByNames != null && !groupByNames.isEmpty()) ? groupByNames.split(",") : gbys;
 			int i;
 			for (i = 0; i < jaBreadcrumb.length(); i++) {
 				JSONObject drilldown = (JSONObject) jaBreadcrumb.get(i);
 
-				String selectedName = drilldown.getString("selectedName");
+				Object selectedName = drilldown.getString("selectedName");
 				String selectedSerie = drilldown.getString("selectedSerie");
+				String dateFormat = drilldown.optString("dateFormatJava");
 				String gby = gbys[i];
 				String gbyName = (gbyNames.length > i) ? gbyNames[i] : gbys[i];
 
@@ -134,11 +148,45 @@ public class ChartEngineDataUtil {
 				drilldownCategory = gby;
 				drilldownCategoryName = gbyName;
 				selectedCategory = selectedName;
+				if (dateFormatJava != null)
+					dateFormatJava = dateFormat;
+			}
+			String jsonData = "";
+			if (!aggregations.equals("")) {
+				JSONArray categories = (JSONArray) aggregationsJson.get("categories");
+				JSONObject categ = (JSONObject) categories.get(0);
+				categ.put("id", drilldownCategory);
+				categ.put("columnName", drilldownCategory);
+				categ.put("alias", drilldownCategory);
+				String key = "";
+				String value = "";
+
+				for (String drillParam : drilldownParams.keySet()) {
+					key = drillParam;
+					value = (String) drilldownParams.get(drillParam);
+					String aggValue = "('" + value + "')";
+					JSONArray aggArray = new JSONArray();
+					aggArray.put(aggValue);
+					if (selectionsJson.length() == 0) {
+						selectionsJson.put(aggregationsJson.getString("dataset"), new JSONObject());
+					}
+					JSONObject dataset = (JSONObject) selectionsJson.get(aggregationsJson.getString("dataset"));
+
+					dataset.put(key, aggArray);
+				}
+
+				String aggregationsToSend = "{aggregations:" + aggregationsJson.toString() + ",parameters:" + parametersJson.toString() + ",selections:"
+						+ selectionsJson.toString() + "}";
+				CockpitExecutionClient cockpitExecutionClient;
+				cockpitExecutionClient = new CockpitExecutionClient();
+				String userId = (String) profile.getUserUniqueIdentifier();
+				jsonData = cockpitExecutionClient.getDataFromDataset(aggregationsToSend, aggregationsJson.getString("dataset"), userId, queryParams);
+
+			} else {
+				IQuery q = extractAggregatedQueryFromTemplate(jsonTemplate, true, drilldownSerie, drilldownCategory, drilldownParams);
+				jsonData = loadJsonData(q, dataSet, analyticalDrivers, userProfile, locale, dateFormatJava);
 			}
 
-			IQuery q = extractAggregatedQueryFromTemplate(jsonTemplate, true, drilldownSerie, drilldownCategory, drilldownParams);
-
-			String jsonData = loadJsonData(q, dataSet, analyticalDrivers, userProfile, locale);
 			boolean enableNextDrilldown = i < gbys.length;
 
 			/**
@@ -149,8 +197,12 @@ public class ChartEngineDataUtil {
 			 * @author Danilo Ristovski (danristo, danilo.ristovski@mht.net)
 			 */
 			VelocityContext velocityContext = ChartEngineUtil.loadVelocityContext(null, jsonData, false, documentLabel, profile);
-
+			if (jsonTemplate != null) {
+				mapTemplate = ChartEngineUtil.convertJsonToMap(jsonTemplate, true);
+				velocityContext.put("chart", mapTemplate.get("chart") != null ? mapTemplate.get("chart") : mapTemplate.get("CHART"));
+			}
 			velocityContext.put("selectedCategory", selectedCategory);
+			velocityContext.put("chart", mapTemplate);
 			velocityContext.put("drilldownSerie", drilldownSerie);
 			velocityContext.put("drilldownCategory", drilldownCategory);
 			velocityContext.put("drilldownCategoryName", drilldownCategoryName);
@@ -196,17 +248,15 @@ public class ChartEngineDataUtil {
 			}
 		}
 		/*
-		 * @author: radmila.selakovic@mht.net
-		 * rselakov
-		 * checking if all series have no agregation
-		*/
+		 * @author: radmila.selakovic@mht.net rselakov checking if all series have no agregation
+		 */
 		boolean none = false;
 		for (JSONObject serie : seriesList) {
 
 			String serieColumn = serie.getString("column");
 			String serieName = serie.getString("name");
 			String serieFunction = StringUtilities.isNotEmpty(serie.optString("groupingFunction")) ? serie.optString("groupingFunction") : "SUM";
-			if(serieFunction.equals("NONE")) {
+			if (serieFunction.equals("NONE")) {
 				none = true;
 			}
 			/**
@@ -264,20 +314,18 @@ public class ChartEngineDataUtil {
 					 *
 					 * @modifiedBy Danilo Ristovski (danristo, danilo.ristovski@mht.net)
 					 */
-					
+
 					/**
 					 * @modifiedBy: Radmila Selakovic (rselakov, radmila.selakovic@mht.net)
-					 * 
-					 * checking if chart type is scatter: if it is, there will not have "group by" 
-					 * in the query
-					*/
-					if(chartType.equals("SCATTER") && none){
+					 *
+					 *              checking if chart type is scatter: if it is, there will not have "group by" in the query
+					 */
+					if (chartType.equals("SCATTER") && none) {
 						q.addSelectFiled(cat.getString("column"), null, cat.getString("column"), true, true, false, cat.getString("orderType"), null,
-								cat.getString("orderColumn")); 
-					}
-					else {
+								cat.getString("orderColumn"));
+					} else {
 						q.addSelectFiled(cat.getString("column"), null, cat.getString("column"), true, true, true, cat.getString("orderType"), null,
-							cat.getString("orderColumn"));
+								cat.getString("orderColumn"));
 					}
 
 				}
@@ -385,7 +433,8 @@ public class ChartEngineDataUtil {
 			case ATTRIBUTE:
 				Object isSegmentAttributeObj = fieldMetaData.getProperty(PROPERTY_IS_SEGMENT_ATTRIBUTE);
 				logger.debug("Read property " + PROPERTY_IS_SEGMENT_ATTRIBUTE + ": its value is [" + propertyRawValue + "]");
-				String attributeNature = (isSegmentAttributeObj != null && (Boolean.parseBoolean(isSegmentAttributeObj.toString()) == true)) ? "segment_attribute"
+				String attributeNature = (isSegmentAttributeObj != null && (Boolean.parseBoolean(isSegmentAttributeObj.toString()) == true))
+						? "segment_attribute"
 						: "attribute";
 
 				logger.debug("The nature of the attribute is recognized as " + attributeNature);

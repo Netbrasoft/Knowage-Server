@@ -75,7 +75,9 @@ import it.eng.spagobi.tools.dataset.bo.JDBCDatasetFactory;
 import it.eng.spagobi.tools.dataset.bo.JavaClassDataSet;
 import it.eng.spagobi.tools.dataset.bo.MongoDataSet;
 import it.eng.spagobi.tools.dataset.bo.RESTDataSet;
+import it.eng.spagobi.tools.dataset.bo.SPARQLDataSet;
 import it.eng.spagobi.tools.dataset.bo.ScriptDataSet;
+import it.eng.spagobi.tools.dataset.bo.SolrDataSet;
 import it.eng.spagobi.tools.dataset.bo.VersionedDataSet;
 import it.eng.spagobi.tools.dataset.cache.SpagoBICacheManager;
 import it.eng.spagobi.tools.dataset.cache.impl.sqldbcache.SQLDBCache;
@@ -89,6 +91,7 @@ import it.eng.spagobi.tools.dataset.common.transformer.PivotDataSetTransformer;
 import it.eng.spagobi.tools.dataset.constants.DataSetConstants;
 import it.eng.spagobi.tools.dataset.dao.IDataSetDAO;
 import it.eng.spagobi.tools.dataset.federation.FederationDefinition;
+import it.eng.spagobi.tools.dataset.metadata.mapping.MetaDataMapping;
 import it.eng.spagobi.tools.dataset.persist.IPersistedManager;
 import it.eng.spagobi.tools.dataset.persist.PersistedTableManager;
 import it.eng.spagobi.tools.dataset.utils.DataSetUtilities;
@@ -369,6 +372,7 @@ public class ManageDataSetsForREST {
 					throw new SpagoBIServiceException(SERVICE_NAME, "sbi.ds.dsTypeError");
 				}
 
+				// MOVED SECTION OF CODE IN THE getDataset Method, otherwise the preview will not use the isPersisted flag
 				try {
 					getPersistenceInfo(ds, json);
 				} catch (EMFUserError e) {
@@ -444,6 +448,8 @@ public class ManageDataSetsForREST {
 
 			String csvDelimiter = json.optString(DataSetConstants.CSV_FILE_DELIMITER_CHARACTER);
 			String csvQuote = json.optString(DataSetConstants.CSV_FILE_QUOTE_CHARACTER);
+			String dateFormat = json.optString(DataSetConstants.FILE_DATE_FORMAT);
+			String csvEncoding = json.optString(DataSetConstants.CSV_FILE_ENCODING);
 
 			String skipRows = json.optString(DataSetConstants.XSL_FILE_SKIP_ROWS);
 			String limitRows = json.optString(DataSetConstants.XSL_FILE_LIMIT_ROWS);
@@ -463,9 +469,11 @@ public class ManageDataSetsForREST {
 			jsonDsConfig.put(DataSetConstants.FILE_TYPE, fileType);
 			jsonDsConfig.put(DataSetConstants.CSV_FILE_DELIMITER_CHARACTER, csvDelimiter);
 			jsonDsConfig.put(DataSetConstants.CSV_FILE_QUOTE_CHARACTER, csvQuote);
+			jsonDsConfig.put(DataSetConstants.CSV_FILE_ENCODING, csvEncoding);
 			jsonDsConfig.put(DataSetConstants.XSL_FILE_SKIP_ROWS, skipRows);
 			jsonDsConfig.put(DataSetConstants.XSL_FILE_LIMIT_ROWS, limitRows);
 			jsonDsConfig.put(DataSetConstants.XSL_FILE_SHEET_NUMBER, xslSheetNumber);
+			jsonDsConfig.put(DataSetConstants.FILE_DATE_FORMAT, dateFormat);
 
 			dataSet.setResourcePath(DAOConfig.getResourcePath());
 			String fileName = json.getString(DataSetConstants.FILE_NAME);
@@ -553,6 +561,7 @@ public class ManageDataSetsForREST {
 
 			String csvDelimiter = json.optString(DataSetConstants.CKAN_CSV_FILE_DELIMITER_CHARACTER);
 			String csvQuote = json.optString(DataSetConstants.CKAN_CSV_FILE_QUOTE_CHARACTER);
+			String dateFormat = json.optString(DataSetConstants.CKAN_CSV_DATE_FORMAT);
 
 			String skipRows = json.optString(DataSetConstants.CKAN_XSL_FILE_SKIP_ROWS);
 			String limitRows = json.optString(DataSetConstants.CKAN_XSL_FILE_LIMIT_ROWS);
@@ -573,6 +582,7 @@ public class ManageDataSetsForREST {
 			jsonDsConfig.put(DataSetConstants.FILE_TYPE, fileType);
 			jsonDsConfig.put(DataSetConstants.CSV_FILE_DELIMITER_CHARACTER, csvDelimiter);
 			jsonDsConfig.put(DataSetConstants.CSV_FILE_QUOTE_CHARACTER, csvQuote);
+			jsonDsConfig.put(DataSetConstants.FILE_DATE_FORMAT, dateFormat);
 			jsonDsConfig.put(DataSetConstants.CSV_FILE_ENCODING, ckanEncodig);
 			jsonDsConfig.put(DataSetConstants.XSL_FILE_SKIP_ROWS, skipRows);
 			jsonDsConfig.put(DataSetConstants.XSL_FILE_LIMIT_ROWS, limitRows);
@@ -636,6 +646,14 @@ public class ManageDataSetsForREST {
 
 		else if (datasetTypeName.equalsIgnoreCase(DataSetConstants.DS_REST_TYPE)) {
 			toReturn = manageRESTDataSet(savingDataset, jsonDsConfig, json);
+		}
+
+		else if (datasetTypeName.equalsIgnoreCase(DataSetConstants.DS_SPARQL)) {
+			toReturn = manageSPARQLDataSet(savingDataset, jsonDsConfig, json);
+		}
+
+		else if (datasetTypeName.equalsIgnoreCase(DataSetConstants.DS_SOLR_TYPE)) {
+			toReturn = manageSolrDataSet(savingDataset, jsonDsConfig, json);
 		}
 
 		else if (datasetTypeName.equalsIgnoreCase(DataSetConstants.DS_QUERY)) {
@@ -801,6 +819,16 @@ public class ManageDataSetsForREST {
 			toReturn = dataSet;
 		}
 
+		// if (toReturn.getDataSourceForReading() == null) {
+		// IDataSource dataSource = DAOFactory.getDataSourceDAO().loadDataSourceWriteDefault();
+		// toReturn.setDataSourceForWriting(dataSource);
+		// }
+		// if (toReturn.getDataSourceForReading() == null) {
+		// IDataSource dataSource = DAOFactory.getDataSourceDAO().loadDataSourceWriteDefault();
+		// toReturn.setDataSourceForReading(dataSource);
+		// }
+		//
+		// getPersistenceInfo(toReturn, json);
 		toReturn.setConfiguration(jsonDsConfig.toString());
 		return toReturn;
 	}
@@ -1018,20 +1046,35 @@ public class ManageDataSetsForREST {
 
 		dataSet.setUserProfileAttributes(UserProfileUtils.getProfileAttributes(profile));
 		dataSet.setParamsMap(parametersFilled);
+
 		try {
 			checkFileDataset(dataSet);
 			dataSet.loadData(start, limit, GeneralUtilities.getDatasetMaxResults());
 			dataStore = dataSet.getDataStore();
 			// DatasetMetadataParser dsp = new DatasetMetadataParser();
 
-			JSONArray metadataArray = null;
-			IMetaData metaData = dataStore.getMetaData();
-
 			try {
-				metadataArray = JSONUtils.toJSONArray(metadata);
+
+				IMetaData metaData = dataStore.getMetaData();
+
+				JSONArray metadataArray = JSONUtils.toJSONArray(metadata);
+
 				for (int i = 0; i < metaData.getFieldCount(); i++) {
 					IFieldMetaData ifmd = metaData.getFieldMeta(i);
+
+					// check if file data set, apply metadata values passed from frontend
+					if (dataSet instanceof FileDataSet) {
+						for (int j = 0; j < metadataArray.length(); j++) {
+							if (ifmd.getName().equals((metadataArray.getJSONObject(j)).getString("name"))) {
+								ifmd.setType(MetaDataMapping.getMetaDataType(metadataArray.getJSONObject(j).getString("type")));
+								break;
+							}
+
+						}
+					}
+
 					for (int j = 0; j < metadataArray.length(); j++) {
+
 						if (ifmd.getName().equals((metadataArray.getJSONObject(j)).getString("name"))) {
 							if ("MEASURE".equals((metadataArray.getJSONObject(j)).getString("fieldType"))) {
 								ifmd.setFieldType(IFieldMetaData.FieldType.MEASURE);
@@ -1041,6 +1084,11 @@ public class ManageDataSetsForREST {
 							break;
 						}
 					}
+
+				}
+
+				if (metadataArray.length() == 0) {
+					setNumericValuesAsMeasures(dataStore.getMetaData());
 				}
 			} catch (ClassCastException e) {
 				logger.debug("Recieving an object instead of array for metadata", e);
@@ -1050,14 +1098,6 @@ public class ManageDataSetsForREST {
 		} catch (Exception e) {
 			logger.error("Error while executing dataset for test purpose", e);
 			throw e;
-		}
-
-		logger.debug("OUT");
-		if (dataStore == null)
-			return null;
-
-		if (JSONUtils.toJSONArray(metadata).length() == 0) {
-			setNumericValuesAsMeasures(dataStore.getMetaData());
 		}
 
 		return dataStore.getMetaData();
@@ -1210,6 +1250,47 @@ public class ManageDataSetsForREST {
 			config.put(ja, new JSONArray(json.getString(ja)));
 		}
 		RESTDataSet res = new RESTDataSet(config);
+		res.setLabel(json.optString(DataSetConstants.LABEL));
+		return res;
+	}
+
+	private SPARQLDataSet manageSPARQLDataSet(boolean savingDataset, JSONObject config, JSONObject json) throws JSONException {
+		for (String sa : DataSetConstants.SPARQL_ATTRIBUTES) {
+			config.put(sa, json.optString(sa));
+		}
+		SPARQLDataSet res = new SPARQLDataSet(config);
+		return res;
+	}
+
+	private SolrDataSet manageSolrDataSet(boolean savingDataset, JSONObject config, JSONObject json) throws JSONException {
+		for (String sa : DataSetConstants.REST_STRING_ATTRIBUTES) {
+			config.put(sa, json.optString(sa));
+		}
+		for (String ja : DataSetConstants.REST_JSON_OBJECT_ATTRIBUTES) {
+			String prop = json.optString(ja);
+			if (prop != null && !prop.trim().isEmpty()) {
+				config.put(ja, new JSONObject(prop));
+			}
+		}
+		for (String ja : DataSetConstants.REST_JSON_ARRAY_ATTRIBUTES) {
+			String prop = json.optString(ja);
+			if (prop != null && !prop.trim().isEmpty()) {
+				config.put(ja, new JSONArray(prop));
+			}
+		}
+		for (String sa : DataSetConstants.SOLR_STRING_ATTRIBUTES) {
+			config.put(sa, json.optString(sa));
+		}
+		for (String ja : DataSetConstants.SOLR_JSON_ARRAY_ATTRIBUTES) {
+			String prop = json.optString(ja);
+			if (prop != null && !prop.trim().isEmpty()) {
+				config.put(ja, new JSONArray(prop));
+			}
+		}
+
+		HashMap<String, String> parametersMap = getDataSetParametersAsMap(false, json);
+
+		SolrDataSet res = new SolrDataSet(config, parametersMap);
 		return res;
 	}
 
@@ -1451,6 +1532,8 @@ public class ManageDataSetsForREST {
 			}
 
 			dataSet.setUserProfileAttributes(UserProfileUtils.getProfileAttributes(profile));
+			if(profile instanceof UserProfile)
+				dataSet.setUserProfile((UserProfile)profile);
 			dataSet.setParamsMap(parametersFilled);
 			checkFileDataset(dataSet);
 			IDataStore dataStore = null;

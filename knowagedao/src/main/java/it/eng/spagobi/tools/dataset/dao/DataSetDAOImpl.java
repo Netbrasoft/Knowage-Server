@@ -17,6 +17,26 @@
  */
 package it.eng.spagobi.tools.dataset.dao;
 
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Set;
+
+import org.apache.log4j.Logger;
+import org.hibernate.Criteria;
+import org.hibernate.Query;
+import org.hibernate.Session;
+import org.hibernate.Transaction;
+import org.hibernate.criterion.Criterion;
+import org.hibernate.criterion.Expression;
+import org.hibernate.criterion.Restrictions;
+import org.json.JSONArray;
+import org.json.JSONObject;
+
 import it.eng.spago.error.EMFInternalError;
 import it.eng.spago.error.EMFUserError;
 import it.eng.spagobi.analiticalmodel.document.bo.BIObject;
@@ -38,6 +58,7 @@ import it.eng.spagobi.federateddataset.metadata.SbiFederationDefinition;
 import it.eng.spagobi.metadata.metadata.SbiMetaBc;
 import it.eng.spagobi.metadata.metadata.SbiMetaDsBc;
 import it.eng.spagobi.metadata.metadata.SbiMetaDsBcId;
+import it.eng.spagobi.metadata.metadata.SbiMetaObjDs;
 import it.eng.spagobi.metadata.metadata.SbiMetaSource;
 import it.eng.spagobi.metadata.metadata.SbiMetaTable;
 import it.eng.spagobi.tools.dataset.bo.IDataSet;
@@ -53,26 +74,6 @@ import it.eng.spagobi.tools.glossary.metadata.SbiGlDataSetWlist;
 import it.eng.spagobi.utilities.assertion.Assert;
 import it.eng.spagobi.utilities.exceptions.SpagoBIRuntimeException;
 import it.eng.spagobi.utilities.json.JSONUtils;
-
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Set;
-
-import org.apache.log4j.Logger;
-import org.hibernate.Criteria;
-import org.hibernate.Query;
-import org.hibernate.Session;
-import org.hibernate.Transaction;
-import org.hibernate.criterion.Criterion;
-import org.hibernate.criterion.Expression;
-import org.hibernate.criterion.Restrictions;
-import org.json.JSONArray;
-import org.json.JSONObject;
 
 /**
  * Implement CRUD operations over spagobi datsets
@@ -340,12 +341,11 @@ public class DataSetDAOImpl extends AbstractHibernateDAO implements IDataSetDAO 
 			String implementation, Boolean showDerivedDatasets) {
 
 		List<IDataSet> results;
-		Session session = getSession();
+		Session session = null;
 
 		logger.debug("IN");
 
 		results = new ArrayList<IDataSet>();
-		session = null;
 		try {
 			// open session
 			session = getSession();
@@ -607,7 +607,6 @@ public class DataSetDAOImpl extends AbstractHibernateDAO implements IDataSetDAO 
 			if (transaction != null && transaction.isActive()) {
 				transaction.rollback();
 			}
-			t.printStackTrace();
 			throw new SpagoBIDAOException("An unexpected error occured while inserting dataset", t);
 		} finally {
 			if (keepPreviousSession == false && session != null && session.isOpen()) {
@@ -878,11 +877,11 @@ public class DataSetDAOImpl extends AbstractHibernateDAO implements IDataSetDAO 
 			Query listQuery;
 			if (isDev) {
 				List idsCat = createIdsCatogriesList(devCategories);
-				String owner = getUserProfile().getUserUniqueIdentifier().toString();
+				String owner = ((UserProfile) getUserProfile()).getUserId().toString();
 				Query countQuery = null;
 				if (idsCat != null && idsCat.size() > 0) {
-					countQuery = session
-							.createQuery("select count(*) from SbiDataSet sb where sb.active = ? and (sb.category.valueId  IN (:idsCat) or sb.owner = :owner) ");
+					countQuery = session.createQuery(
+							"select count(*) from SbiDataSet sb where sb.active = ? and (sb.category.valueId  IN (:idsCat) or sb.owner = :owner) ");
 					countQuery.setBoolean(0, true);
 					countQuery.setParameterList("idsCat", idsCat);
 					countQuery.setString("owner", owner);
@@ -1248,7 +1247,7 @@ public class DataSetDAOImpl extends AbstractHibernateDAO implements IDataSetDAO 
 			boolean isDev = fillDevCategories(devCategories);
 			if (isDev) {
 				List idsCat = createIdsCatogriesList(devCategories);
-				String owner = getUserProfile().getUserUniqueIdentifier().toString();
+				String owner = ((UserProfile) getUserProfile()).getUserId().toString();
 				Query countQuery;
 				if (idsCat == null || idsCat.size() == 0) {
 					countQuery = session.createQuery("select count(*) from SbiDataSet sb where sb.active = ? and owner = :owner");
@@ -1303,10 +1302,10 @@ public class DataSetDAOImpl extends AbstractHibernateDAO implements IDataSetDAO 
 			boolean isDev = fillDevCategories(devCategories);
 			if (isDev) {
 				List idsCat = createIdsCatogriesList(devCategories);
-				String owner = getUserProfile().getUserUniqueIdentifier().toString();
+				String owner = ((UserProfile) getUserProfile()).getUserId().toString();
 				// hsql += " and h." + columnFilter + " like '%" + valuefilter + "%'";
-				Query countQuery = session
-						.createQuery("select count(*) from SbiDataSet sb where sb.active = ? and (sb.category.valueId IN (:idsCat) or owner = :owner) and sb.label "
+				Query countQuery = session.createQuery(
+						"select count(*) from SbiDataSet sb where sb.active = ? and (sb.category.valueId IN (:idsCat) or owner = :owner) and sb.label "
 								+ " like '%" + search + "%'");
 				countQuery.setBoolean(0, true);
 				countQuery.setParameterList("idsCat", idsCat);
@@ -1766,6 +1765,11 @@ public class DataSetDAOImpl extends AbstractHibernateDAO implements IDataSetDAO 
 						DAOFactory.getSbiDsBcDAO().deleteDsBc(dsBc);
 					}
 
+					List<SbiMetaObjDs> listObjDs = DAOFactory.getSbiObjDsDAO().loadObjByDsId(intDsId);
+					for (SbiMetaObjDs objDs : listObjDs) {
+						DAOFactory.getSbiObjDsDAO().deleteObjDs(objDs);
+					}
+
 					DataSetEventManager.getInstance().notifyDelete(toReturn);
 				}
 			}
@@ -1787,8 +1791,8 @@ public class DataSetDAOImpl extends AbstractHibernateDAO implements IDataSetDAO 
 				DatasetException de = (DatasetException) t;
 				throw de;
 			} else {
-				String msg = (t.getMessage() != null) ? t.getMessage() : "An unexpected error occured while deleting dataset " + "whose id is equal to ["
-						+ datasetId + "]";
+				String msg = (t.getMessage() != null) ? t.getMessage()
+						: "An unexpected error occured while deleting dataset " + "whose id is equal to [" + datasetId + "]";
 				throw new SpagoBIDAOException(msg, t);
 			}
 		} finally {
@@ -1847,8 +1851,8 @@ public class DataSetDAOImpl extends AbstractHibernateDAO implements IDataSetDAO 
 			if (transaction != null && transaction.isActive()) {
 				transaction.rollback();
 			}
-			String msg = (t.getMessage() != null) ? t.getMessage() : "An unexpected error occured while deleting dataset " + "whose id is equal to ["
-					+ datasetId + "]";
+			String msg = (t.getMessage() != null) ? t.getMessage()
+					: "An unexpected error occured while deleting dataset " + "whose id is equal to [" + datasetId + "]";
 			throw new SpagoBIDAOException(msg, t);
 		} finally {
 			if (session != null && session.isOpen()) {
@@ -1967,8 +1971,8 @@ public class DataSetDAOImpl extends AbstractHibernateDAO implements IDataSetDAO 
 			if (transaction != null && transaction.isActive()) {
 				transaction.rollback();
 			}
-			throw new SpagoBIDAOException("An unexpected error occured while deleting dataset version" + "whose version num is equal to [" + datasetVersionNum
-					+ "]", t);
+			throw new SpagoBIDAOException(
+					"An unexpected error occured while deleting dataset version" + "whose version num is equal to [" + datasetVersionNum + "]", t);
 		} finally {
 			if (session != null && session.isOpen()) {
 				session.close();
@@ -2034,8 +2038,8 @@ public class DataSetDAOImpl extends AbstractHibernateDAO implements IDataSetDAO 
 			if (transaction != null && transaction.isActive()) {
 				transaction.rollback();
 			}
-			throw new SpagoBIDAOException("An unexpected error occured while deleting inactive versions of dataset " + "whose id is equal to [" + datasetId
-					+ "]", t);
+			throw new SpagoBIDAOException(
+					"An unexpected error occured while deleting inactive versions of dataset " + "whose id is equal to [" + datasetId + "]", t);
 		} finally {
 			if (session != null && session.isOpen()) {
 				session.close();
@@ -2293,8 +2297,8 @@ public class DataSetDAOImpl extends AbstractHibernateDAO implements IDataSetDAO 
 
 					}
 					if (metaBC == null || !metaBC.getSbiMetaModel().getName().equalsIgnoreCase(qbeDataMart) || metaBC.isDeleted()) {
-						logger.error("There isn't a business class for the entity [" + entityName + "] and the model [" + qbeDataMart
-								+ "]. Relation not inserted!");
+						logger.error(
+								"There isn't a business class for the entity [" + entityName + "] and the model [" + qbeDataMart + "]. Relation not inserted!");
 						continue;
 					}
 

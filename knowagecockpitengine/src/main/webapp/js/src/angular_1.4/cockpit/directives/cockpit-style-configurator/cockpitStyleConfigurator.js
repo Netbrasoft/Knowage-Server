@@ -50,8 +50,6 @@ angular.module('cockpitModule').directive('cockpitStyleConfigurator',function($c
                     		scope.isWidget=false;
                     	}
 
-                    	scope.borderColorOptions.disabled=!scope.ngModel.borders;
-
                     	 transclude(scope, function (clone, scope) {
                              angular.element(element[0].querySelector("md-content")).prepend(clone);
                          });
@@ -75,7 +73,6 @@ angular.module('cockpitModule').directive('cockpitStyleCustomWidgetConfigurator'
                  pre: function preLink(scope, element, attrs,ctrl, transclud) {
                  },
                  post: function postLink(scope, element, attrs,ctrl, transclud) {
-
                 	ctrl.labelWidget = scope.$parent.$eval(attrs.label);
                 	ctrl.layoutType = attrs.layout;
                 	 if(ctrl.layoutType==undefined){
@@ -111,11 +108,18 @@ function cockpitStyleConfiguratorControllerFunction($scope,sbiModule_translate,c
 		$scope.ngModel.headerHeight=0;
 		angular.copy($scope.cockpitStyle.title,$scope.ngModel.title);
 	}
+	$scope.resetBackgroundStyle=function(){
+		if($scope.cockpitStyle.backgroundColor){
+			angular.copy($scope.cockpitStyle.backgroundColor,$scope.ngModel.backgroundColor);
+		}else{
+			delete $scope.ngModel.backgroundColor;
+		}
+	}
 
 	$scope.colorPickerOptions = {
 			placeholder:$scope.translate.load('sbi.cockpit.color.select'),
 			format:'rgb',
-			disabled: ($scope.cockpitStyle && $scope.cockpitStyle.titles) ? false : true
+			disabled: ($scope.cockpitStyle && $scope.cockpitStyle.titles) || ($scope.ngModel && !$scope.ngModel.titles) ? false : true
 		}
 
 	$scope.toggleTitle = function(){
@@ -127,6 +131,12 @@ function cockpitStyleConfiguratorControllerFunction($scope,sbiModule_translate,c
 	}
 
 	$scope.borderColorOptions={format:'rgb',disabled:false};
+	
+	$scope.$watch('ngModel.borders',function(newValue,oldValue){
+		$scope.borderColorOptions.disabled = !newValue;
+	})
+	
+	
 
 	$scope.toggleBorderVisibility=function(){
 		$scope.borderColorOptions.disabled=!$scope.ngModel.borders

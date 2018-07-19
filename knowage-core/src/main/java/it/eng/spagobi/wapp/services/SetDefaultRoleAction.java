@@ -17,6 +17,13 @@
  */
 package it.eng.spagobi.wapp.services;
 
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collection;
+
+import org.apache.log4j.LogMF;
+import org.apache.log4j.Logger;
+
 import it.eng.spago.security.IEngUserProfile;
 import it.eng.spagobi.commons.bo.UserProfile;
 import it.eng.spagobi.commons.services.AbstractSpagoBIAction;
@@ -26,13 +33,6 @@ import it.eng.spagobi.services.security.bo.SpagoBIUserProfile;
 import it.eng.spagobi.utilities.engines.SpagoBIEngineServiceException;
 import it.eng.spagobi.utilities.exceptions.SpagoBIServiceException;
 import it.eng.spagobi.utilities.service.JSONAcknowledge;
-
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collection;
-
-import org.apache.log4j.LogMF;
-import org.apache.log4j.Logger;
 
 public class SetDefaultRoleAction extends AbstractSpagoBIAction {
 
@@ -94,7 +94,7 @@ public class SetDefaultRoleAction extends AbstractSpagoBIAction {
 				// there is a default role selected so filter only its functionalities
 				logger.debug("Selected role is not null, put right functionality");
 				Collection functionalities = this.getFunctionalitiesForDefaultRole(profile, defaultRole);
-				LogMF.error(logger, "User functionalities considering default role [{0}]: {1}", new String[] { defaultRole, functionalities.toString() });
+				LogMF.debug(logger, "User functionalities considering default role [{0}]: {1}", new String[] { defaultRole, functionalities.toString() });
 				((UserProfile) profile).setFunctionalities(functionalities);
 				logger.debug("set functionalities for default role");
 			}
@@ -131,7 +131,7 @@ public class SetDefaultRoleAction extends AbstractSpagoBIAction {
 			throw ex;
 		} finally {
 			if (toReturn != null) {
-				LogMF.error(logger, "Returning: {0}", new String[] { toReturn.toString() });
+				LogMF.debug(logger, "Returning: {0}", new String[] { toReturn.toString() });
 			}
 		}
 		return toReturn;

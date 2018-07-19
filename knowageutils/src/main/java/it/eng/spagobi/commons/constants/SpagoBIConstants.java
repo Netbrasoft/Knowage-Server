@@ -39,6 +39,7 @@ public class SpagoBIConstants {
 	public static final String SBI_LANGUAGE = "SBI_LANGUAGE";
 	public static final String SBI_COUNTRY = "SBI_COUNTRY";
 	public static final String EXECUTE_DOCUMENT_ACTION = "EXECUTE_DOCUMENT_ACTION";
+	public static final String SBI_ENVIRONMENT = "SBI_ENVIRONMENT";
 
 	public static final String EXECUTION_MODALITY = "EXECUTION_MODALITY";
 	public static final String TEST_MODALITY = "TEST_MODALITY";
@@ -400,6 +401,7 @@ public class SpagoBIConstants {
 	public static final String SEE_SUBOBJECTS_FUNCTIONALITY = "SeeSubobjectsFunctionality";
 	public static final String SEE_VIEWPOINTS_FUNCTIONALITY = "SeeViewpointsFunctionality";
 	public static final String SEE_SNAPSHOTS_FUNCTIONALITY = "SeeSnapshotsFunctionality";
+	public static final String RUN_SNAPSHOTS_FUNCTIONALITY = "RunSnapshotsFunctionality";
 	public static final String SEE_NOTES_FUNCTIONALITY = "SeeNotesFunctionality";
 	public static final String SEND_MAIL_FUNCTIONALITY = "SendMailFunctionality";
 	public static final String SAVE_INTO_FOLDER_FUNCTIONALITY = "SaveIntoFolderFunctionality";
@@ -429,13 +431,13 @@ public class SpagoBIConstants {
 	public static final String TIMESPAN = "Timespan";
 	public static final String CREATE_DATASETS_AS_FINAL_USER = "CreateDatasetsAsFinalUser";
 	public static final String USER_SAVE_DOCUMENT_FUNCTIONALITY = "UserSaveDocumentFunctionality";
+	public static final String FINAL_USER_INTERNATIONALIZATION = "FinalUserInternationalization";
 
 	public static final String DOCUMENT_MOVE_DOWN_STATE = "DocumentMoveDownState";
 	public static final String DOCUMENT_MOVE_UP_STATE = "DocumentMoveUpState";
 	// for management of DOCUMENT COMPOSITION
 	public static final String DOCUMENT_COMPOSITION = "DOCUMENT_COMPOSITION";
 	public static final String DOCUMENT_COMPOSITE_TYPE = "DOCUMENT_COMPOSITE";
-	public static final String PASS_TICKET = "PASS_TICKET";
 	// to modify refresh time
 	public static final String MODIFY_REFRESH = "ModifyRefresh";
 
@@ -533,6 +535,7 @@ public class SpagoBIConstants {
 
 	public static final String DOMAIN_WRITE = "DomainWrite";
 	public static final String DOMAIN_MANAGEMENT = "DomainManagement";
+	public static final String EXPORTERS_CATALOGUE = "ExportersCatalogue";
 	public static final String CONFIG_MANAGEMENT = "ConfigManagement";
 	public static final String USER_DATA_PROPERTIES_MANAGEMENT = "UserDefinedPropertyManagement";
 	public static final String TEMPLATE_MANAGEMENT = "TemplateManagement";

@@ -1,5 +1,6 @@
 
 
+<%@page import="it.eng.spagobi.tenant.TenantManager"%>
 <%@page import="it.eng.spagobi.commons.SingletonConfig"%>
 <%@page import="it.eng.spagobi.commons.constants.SpagoBIConstants"%>
 <script>
@@ -44,6 +45,7 @@ sbiM.factory('sbiModule_config',function(){
         sessionParametersStateKey: '<%= SpagoBIConstants.SESSION_PARAMETER_STATE_OBJECT_KEY %>',
         isStatePersistenceEnabled: <%= SingletonConfig.getInstance().getConfigValue("SPAGOBI.SESSION_PARAMETERS_MANAGER.enabled")  %>,
         layerFileMaxSize: '<%= GeneralUtilities.getGisLayerFileMaxSize() %>',
+        workspaceShowGrid: '<%= SingletonConfig.getInstance().getConfigValue("KNOWAGE.WORKSPACE_SHOW_GRID") %>',
                 
         
 		<%-- <%if(parametersStatePersistenceEnabled != null) {%> --%>
@@ -162,6 +164,7 @@ sbiM.factory('sbiModule_user',function(){
 	user.isSuperAdmin = '<%= userProfile != null && ((UserProfile)userProfile).getIsSuperadmin() %>';
 	user.isTechnicalUser = '<%= userProfile != null && UserUtilities.isTechnicalUser((UserProfile)userProfile)%>'
 	user.defaultRole = '<%= defaultRole != null ? StringEscapeUtils.escapeJavaScript(defaultRole)  : ""%>';
+	user.tenant = '<%= ((UserProfile)userProfile).getOrganization() != null ? ((UserProfile)userProfile).getOrganization() : TenantManager.getTenant().getName() %>';
 	// 	set roles
 	user.roles =[];
 	<% for(Object rol : userRoles) { 	%>
@@ -242,13 +245,31 @@ sbiM.service('sbiModule_logger',function(){
 	
 });
 
-sbiM.service('sbiModule_messaging',function(toastr,sbiModule_restServices,$mdToast){
+sbiM.service('kn_regex',function(){
+	this.extendedAlphanumeric = /^([\pL\w\s\-\_\(\)\[\]\;\:\!\?\,\.\'\"\x2F\x5F%])*$/;
+	this.xss = /^((?!<A|<LINK|<IMG|<SCRIPT|&LT;A|&LT;LINK|&LT;IMG|&LT;SCRIPT|{{).)*$/i;
+	this.alphanumeric = /^([a-zA-Z0-9\s\-\_])*$/;
+});
+
+sbiM.service('sbiModule_messaging',function(toastr,sbiModule_restServices,sbiModule_translate,$mdToast,$mdDialog){
 	
 	this.showErrorMessage = function(msg,title){
 // 		toastr.error(msg,title, {
 // 			  closeButton: true
 // 		});
 		sbiModule_restServices.errorHandler(msg,title);
+	};
+	
+	this.showAlertMessage = function(title,msg){
+		$mdDialog.show(
+			      $mdDialog.alert()
+			        .parent(angular.element(document.querySelector('body')))
+			        .clickOutsideToClose(true)
+			        .title(title)
+			        .htmlContent(msg)
+			        .ariaLabel('Alert Dialog')
+			        .ok(sbiModule_translate.load('sbi.general.hide'))
+			    );
 	};
 	
 	
@@ -260,7 +281,7 @@ sbiM.service('sbiModule_messaging',function(toastr,sbiModule_restServices,$mdToa
 
 		var timeout = 3000;
 
-		if (hideTimeout && typeof hideTimeout == "number") {
+		if (hideTimeout != undefined && typeof hideTimeout == "number") {
 			timeout = hideTimeout;
 		}
 
@@ -282,7 +303,7 @@ sbiM.service('sbiModule_messaging',function(toastr,sbiModule_restServices,$mdToa
 
 		var timeout = 3000;
 
-		if (hideTimeout && typeof hideTimeout == "number") {
+		if (hideTimeout != undefined && typeof hideTimeout == "number") {
 			timeout = hideTimeout;
 		}
 
@@ -306,7 +327,7 @@ sbiM.service('sbiModule_messaging',function(toastr,sbiModule_restServices,$mdToa
 		
 		var timeout = 3000;
 
-		if (hideTimeout && typeof hideTimeout == "number") {
+		if (hideTimeout != undefined && typeof hideTimeout == "number") {
 			timeout = hideTimeout;
 		}
 
@@ -352,7 +373,10 @@ sbiM.service('sbiModule_translate', function() {
 	
 });
 
-sbiM.service('sbiModule_restServices', function($http, $q, sbiModule_translate, sbiModule_config, sbiModule_logger, $mdDialog, $sanitize,$mdPanel) {
+
+
+
+sbiM.service('sbiModule_restServices', function($http, $q, sbiModule_translate, sbiModule_config, sbiModule_logger, $mdDialog, $sanitize,$mdPanel, sbiModule_user) {
 	
 	var loginUrl = '<%= GeneralUtilities.getSpagoBiContext() %>'; // login url, used when session is expired
 	
@@ -362,8 +386,15 @@ sbiM.service('sbiModule_restServices', function($http, $q, sbiModule_translate, 
 		alteredContextPath=cpat;
 	}
 
-	function getBaseUrl(endP_path) {
-		var burl= alteredContextPath==null? sbiModule_config.contextName +'/restful-services/'+ endP_path+"/"  : alteredContextPath+ "/restful-services/" + endP_path+"/" 
+	this.getBaseUrl = function(endP_path) {
+
+		var burl;
+		if(sbiModule_user.userId == ('public-'+sbiModule_user.tenant)){
+			burl= alteredContextPath==null? sbiModule_config.contextName +'/public/restful-services/'+ endP_path+"/"  : alteredContextPath+ "/public/restful-services/" + endP_path+"/";
+		}
+		else{
+			burl= alteredContextPath==null? sbiModule_config.contextName +'/restful-services/'+ endP_path+"/"  : alteredContextPath+ "/restful-services/" + endP_path+"/"; 
+		} 
 		alteredContextPath=null;
 		return burl ;
 	};
@@ -377,29 +408,29 @@ sbiM.service('sbiModule_restServices', function($http, $q, sbiModule_translate, 
 							.replace(/%3D/g,"=")
 							.replace(/%26/g,"&");
 		sbiModule_logger.trace("GET: " +endP_path+"/"+ req_Path + "" + item, conf);
-		return $http.get(getBaseUrl(endP_path) + "" + req_Path + "" + item, conf);
+		return $http.get(this.getBaseUrl(endP_path) + "" + req_Path + "" + item, conf);
 	};
 
 	this.remove = function(endP_path, req_Path, item, conf) {
 		item == undefined ? item = "" : item = "?" + item;
 		sbiModule_logger.trace("REMOVE: "+endP_path+"/"+req_Path + "" + item,conf);
-		return $http.post(getBaseUrl(endP_path) + "" + req_Path + "" + item, conf);
+		return $http.post(this.getBaseUrl(endP_path) + "" + req_Path + "" + item, conf);
 	};
 
 	this.post = function(endP_path, req_Path, item, conf) {
 		sbiModule_logger.trace("POST: "+endP_path+"/"+ req_Path,item,conf);
-		return $http.post(getBaseUrl(endP_path) + "" + req_Path, item, conf);
+		return $http.post(this.getBaseUrl(endP_path) + "" + req_Path, item, conf);
 	};
 	
 	this.put = function(endP_path, req_Path, item, conf) {
 		sbiModule_logger.trace("PUT: "+endP_path+"/"+req_Path,item,conf);
-		return $http.put(getBaseUrl(endP_path) + "" + req_Path, item, conf);
+		return $http.put(this.getBaseUrl(endP_path) + "" + req_Path, item, conf);
 	};
 	
 	this.delete = function(endP_path, req_Path, item, conf) {
 		(item == undefined || item==null) ? item = "" : item = "?" + encodeURIComponent(item).replace(/'/g,"%27").replace(/"/g,"%22").replace(/%3D/g,"=").replace(/%26/g,"&");
 		sbiModule_logger.trace("PUT:" +endP_path+"/"+req_Path+ "" + item,conf);
-		return $http.delete(getBaseUrl(endP_path) + "" + req_Path, conf);
+		return $http.delete(this.getBaseUrl(endP_path) + "" + req_Path, conf);
 	};
 
 
@@ -483,7 +514,7 @@ sbiM.service('sbiModule_restServices', function($http, $q, sbiModule_translate, 
 		
 		deferred.notify('About to call async function');
 
-		$http.get(getBaseUrl(endP_path) + "" + req_Path + "" + item, conf)
+		$http.get(this.getBaseUrl(endP_path) + "" + req_Path + "" + item, conf)
 			.then(
 					function successCallback(data, status, headers, config) {
 						handleResponse(data, status, headers, config, deferred);
@@ -503,7 +534,7 @@ sbiM.service('sbiModule_restServices', function($http, $q, sbiModule_translate, 
 		
 		deferred.notify('About to call async function');
 
-		$http.post(getBaseUrl(endP_path) + "" + req_Path , item, conf)
+		$http.post(this.getBaseUrl(endP_path) + "" + req_Path , item, conf)
 			.then(
 					function successCallback(data, status, headers, config) {
 						handleResponse(data, status, headers, config, deferred);
@@ -523,7 +554,7 @@ sbiM.service('sbiModule_restServices', function($http, $q, sbiModule_translate, 
 		
 		deferred.notify('About to call async function');
 
-		$http.put(getBaseUrl(endP_path) + "" + req_Path , item, conf)
+		$http.put(this.getBaseUrl(endP_path) + "" + req_Path , item, conf)
 			.then(
 					function successCallback(data, status, headers, config) {
 						handleResponse(data, status, headers, config, deferred);
@@ -544,7 +575,7 @@ sbiM.service('sbiModule_restServices', function($http, $q, sbiModule_translate, 
 		deferred.notify('About to call async function');
 		(item == undefined || item==null) ? item = "" : item = "?" + encodeURIComponent(item).replace(/'/g,"%27").replace(/"/g,"%22").replace(/%3D/g,"=").replace(/%26/g,"&");
 		
-		$http.delete(getBaseUrl(endP_path) + "" + req_Path+""+item, conf)
+		$http.delete(this.getBaseUrl(endP_path) + "" + req_Path+""+item, conf)
 			.then(
 					function successCallback(data, status, headers, config) {
 						handleResponse(data, status, headers, config, deferred);
@@ -618,6 +649,46 @@ sbiM.service('sbiModule_restServices', function($http, $q, sbiModule_translate, 
 		
 	};
 });
+
+
+sbiM.service('sbiModule_i18n', function(sbiModule_config, sbiModule_restServices, $q) {
+	
+	var self = this;
+	self.i18nMap;
+
+    return {
+        
+    	loadI18nMap : function(){
+    		 return $q(function(resolve, reject) {
+    		if(self.i18nMap){
+    			resolve(self.i18nMap);
+			}else{
+    		
+    		sbiModule_restServices.promiseGet("2.0/i18nMessages","?currCountry="+sbiModule_config.curr_country+"&currLanguage="+sbiModule_config.curr_language).then(
+    				function(response){
+    					self.i18nMap = response.data;
+    					resolve(self.i18nMap);
+    			},function(response){
+    				alert("Error: "+response.data.errors[0].message);
+    			});
+			}
+    	});
+    	},
+
+        getI18n : function (label) { // return translation of a label if present, otherwise return the label
+    		if(self.i18nMap && label.startsWith('i18n_') && self.i18nMap[label] != undefined){
+    			return self.i18nMap[label];
+    		}
+    		else return label; 
+        },
+    	printMsg : function(){
+    		alert('test message');
+    	}
+      };
+		
+});
+
+
 
 sbiM.factory('sbiModule_device',function($window){
 	var deviceObj = {};
@@ -767,5 +838,5 @@ sbiM.service('sbiModule_helpOnLine', function(sbiModule_config,$mdDialog,sbiModu
 
 
 <!-- sbiModule_dateServices -->
-<script type="text/javascript" src="${pageContext.request.contextPath}/js/src/angular_1.4/tools/commons/sbiModule_services/sbiModule_dateServices.js"></script>
-	 
+<script type="text/javascript" src="<%=urlBuilder.getResourceLink(request, "js/src/angular_1.4/tools/commons/sbiModule_services/sbiModule_dateServices.js")%>"></script>
+	 <script type="text/javascript" src="<%=urlBuilder.getResourceLink(request,"/js/lib/angular-localization/" + curr_language + "-" + curr_country + ".js")%>"></script>

@@ -25,6 +25,8 @@ import java.sql.Timestamp;
 import java.util.Map;
 
 import org.apache.log4j.Logger;
+import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
 
 /**
  * @author Francesco Lucchi (francesco.lucchi@eng.it)
@@ -79,27 +81,30 @@ public class PersistedTableHelper {
 				if (!(fieldValue instanceof String)) {
 					logger.debug("An unexpected error occured while extimating field [" + fieldMetaName + "] memory size whose type is equal to ["
 							+ fieldMetaTypeName + "]. Field forced to String");
-					Object nonStringValue = fieldValue;
-					if (nonStringValue != null) {
-						insertStatement.setString(fieldIndex + 1, nonStringValue.toString());
-					} else {
-						insertStatement.setString(fieldIndex + 1, "");
-					}
+					insertStatement.setString(fieldIndex + 1, fieldValue.toString());
 				} else {
 					insertStatement.setString(fieldIndex + 1, (String) fieldValue);
 				}
 			} else if (fieldMetaTypeName.contains("Date")) {
-				insertStatement.setDate(fieldIndex + 1, (Date) fieldValue);
-			} else if (fieldMetaTypeName.toLowerCase().contains("timestamp")) {
-				if (fieldValue.getClass().toString().contains("oracle.sql.TIMESTAMP")) {
-					insertStatement.setTimestamp(fieldIndex + 1, ((oracle.sql.TIMESTAMP) fieldValue).timestampValue());
+				if (fieldValue instanceof java.sql.Date) {
+					insertStatement.setDate(fieldIndex + 1, (Date) fieldValue);
 				} else {
-					insertStatement.setTimestamp(fieldIndex + 1, (Timestamp) fieldValue);
+					java.util.Date date = (java.util.Date) fieldValue;
+					// JDK 8 version
+					/*
+					 * Instant instant = date.toInstant(); ZonedDateTime zdt = ZonedDateTime.ofInstant(instant, ZoneId.systemDefault()); LocalDate localDate =
+					 * zdt.toLocalDate();
+					 */
+					DateTime dateTime = new DateTime(date, DateTimeZone.getDefault());
+					java.sql.Date sqlDate = new java.sql.Date(dateTime.getMillis());
+					insertStatement.setDate(fieldIndex + 1, sqlDate);
 				}
+			} else if (fieldMetaTypeName.toLowerCase().contains("timestamp")) {
+				insertStatement.setTimestamp(fieldIndex + 1, Timestamp.valueOf(fieldValue.toString()));
 			} else if (fieldMetaTypeName.contains("Time")) {
 				insertStatement.setTime(fieldIndex + 1, (Time) fieldValue);
 			} else if (fieldMetaTypeName.contains("Byte")) {
-				if (fieldValue == null) {
+				if (fieldValue == null || fieldValue.toString().isEmpty()) {
 					insertStatement.setNull(fieldIndex + 1, java.sql.Types.INTEGER);
 				} else {
 					// insertStatement.setByte(fieldIndex + 1, (Byte) fieldValue);
@@ -107,7 +112,7 @@ public class PersistedTableHelper {
 				}
 			} else if (fieldMetaTypeName.contains("Short")) {
 				// only for primitive type is necessary to use setNull method if value is null
-				if (fieldValue == null) {
+				if (fieldValue == null || fieldValue.toString().isEmpty()) {
 					insertStatement.setNull(fieldIndex + 1, java.sql.Types.INTEGER);
 				} else {
 					if (fieldValue instanceof Integer) {
@@ -118,43 +123,61 @@ public class PersistedTableHelper {
 						logger.debug("Cannot setting the column " + fieldMetaName + " with type " + fieldMetaTypeName);
 					}
 				}
+			} else if (fieldMetaTypeName.contains("BigInteger")) {
+				// only for primitive type is necessary to use setNull method if value is null
+				if (fieldValue == null || fieldValue.toString().isEmpty()) {
+					insertStatement.setNull(fieldIndex + 1, java.sql.Types.BIGINT);
+				} else {
+					insertStatement.setLong(fieldIndex + 1, Long.valueOf(fieldValue.toString()));
+				}
 			} else if (fieldMetaTypeName.contains("Integer")) {
 				// only for primitive type is necessary to use setNull method if value is null
-				if (fieldValue == null) {
+				if (fieldValue == null || fieldValue.toString().isEmpty()) {
 					insertStatement.setNull(fieldIndex + 1, java.sql.Types.INTEGER);
 				} else {
 					insertStatement.setInt(fieldIndex + 1, (Integer) fieldValue);
 				}
 			} else if (fieldMetaTypeName.contains("Double")) {
 				// only for primitive type is necessary to use setNull method if value is null
-				if (fieldValue == null) {
+				if (fieldValue == null || fieldValue.toString().isEmpty()) {
 					insertStatement.setNull(fieldIndex + 1, java.sql.Types.DOUBLE);
 				} else {
-					insertStatement.setDouble(fieldIndex + 1, (Double) fieldValue);
+
+					try {
+						insertStatement.setDouble(fieldIndex + 1, (Double) fieldValue);
+					} catch (ClassCastException e) {
+						logger.debug("the type of field [" + fieldValue + "] is not a double, I'm going to transform it in double ");
+						;
+						insertStatement.setDouble(fieldIndex + 1, new Double(fieldValue + ""));
+					}
 				}
 			} else if (fieldMetaTypeName.contains("Float")) {
 				// only for primitive type is necessary to use setNull method if value is null
-				if (fieldValue == null) {
+				if (fieldValue == null || fieldValue.toString().isEmpty()) {
 					insertStatement.setNull(fieldIndex + 1, java.sql.Types.FLOAT);
 				} else {
 					insertStatement.setDouble(fieldIndex + 1, (Float) fieldValue);
 				}
 			} else if (fieldMetaTypeName.contains("Long")) {
 				// only for primitive type is necessary to use setNull method if value is null
-				if (fieldValue == null) {
+				if (fieldValue == null || fieldValue.toString().isEmpty()) {
 					insertStatement.setNull(fieldIndex + 1, java.sql.Types.BIGINT);
 				} else {
 					insertStatement.setLong(fieldIndex + 1, (Long) fieldValue);
 				}
 			} else if (fieldMetaTypeName.contains("Boolean")) {
 				// only for primitive type is necessary to use setNull method if value is null
-				if (fieldValue == null) {
+				if (fieldValue == null || fieldValue.toString().isEmpty()) {
 					insertStatement.setNull(fieldIndex + 1, java.sql.Types.BOOLEAN);
 				} else {
 					insertStatement.setBoolean(fieldIndex + 1, (Boolean) fieldValue);
 				}
 			} else if (fieldMetaTypeName.contains("BigDecimal")) {
-				insertStatement.setBigDecimal(fieldIndex + 1, (BigDecimal) fieldValue);
+				if (fieldValue == null || fieldValue.toString().isEmpty()) {
+					insertStatement.setNull(fieldIndex + 1, java.sql.Types.DECIMAL);
+				} else {
+					insertStatement.setBigDecimal(fieldIndex + 1, (BigDecimal) fieldValue);
+				}
 			} else if (fieldMetaTypeName.contains("[B")) { // BLOB
 				insertStatement.setBytes(fieldIndex + 1, (byte[]) fieldValue);
 			} else if (fieldMetaTypeName.contains("BLOB")) {
@@ -183,8 +206,12 @@ public class PersistedTableHelper {
 				} else {
 					logger.debug("Cannot setting the column " + fieldMetaName + " with type " + fieldMetaTypeName);
 				}
+			} else if (fieldMetaTypeName.contains("JSONArray") || fieldMetaTypeName.contains("JSONObject") || fieldMetaTypeName.contains("Map")
+					|| fieldMetaTypeName.contains("List")) { // JSONObject and JSONArray
+				insertStatement.setString(fieldIndex + 1, fieldValue.toString());
 			} else {
-				logger.debug("Cannot setting the column " + fieldMetaName + " with type " + fieldMetaTypeName);
+				logger.error("Cannot setting the column " + fieldMetaName + " with type " + fieldMetaTypeName);
+				insertStatement.setObject(fieldIndex + 1, fieldValue.toString());
 			}
 		} catch (Throwable t) {
 			logger.error("FieldValue [" + fieldValue + "] has class name [" + fieldValue.getClass().getName() + "]");

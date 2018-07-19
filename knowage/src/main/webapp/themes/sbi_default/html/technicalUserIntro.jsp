@@ -18,6 +18,8 @@
 <%@page import="org.apache.commons.lang.StringEscapeUtils"%>
 <%@page import="java.util.Enumeration"%>
 
+<%@ include file="/WEB-INF/jsp/commons/angular/angularResource.jspf"%>
+
 <html>
 <head>
 <style>
@@ -55,7 +57,8 @@ img {
 }
 
 </style> 
-<link id="spagobi-angular" rel="styleSheet"	href="${pageContext.request.contextPath}/themes/commons/css/customStyle.css" type="text/css" /> 
+<link id="spagobi-angular" rel="styleSheet"	href="<%=urlBuilder.getResourceLink(request, "themes/commons/css/customStyle.css")%>" type="text/css" /> 
+ 
 </head>
 <body class="landingPageAdmin">
   

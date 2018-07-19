@@ -1,7 +1,7 @@
 /*
  * Knowage, Open Source Business Intelligence suite
  * Copyright (C) 2016 Engineering Ingegneria Informatica S.p.A.
- * 
+ *
  * Knowage is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -11,11 +11,22 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU Affero General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 package it.eng.qbe.query.serializer.json;
+
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+
+import org.apache.log4j.Logger;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import it.eng.qbe.datasource.IDataSource;
 import it.eng.qbe.model.properties.IModelProperties;
@@ -35,19 +46,9 @@ import it.eng.qbe.statement.AbstractStatement;
 import it.eng.qbe.statement.StatementTockenizer;
 import it.eng.qbe.statement.graph.GraphUtilities;
 import it.eng.spagobi.commons.utilities.StringUtilities;
+import it.eng.spagobi.tools.dataset.utils.DataSetUtilities;
 import it.eng.spagobi.utilities.assertion.Assert;
 import it.eng.spagobi.utilities.json.JSONUtils;
-
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-
-import org.apache.log4j.Logger;
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
 
 /**
  * @author Andrea Gioia (andrea.gioia@eng.it)
@@ -299,11 +300,14 @@ public class QueryJSONSerializer implements IQuerySerializer {
 						fieldJSON.put(QuerySerializationConstants.FIELD_TYPE, ISelectField.IN_LINE_CALCULATED_FIELD);
 
 						JSONObject fieldCalculationDescriptor = new JSONObject();
+						fieldCalculationDescriptor.put(QuerySerializationConstants.FIELD_NAME, calculatedSelectField.getName());
 						fieldCalculationDescriptor.put(QuerySerializationConstants.FIELD_ALIAS, calculatedSelectField.getAlias());
 						fieldCalculationDescriptor.put(QuerySerializationConstants.FIELD_TYPE, calculatedSelectField.getType());
 						fieldCalculationDescriptor.put(QuerySerializationConstants.FIELD_EXPRESSION, calculatedSelectField.getExpression());
 						fieldJSON.put(QuerySerializationConstants.FIELD_ID, fieldCalculationDescriptor);
 						fieldJSON.put(QuerySerializationConstants.FIELD_LONG_DESCRIPTION, calculatedSelectField.getExpression());
+						fieldJSON.put(QuerySerializationConstants.FIELD_ENTITY, calculatedSelectField.getEntity());
+						fieldJSON.put(QuerySerializationConstants.FIELD_EDITABLE, calculatedSelectField.isEditable());
 
 						if (calculatedSelectField.isGroupByField()) {
 							fieldJSON.put(QuerySerializationConstants.FIELD_GROUP, "true");
@@ -355,21 +359,33 @@ public class QueryJSONSerializer implements IQuerySerializer {
 	 * @return the nature of the calculated field
 	 */
 	public static String getInLinecalculatedFieldNature(String expr, Map<String, String> datamartFields) {
-
+		logger.debug("IN");
 		StatementTockenizer stk = new StatementTockenizer(expr);
 		while (stk.hasMoreTokens()) {
 			String alias = stk.nextTokenInStatement().trim();
+			logger.debug("alias: " + alias);
+
 			// alias can contain "DISTINCT" HQL/SQL key: we have to remove it
 			if (alias.toUpperCase().startsWith("DISTINCT ")) {
 				alias = alias.substring("DISTINCT ".length());
 			}
+
+			// if alias has entity informaton clean it
+			alias = DataSetUtilities.getColumnNameWithoutQbePrefix(alias);
+			if (alias.indexOf(".") != -1) {
+				int ind = alias.indexOf(".");
+				alias = alias.substring(ind + 1);
+			}
+			logger.debug("alias: " + alias);
+
 			if (datamartFields.get(alias) == null)
 				continue;
-			if ((!(datamartFields.get(alias)).equals(QuerySerializationConstants.FIELD_NATURE_MEASURE) && !(datamartFields.get(alias))
-					.equals(QuerySerializationConstants.FIELD_NATURE_MANDATORY_MEASURE))) {
+			if ((!(datamartFields.get(alias)).equals(QuerySerializationConstants.FIELD_NATURE_MEASURE)
+					&& !(datamartFields.get(alias)).equals(QuerySerializationConstants.FIELD_NATURE_MANDATORY_MEASURE))) {
 				return QuerySerializationConstants.FIELD_NATURE_ATTRIBUTE;
 			}
 		}
+		logger.debug("OUT");
 		return QuerySerializationConstants.FIELD_NATURE_MEASURE;
 	}
 
@@ -433,7 +449,7 @@ public class QueryJSONSerializer implements IQuerySerializer {
 	}
 
 	/*
-	 * 
+	 *
 	 * Iterator it = query.getSelectFields().iterator(); while( it.hasNext() ) { SelectField selectField = (SelectField)it.next(); DataMartField datamartField =
 	 * getDatamartModel().getDataMartModelStructure().getField(selectField.getUniqueName()); String label; label = datamartLabels.getLabel(datamartField); label
 	 * = StringUtilities.isEmpty(label)? datamartField.getName(): label; }

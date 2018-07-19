@@ -48,6 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 			$mdPanel,
 			$q,
 			$filter,
+			sbiModule_user,
 			sbiModule_translate,
 			sbiModule_restServices,
 			cockpitModule_datasetServices,
@@ -66,6 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 		$scope.widgetIsInit=false;
 		$scope.totalCount = 0;
 		$scope.translate = sbiModule_translate;
+		$scope.user = sbiModule_user;
 		$scope.datasetRecords = {};
 
 		var scope = $scope;
@@ -73,14 +75,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 		$scope.realTimeSelections = cockpitModule_widgetServices.realtimeSelections;
 		//set a watcher on a variable that can contains the associative selections for realtime dataset
 		var realtimeSelectionsWatcher = $scope.$watchCollection('realTimeSelections',function(newValue,oldValue,scope){
-			var dataset = cockpitModule_datasetServices.getDatasetById(scope.ngModel.dataset.dsId);
-			if(cockpitModule_properties.DS_IN_CACHE.indexOf(dataset.label)==-1 ){
-                cockpitModule_properties.DS_IN_CACHE.push(dataset.label);
-            }
-			if(newValue != oldValue && newValue.length > 0){
-				scope.itemList = scope.filterDataset(scope.itemList,scope.reformatSelections(newValue));
-			}else{
-				angular.copy(scope.savedRows, scope.itemList);
+			if(scope.ngModel && scope.ngModel.dataset && scope.ngModel.dataset.dsId){
+				var dataset = cockpitModule_datasetServices.getDatasetById(scope.ngModel.dataset.dsId);
+				if(dataset.isRealtime && dataset.useCache){
+					if(cockpitModule_properties.DS_IN_CACHE.indexOf(dataset.label)==-1 ){
+		                cockpitModule_properties.DS_IN_CACHE.push(dataset.label);
+		            }
+					if(newValue != oldValue && newValue.length > 0){
+						scope.itemList = scope.filterDataset(scope.itemList,scope.reformatSelections(newValue));
+					}else{
+						angular.copy(scope.savedRows, scope.itemList);
+					}
+				}
 			}
 		});
 
@@ -232,6 +238,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 		$scope.retroCompatibilityCheckToVersion1();
 
 		$scope.selectRow=function(row,column,evt){
+			cockpitModule_widgetSelection.setWidgetOfType("table");
 			var newValue = undefined;
 
 			for(var i=0;i<$scope.ngModel.content.columnSelectedOfDataset.length;i++){
@@ -407,8 +414,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 			$scope.columnToshowinIndex = [];
 			$scope.tableFunction.widgetStyle = $scope.ngModel.style;
 			$scope.datasetRecords = datasetRecords;
+			if($scope.columnWatcher){$scope.columnWatcher};
 
-
+			$scope.columnWatcher = $scope.$watchCollection('ngModel.content.columnSelectedOfDataset',function(newValue,oldValue){
+				$scope.getColumns(newValue);
+			})
 			var calculateScaleValue=function(minVal, maxVal, val)
 			{
 				if(maxVal!=minVal)
@@ -449,7 +459,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 					var aliasToShow = columnObject.aliasToShow;
 					filters[aliasToShow] = {
 						"type":columnObject.fieldType,
-						"values":$scope.ngModel.filters[f].filterVals
+						"values":$scope.ngModel.filters[f].filterVals,
+						"operator":$scope.ngModel.filters[f].filterOperator
 					};
 				}
 			}
@@ -464,7 +475,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 				for(var d = dataset.length - 1; d >= 0; d--){
 					//if the column is an attribute check in filter
 					if (filters[f].type == 'ATTRIBUTE'){
-						if (filters[f].values.indexOf(dataset[d][f])==-1){
+						var value = dataset[d][f];
+						if(typeof value == "number"){
+							value = String(value);
+						}
+						if (filters[f].values.indexOf(value)==-1){
 							dataset.splice(d,1);
 						}
 					//if the column is a measure cast it to number and check in filter
@@ -473,7 +488,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 						var filterValue = filters[f].values.map(function (x) {
 						    return Number(x);
 						});
-						if (filterValue.indexOf(columnValue)==-1){
+						//check operator
+						var operator = String(filters[f].operator);
+						if (operator == "="){
+							operator = "==";
+						}
+						var leftOperand = String(columnValue);
+						var rightOperand = String(filterValue[0]);
+						var expression =  leftOperand + operator + rightOperand;
+
+
+						//if (filterValue.indexOf(columnValue)==-1){
+						if (eval(expression) == false){
 							dataset.splice(d,1);
 						}
 					}
@@ -611,7 +637,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 		}
 
 		$scope.init=function(element,width,height){
-			$scope.refreshWidget();
+			$scope.refreshWidget(null, 'init');
 			$timeout(function(){
 				$scope.widgetIsInit=true;
 			},500);
@@ -627,7 +653,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 						columns[k].text = {"enabled":true};
 					}
 				}else if(columns[k].visType == "Chart") {
-					if(!columns[k].barchart.enabled) columns[k].barchart.enabled=true;
+					if(!columns[k].barchart || !columns[k].barchart.enabled) columns[k].barchart = {'enabled':true};
 					columns[k].barchart.maxValue = columns[k].barchart.maxValue ? columns[k].barchart.maxValue : 100;
 					delete columns[k].text;
 				}else if(columns[k].visType == "Text & Chart") {
@@ -638,9 +664,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 			}
 		}
 
-		$scope.$watchCollection('ngModel.content.columnSelectedOfDataset',function(newValue,oldValue){
-			$scope.getColumns(newValue);
-		})
+		
 
 		$scope.getOptions =function(){
 			var obj = {};
@@ -742,7 +766,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 		});
 	};
 
-	function tableWidgetEditControllerFunction($scope,finishEdit,sbiModule_translate,$mdDialog,originalModel,mdPanelRef,getMetadata,scopeFather,$mdToast){
+	function tableWidgetEditControllerFunction($scope,finishEdit,sbiModule_translate,$mdDialog,originalModel,mdPanelRef,getMetadata,scopeFather,$mdToast, sbiModule_user){
 		$scope.translate=sbiModule_translate;
 
 		$scope.fontFamily = ["Inherit","Roboto","Arial","Times New Roman","Tahoma","Verdana","Impact","Calibri","Cambria","Georgia","Gungsuh"],
@@ -753,9 +777,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 		$scope.getMetadata = getMetadata;
 
+		$scope.user = sbiModule_user;
+
 		$scope.model = {};
 		angular.copy(originalModel,$scope.model);
-
+		
+		$scope.toggleTh = function(){
+			$scope.colorPickerPropertyTh.disabled = $scope.model.style.th.enabled;
+		}
+		
+		$scope.colorPickerPropertyTh = {format:'rgb', placeholder:sbiModule_translate.load('sbi.cockpit.color.select'), disabled:($scope.model.style.th && $scope.model.style.th.enabled === false)}
+		
 		$scope.colorPickerProperty={format:'rgb', placeholder:sbiModule_translate.load('sbi.cockpit.color.select')};
 
 		$scope.colorPickerPropertyEvenOddRows = {placeholder:sbiModule_translate.load('sbi.cockpit.color.select') ,format:'rgb',disabled:!$scope.model.settings.alternateRows.enabled};
@@ -795,6 +827,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 			if($scope.model.content.columnSelectedOfDataset == undefined || $scope.model.content.columnSelectedOfDataset.length==0){
 				$scope.showAction($scope.translate.load('sbi.cockpit.table.nocolumns'));
 			}
+			$scope.watchColumnSelectedOfDataset();
 			finishEdit.resolve();
 		}
 
@@ -927,8 +960,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 				return false;
 			}
 		}
-
-		$scope.$watchCollection('model.content.columnSelectedOfDataset', function(newColumns, oldColumns) {
+		$scope.watchColumnSelectedOfDataset = $scope.$watchCollection('model.content.columnSelectedOfDataset', function(newColumns, oldColumns) {
 			var disableShowSummary = true;
 			if(newColumns){
 				for(var i=0; i<newColumns.length; i++){
@@ -946,6 +978,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 	}
 
 	// this function register the widget in the cockpitModule_widgetConfigurator factory
-	addWidgetFunctionality("table",{'initialDimension':{'width':20, 'height':20},'updateble':true,'cliccable':true});
+	addWidgetFunctionality("table",{'initialDimension':{'width':5, 'height':5},'updateble':true,'cliccable':true});
 
 })();

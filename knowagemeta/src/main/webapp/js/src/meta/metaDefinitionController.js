@@ -15,6 +15,8 @@ app.service("metaModelServices",function(sbiModule_jsonServices){
 	this.originalMetaModelObserver; //the observer on the original object
 	this.observerObject;
 	this.cleanedObserverObject={};
+	this.dataSourceId;
+
 
 	this.cleanObserverObject=function(){
 		var data={};
@@ -38,6 +40,10 @@ app.service("metaModelServices",function(sbiModule_jsonServices){
 		bms.cleanObserverObject();
 		bms.metaModelObserve=sbiModule_jsonServices.observe(bms.cleanedObserverObject);
 	};
+
+	this.getDataSourceId=function(){
+		return this.dataSourceId;
+	}
 
 	this.generateDiff=function(){
 		bms.cleanObserverObject();
@@ -137,6 +143,7 @@ function metaDefinitionControllerFunction($scope, sbiModule_translate,sbiModule_
 	$scope.physicalModels = []; // array of table to transform in physical model
 	$scope.businessModels = []; // array of table to transform in business model
 
+	metaModelServices.dataSourceId =datasourceId;
 
 	$scope.loadSbiModel=function(translatedModel){
 		angular.copy(translatedModel,$scope.meta);
@@ -272,16 +279,19 @@ angular.module('metaManager').filter('filterByMainCategory', function(sbiModule_
 	var showDataProfiling = sbiModule_user.functionalities.indexOf("MetaModelDataProfiling")>-1;
 
 	return function(items, prop) {
-		angular.forEach(items, function(item) {
+		var toReturn = [];
+		angular.copy(items,toReturn);
+
+		angular.forEach(toReturn, function(item) {
 			if(item == "behavioural" && !showDataProfiling){
 				//remove behavioural category
-				var sdInd = items.indexOf("behavioural");
+				var sdInd = toReturn.indexOf("behavioural");
 				if(sdInd != -1){
-					items.splice(sdInd,1);
+					toReturn.splice(sdInd,1);
 				}
 			}
 		});
-		return items;
+		return toReturn;
 	};
 });
 
@@ -291,8 +301,9 @@ angular.module('metaManager').filter('filterByCategory', function(sbiModule_user
 	return function(items, categoryName) {
 		var filtered = [];
 		angular.forEach(items, function(item) {
-			if (angular.equals(item.key.split(".")[0], categoryName)) {
-				if (categoryName == "behavioural" || item.key == "structural.attribute"){
+			var key = Object.keys(item)[0];
+			if (angular.equals(key.split(".")[0], categoryName)) {
+				if (categoryName == "behavioural" || key == "structural.attribute"){
 					if (showDataProfiling == true) {
 						filtered.push(item);
 					}
@@ -310,36 +321,39 @@ angular.module('metaManager').filter('filterByProductType', function(sbiModule_c
 
 		var showSpatialDimension = sbiModule_user.functionalities.indexOf("SpatialDimension")>-1;
 		var showTemporalDimension = sbiModule_user.functionalities.indexOf("TemporalDimension")>-1;
+		var toReturn = [];
+		angular.copy(items,toReturn);
 
-		if(angular.equals(prop.value.propertyType.name,"Type")){
+		var key = Object.keys(prop)[0];
+		if(angular.equals(prop[key].propertyType.name,"Type")){
 			if(sbiModule_config.productTypes.indexOf("KnowageLI")==-1 || !showSpatialDimension){
 				//remove spatial dimension
-				var sdInd=items.indexOf("geographic dimension");
+				var sdInd=toReturn.indexOf("geographic dimension");
 				if(sdInd!=-1){
-					items.splice(sdInd,1);
+					toReturn.splice(sdInd,1);
 				}
 			}
 
 			if(sbiModule_config.productTypes.indexOf("KnowageSI")==-1 || !showTemporalDimension){
 				//remove temporal dimension
-				var tdInd=items.indexOf("temporal dimension");
+				var tdInd=toReturn.indexOf("temporal dimension");
 				if(tdInd!=-1){
-					items.splice(tdInd,1);
+					toReturn.splice(tdInd,1);
 				}
 
-				var tdInd=items.indexOf("time dimension");
+				var tdInd=toReturn.indexOf("time dimension");
 				if(tdInd!=-1){
-					items.splice(tdInd,1);
+					toReturn.splice(tdInd,1);
 				}
 
-				var tdInd=items.indexOf("calendar");
+				var tdInd=toReturn.indexOf("calendar");
 				if(tdInd!=-1){
-					items.splice(tdInd,1);
+					toReturn.splice(tdInd,1);
 				}
 
 			}
 		}
-		return items;
+		return toReturn;
 
 	};
 });
@@ -349,7 +363,8 @@ angular.module('metaManager').service("parametersBuilder", function() {
 		var propertiesCat = [];
 		for (var i = 0; i < properties.length; i++) {
 			var tmpProp = properties[i];
-			var struct = tmpProp.key.split(".");
+			var key = Object.keys(tmpProp)[0];
+			var struct = key.split(".");
 			if (propertiesCat.indexOf(struct[0]) == -1) {
 				propertiesCat.push(struct[0]);
 			}

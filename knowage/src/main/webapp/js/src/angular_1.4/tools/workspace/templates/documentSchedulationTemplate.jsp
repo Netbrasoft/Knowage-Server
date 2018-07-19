@@ -31,16 +31,17 @@
 		 </md-button>
 		</div>
 	</md-toolbar>
-	
-	<md-tabs md-dynamic-height flex=95>
-	 <md-tab ng-repeat="d in scheduler.documents" label="{{d.name}}" md-on-select="getDocumentsSnapshots(scheduler.jobName, d.name)"  >
+	<md-tabs md-dynamic-height flex=95 class="tabOverflow">
+	 <md-tab ng-repeat="d in scheduler.documents" label="{{d.nameTitle}}" md-on-select="getDocumentsSnapshots(scheduler.jobName, d.name)"  >
 	  	<div layout-fill layout="column" flex>
 	  	
-	  	<angular-table style="min-height:600px"
-			id="tableSchedulers" ng-model="schedulers" 
+	  	<!-- Xstyle="min-height:600px" -->
+	  	<angular-table 
+	  		flex=70
+			id="tableSchedulers_{{d.name}}" ng-model="schedulers" 
 			columns='schedulatinColumns'
 			columns-search='["name","description","time"]'
-			initial-sorting="'dateCreation'"
+			initial-sorting="'time'"
 			initial-sorting-asc="true"
 			highlights-selected-item = "true"
 			show-search-bar="true"
@@ -64,15 +65,27 @@
 			 </md-button>
 			</div>
 		</md-toolbar>
-	 	<angular-table flex=95
-			id="tableMergeSchedulers" ng-model=schedulationListForMerge 
-			columns='schedulatinMergeColumns'
-			highlights-selected-item = "true"
-			initial-sorting="'time'"
-			initial-sorting-asc="true"
-			show-search-bar="true"
-			speed-menu-option=downloadSnapshotSpeedMenuOption
+
+		<div ng-if=mergeAndNotPDF flex layout="column">
+
+			<angular-table flex=70 id="tableMergeSchedulersNoButton"
+				ng-model=schedulationListForMerge columns='schedulatinMergeColumns'
+				highlights-selected-item="true" initial-sorting="'time'"
+				initial-sorting-asc="true" show-search-bar="true"
 				>
-		</angular-table>
-	 </div>
+			</angular-table>
+		</div>
+
+		<div ng-if=!mergeAndNotPDF flex layout="column">
+			<angular-table flex=70 id="tableMergeSchedulersButton"
+				ng-model=schedulationListForMerge columns='schedulatinMergeColumns'
+				highlights-selected-item="true" initial-sorting="'time'"
+				initial-sorting-asc="true" show-search-bar="true"
+				speed-menu-option=downloadSnapshotSpeedMenuOption> </angular-table>
+		</div>
+
+
+
+
+	</div>
  </div>

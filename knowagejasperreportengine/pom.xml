@@ -5,20 +5,33 @@
 	<parent>
 		<groupId>it.eng.knowage</groupId>
 		<artifactId>knowage-ce-parent</artifactId>
-		<version>6.1.1-SNAPSHOT</version>
+		<version>6.2.0</version>
 		<relativePath>../knowage-ce-parent/pom.xml</relativePath>
 	</parent>
 
 	<artifactId>knowagejasperreportengine</artifactId>
 	<packaging>war</packaging>
 	<name>knowagejasperreportengine</name>
-
+	
+	<build>
+	    <plugins>
+	        <plugin>
+	            <artifactId>maven-war-plugin</artifactId>
+	            <configuration>
+	                <attachClasses>true</attachClasses>
+	                <classesClassifier>classes</classesClassifier>
+	            </configuration>
+	        </plugin>
+	    </plugins>
+	</build>
+	
+	
 	<dependencies>
 		
 		<dependency>
 			<groupId>it.eng.knowage</groupId>
 			<artifactId>knowage-utils</artifactId>
-			<version>6.1.1-SNAPSHOT</version>
+			<version>6.2.0</version>
 			<scope>compile</scope>
 			<exclusions>
 				<exclusion>
@@ -31,7 +44,7 @@
 		<dependency>
 			<groupId>it.eng.knowage</groupId>
 			<artifactId>qbe-core</artifactId>
-			<version>6.1.1-SNAPSHOT</version>
+			<version>6.2.0</version>
 			<scope>runtime</scope>
 		</dependency>
 		
@@ -40,12 +53,33 @@
 			<artifactId>jasperreports</artifactId>
 			<version>6.1.0</version>
 			<scope>compile</scope>
+			<exclusions>
+				<exclusion>
+					<groupId>com.fasterxml.jackson.core</groupId>
+					<artifactId>jackson-core</artifactId>
+				</exclusion>
+				<exclusion>
+					<groupId>com.fasterxml.jackson.core</groupId>
+					<artifactId>jackson-databind</artifactId>
+				</exclusion>
+				<exclusion>
+					<groupId>com.fasterxml.jackson.core</groupId>
+					<artifactId>jackson-annotations</artifactId>
+				</exclusion>
+			</exclusions>
 		</dependency>
 		
 		<dependency>
 			<groupId>net.sf.jasperreports</groupId>
 			<artifactId>jasperreports-fonts</artifactId>
 			<version>6.0.0</version>
+			<scope>runtime</scope>
+		</dependency>
+		
+		<dependency>
+			<groupId>net.sf.jasperreports</groupId>
+			<artifactId>jasperreports-functions</artifactId>
+			<version>6.1.0</version>
 			<scope>runtime</scope>
 		</dependency>
 

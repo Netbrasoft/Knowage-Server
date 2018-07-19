@@ -17,6 +17,16 @@
  */
 package it.eng.knowage.meta.generator.jpamapping.wrappers.impl;
 
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
+import org.apache.commons.lang.math.NumberUtils;
+import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import it.eng.knowage.meta.exception.KnowageMetaException;
 import it.eng.knowage.meta.generator.jpamapping.wrappers.IJpaCalculatedColumn;
 import it.eng.knowage.meta.generator.jpamapping.wrappers.IJpaColumn;
@@ -24,13 +34,10 @@ import it.eng.knowage.meta.generator.jpamapping.wrappers.IJpaTable;
 import it.eng.knowage.meta.model.ModelProperty;
 import it.eng.knowage.meta.model.business.CalculatedBusinessColumn;
 import it.eng.knowage.meta.model.business.SimpleBusinessColumn;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.StringTokenizer;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import it.eng.qbe.utility.CustomFunctionsSingleton;
+import it.eng.qbe.utility.CustomizedFunctionsReader;
+import it.eng.qbe.utility.DbTypeThreadLocal;
+import it.eng.qbe.utility.bo.CustomizedFunction;
 
 /**
  * @author Andrea Gioia (andrea.gioia@eng.it)
@@ -109,11 +116,11 @@ public class JpaCalculatedColumn implements IJpaCalculatedColumn {
 		return property != null ? property.getValue() : "";
 	}
 
-	public List<IJpaColumn> getReferencedColumns() {
-		List<IJpaColumn> jpaColumns = new ArrayList<IJpaColumn>();
+	public Set<IJpaColumn> getReferencedColumns() {
+		Set<IJpaColumn> jpaColumns = new HashSet<IJpaColumn>();
 
 		try {
-			List<SimpleBusinessColumn> businessColumns = businessCalculatedColumn.getReferencedColumns();
+			Set<SimpleBusinessColumn> businessColumns = businessCalculatedColumn.getReferencedColumns();
 			if (!businessColumns.isEmpty()) {
 				for (SimpleBusinessColumn businessColumn : businessColumns) {
 					JpaColumn jpaColumn = new JpaColumn(jpaTable, businessColumn);
@@ -130,31 +137,71 @@ public class JpaCalculatedColumn implements IJpaCalculatedColumn {
 
 	public String getExpressionWithUniqueNames() {
 		String expression = getExpression();
-		List<IJpaColumn> jpaColumns = this.getReferencedColumns();
-		List<String> operands = new ArrayList<String>();
+		Set<IJpaColumn> jpaColumns = this.getReferencedColumns();
+		Set<String> operands = new HashSet<String>();
 
 		if (!jpaColumns.isEmpty()) {
 			// retrieve operands from string
-			StringTokenizer stk = new StringTokenizer(expression, "+-|*/()");
-			while (stk.hasMoreTokens()) {
-				String operand = stk.nextToken().trim();
-				System.out.println("Found Operand " + operand);
+			// StringTokenizer stk = new StringTokenizer(expression, "+-|*/()");
+
+			String regularExpression = "(\\,|\\+|\\-|\\*|\\(|\\)|\\|\\||\\/|GG_between_dates|MM_between_dates|AA_between_dates|GG_up_today|MM_up_today|AA_up_today|current_date|current_time|length|substring|concat|year|month|mod|bit_length|upper|lower|trim|current_timestamp|hour|minute|second|day";
+
+			// add custom functions if present
+			String customs = "";
+			JSONObject json = CustomFunctionsSingleton.getInstance().getCustomizedFunctionsJSON();
+			// check there really are some custom functions
+			if (json != null && !json.toString().equals("{}")) {
+				String dbType = DbTypeThreadLocal.getDbType();
+				if (dbType == null) {
+					logger.error("Db Type not found");
+					throw new RuntimeException("Db Type name could not be found in current Thread Locale, check stack of calls");
+				}
+				CustomizedFunctionsReader reader = new CustomizedFunctionsReader();
+				List<CustomizedFunction> list = reader.getCustomDefinedFunctionListFromJSON(json, dbType);
+				if (list != null && list.size() > 0) {
+					customs = reader.getStringFromOrderedList(list);
+				}
+			}
+
+			logger.debug("Customs functions definition " + customs);
+			regularExpression += customs;
+
+			regularExpression += ")";
+
+			String[] splittedExpr = expression.split(regularExpression);
+			for (String operand : splittedExpr) {
+				operand = operand.trim();
+
+				if (NumberUtils.isNumber(operand)) {
+					continue;
+				}
+
+				logger.debug("Found Operand " + operand);
 				operands.add(operand);
 			}
+			operands.removeAll(Arrays.asList("", null));
 		}
 
-		for (int i = 0; i < operands.size(); i++) {
-			System.out.println("Replacing " + operands.get(i) + " with " + jpaColumns.get(i).getUniqueName());
-			expression = expression.replace(operands.get(i), jpaColumns.get(i).getUniqueName());
-		}
-		expression = expression.replaceAll("/", ":");
+		for (String operand : operands) {
+			// search if the operand is a column of the metamodel (it could be a fixed value)
+			String uniqueName = getUniqueNameOfOperand(jpaColumns, operand);
+			if (uniqueName != null) {
+				logger.debug("Replacing " + operand + " with " + uniqueName);
+				expression = expression.replace(operand, uniqueName);
+			}
 
-		/*
-		 * for (int i = 0; i<operands.size(); i++){ System.out.println("Replacing "+operands.get(i)+" with "+jpaColumns.get(i).getName()); expression =
-		 * expression.replace(operands.get(i),jpaColumns.get(i).getName()); }
-		 */
+		}
 
 		return expression;
+	}
+
+	public String getUniqueNameOfOperand(Set<IJpaColumn> jpaColumns, String operandToFind) {
+		for (IJpaColumn jpaColumn : jpaColumns) {
+			if (jpaColumn.getName().equals(operandToFind)) {
+				return jpaColumn.getUniqueName().replaceAll("/", ":");
+			}
+		}
+		return null;
 	}
 
 }

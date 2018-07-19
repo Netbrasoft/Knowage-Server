@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     boolean isAdmin=UserUtilities.hasAdministratorRole(profile);
     UserUtilities.isAdministrator(profile);
     String admin=isAdmin+"";
-    String userNameOwner=(String)myUserProfile.getUserUniqueIdentifier();
+    String userNameOwner=(String)myUserProfile.getUserId();
 	
     boolean isDev=UserUtilities.hasDeveloperRole(profile);
     boolean isUser=UserUtilities.hasUserRole(profile);
@@ -99,25 +99,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <link rel="stylesheet" type="text/css" href="<%=urlBuilder.getResourceLink(request, "themes/commons/css/customStyle.css")%>">
 
-<link rel="stylesheet" type="text/css" href="${pageContext.request.contextPath}/themes/sbi_default/css/FunctionsCatalog/functionsCatalog.css">
+<script type="text/javascript" src="<%=urlBuilder.getResourceLink(request, "js/src/angular_1.4/tools/commons/angular-table/AngularTable.js")%>"></script>
 
-<script type="text/javascript" src="${pageContext.request.contextPath}/js/src/angular_1.4/tools/commons/angular-table/AngularTable.js"></script>
-
-<script type="text/javascript" src="${pageContext.request.contextPath}/js/src/angular_1.4/tools/functionsCatalog/functionsCatalog.js"></script>
+<script type="text/javascript" src="<%=urlBuilder.getResourceLink(request, "js/src/angular_1.4/tools/functionsCatalog/functionsCatalog.js")%>"></script>
 
 <!-- Codemirror  -->
-<link rel="stylesheet" type="text/css" href="${pageContext.request.contextPath}/js/lib/angular/codemirror/CodeMirror-master/lib/codemirror.css">
-<link rel="stylesheet" type="text/css" href="${pageContext.request.contextPath}/js/lib/angular/codemirror/CodeMirror-master/theme/eclipse.css">  
-<script type="text/javascript" src="${pageContext.request.contextPath}/js/lib/angular/codemirror/CodeMirror-master/lib/codemirror.js"></script>  
-<script type="text/javascript" src="${pageContext.request.contextPath}/js/lib/angular/codemirror/ui-codemirror.js"></script> 
-<script type="text/javascript" src="${pageContext.request.contextPath}/js/lib/angular/mathematicaModified.js"></script>  
-<link rel="stylesheet" href="${pageContext.request.contextPath}/js/lib/angular/codemirror/CodeMirror-master/addon/hint/show-hint.css" />
-<script src="${pageContext.request.contextPath}/js/lib/angular/codemirror/CodeMirror-master/addon/hint/show-hint.js"></script>
-<script src="${pageContext.request.contextPath}/js/lib/angular/codemirror/CodeMirror-master/addon/hint/sql-hint.js"></script>
-<script src="${pageContext.request.contextPath}/js/lib/angular/codemirror/CodeMirror-master/mode/python/python.js"></script>
-<script src="${pageContext.request.contextPath}/js/lib/angular/codemirror/CodeMirror-master/mode/r/r.js"></script>
-<script src="${pageContext.request.contextPath}/js/lib/angular/codemirror/CodeMirror-master/addon/selection/mark-selection.js"></script>
-<script src="${pageContext.request.contextPath}/js/lib/angular/codemirror/CodeMirror-master/addon/display/autorefresh.js"></script>
+<link rel="stylesheet" type="text/css" href="<%=urlBuilder.getResourceLink(request, "js/lib/angular/codemirror/CodeMirror-master/lib/codemirror.css")%>">
+<link rel="stylesheet" type="text/css" href="<%=urlBuilder.getResourceLink(request, "js/lib/angular/codemirror/CodeMirror-master/theme/eclipse.css")%>">  
+<script type="text/javascript" src="<%=urlBuilder.getResourceLink(request, "js/lib/angular/codemirror/CodeMirror-master/lib/codemirror.js")%>"></script>  
+<script type="text/javascript" src="<%=urlBuilder.getResourceLink(request, "js/lib/angular/codemirror/ui-codemirror.js")%>"></script> 
+<script type="text/javascript" src="<%=urlBuilder.getResourceLink(request, "js/lib/angular/mathematicaModified.js")%>"></script>  
+<link rel="stylesheet" href="<%=urlBuilder.getResourceLink(request, "js/lib/angular/codemirror/CodeMirror-master/addon/hint/show-hint.css")%>" />
+<script src="<%=urlBuilder.getResourceLink(request, "js/lib/angular/codemirror/CodeMirror-master/addon/hint/show-hint.js")%>"></script>
+<script src="<%=urlBuilder.getResourceLink(request, "js/lib/angular/codemirror/CodeMirror-master/addon/hint/sql-hint.js")%>"></script>
+<script src="<%=urlBuilder.getResourceLink(request, "js/lib/angular/codemirror/CodeMirror-master/mode/python/python.js")%>"></script>
+<script src="<%=urlBuilder.getResourceLink(request, "js/lib/angular/codemirror/CodeMirror-master/mode/r/r.js")%>"></script>
+<script src="<%=urlBuilder.getResourceLink(request, "js/lib/angular/codemirror/CodeMirror-master/addon/selection/mark-selection.js")%>"></script>
+<script src="<%=urlBuilder.getResourceLink(request, "js/lib/angular/codemirror/CodeMirror-master/addon/display/autorefresh.js")%>"></script>
 
 <script type="text/javascript" src="<%=urlBuilder.getResourceLink(request, "js/lib/angular/ngWYSIWYG/wysiwyg.min.js")%>"></script>	
 <link rel="stylesheet" type="text/css" href="<%=urlBuilder.getResourceLink(request, "js/lib/angular/ngWYSIWYG/editor.min.css")%>"> 
@@ -143,111 +141,110 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 			
 		   } 
 		%>
-		
-		
+
 		<list label="Functions"  new-function="<%=addFunction%>" layout-column> 
-		
-			<md-content layout="column" >
+			<md-content>
 				<div layout-gt-xs="row" layout="column" class="functionsCardContainer">
 				
-					<md-card  class="functionsCard"  ng-class="{'active':selectedType == functionType.valueCd}" ng-repeat="functionType in functionTypesList" ng-click="functionsList=filterByType(functionType)" ng-style="{'background-image':functionType.valueDescription}" flex>
-						<md-card-content>
-		          				<span class="md-headline ng-binding" flex="">{{functionType.valueCd}}</span>
-                                <span class="md-subhead ng-binding smallGrey" flex="">{{functionType.domainName}}</span>
+					<md-card layout="column" layout-align="center center" class="functionsCard"  ng-class="{'active':selectedType == functionType.valueCd}" ng-repeat="functionType in functionTypesList" ng-click="functionsList=filterByType(functionType)" ng-style="{'background-image':functionType.valueDescription}" flex>
+						<md-card-content layout="column" layout-align="center center" class="noPadding" flex>
+		          				<span class="md-headline ng-binding">{{functionType.valueCd}}</span>
+                                <span class="md-subhead ng-binding smallGrey">{{functionType.domainName}}</span>
 						</md-card-content>
 					
 		      		</md-card>
 		      		
-					<md-card  class="functionsCard image_all" ng-class="{'active':selectedType == 'All'}" ng-click="functionsList=filterByType({valueCd:'All'})" flex> 
-						<md-card-content>
-		            			<span class="md-headline ng-binding" flex="">{{translate.load("sbi.functionscatalog.all")}}</span>
-		            			<span class="md-subhead ng-binding smallGrey" flex="">{{translate.load("sbi.functionscatalog.allmessage")}}</span>
+					<md-card  class="functionsCard image_all" ng-class="{'active':selectedType == 'All'}" ng-click="functionsList=filterByType({valueCd:'All'})" flex layout="column" layout-align="center center"> 
+						<md-card-content layout="column" layout-align="center center" class="noPadding" flex>
+		            			<span class="md-headline ng-binding" >{{translate.load("sbi.functionscatalog.all")}}</span>
+		            			<span class="md-subhead ng-binding smallGrey">{{translate.load("sbi.functionscatalog.allmessage")}}</span>
 						</md-card-content>
 
 		      		</md-card>
 				</div>	
-					<div class="md-block functionsChipsContainer" layout="row" layout-align="center center" >
-						<md-chips ng-model="searchKeywords" readonly=true class="functionsChips"> 
-							<md-chip-template ng-click="chipFilter($chip)" >
-							{{$chip}}
-							</md-chip-template>
-						</md-chips>	
+					<div class="functionsChipsContainer" layout="row" layout-align="center" layout-wrap>
+						<div class="functionsChips" ng-repeat="chip in searchKeywords" ng-click="chipFilter(chip)" ng-class="{'chipSelected':selectedChip==chip}">
+							{{chip}}
+						</div>
 					</div>
 					
-		    		<angular-table
-		    				id="functionsTable" 
-							flex=70
-							ng-show=true
-							ng-model="functionsList"
-							columns='[{"label":"Function Name","name":"name"},{"label":"Owner","name":"owner"}]'  
-							columns-search='["name","keywords","description","owner"]'
-							show-search-bar=true
-							highlights-selected-item=true
-							speed-menu-option="acSpeedMenu"
-							click-function ="leftTableClick(item)"
-							selected-item="tableSelectedFunction"
-							no-pagination=true					
-					>						
-					</angular-table>
+					<div layout="row" layout-align="center center" ng-if="!functionsList || functionsList.length == 0">
+						<div class="kn-noItems" flex="60" flex-xs="100">
+							<p class="ng-binding">{{translate.load("sbi.functionscatalog.nofunctions")}}</p>
+						</div>
+					</div>
+			    		<angular-table
+			    				id="functionsTable" 
+								ng-show="functionsList && functionsList.length >0"
+								ng-model="functionsList"
+								columns='[{"label":"Function Name","name":"name","size":300},{"label":"Description","name":"description"},{"label":"Owner","name":"owner","size":100}]'  
+								columns-search='["name","description","owner"]'
+								show-search-bar=true
+								highlights-selected-item=true
+								speed-menu-option="acSpeedMenu"
+								click-function ="leftTableClick(item)"
+								selected-item="tableSelectedFunction"
+								no-pagination=true
+								layout-padding					
+						>						
+						</angular-table>
 			</md-content>
     	</list>
     	
-    	
-       <detail label='shownFunction.name==undefined? "" : shownFunction.name' save-function="saveFunction" 	cancel-function="cancelFunction"
-       	disable-cancel-button=false
-		disable-save-button=false
-		show-save-button="isAdmin || (isDev && shownFunction.owner==ownerUserName)">
+       <detail label='shownFunction.name==undefined? "" : shownFunction.name' save-function="saveFunction" 	cancel-function="cancelFunction" disable-cancel-button=false disable-save-button=false	show-save-button="isAdmin || (isDev && shownFunction.owner==ownerUserName)">
        		<md-tabs layout-fill> 
        		
        			<md-tab label='{{translate.load("sbi.functionscatalog.general");}}'>
-					<md-card layout-padding layout="column">
-						
-						<md-input-container class="md-block" >
-        					<label>{{translate.load("sbi.functionscatalog.functionname");}}</label>
-        					<input ng-model=shownFunction.name ng-disabled="!(isAdmin || (isDev && shownFunction.owner==ownerUserName))">
-      					</md-input-container>
-  
-  						<md-input-container class="md-block" >
-        					<label>{{translate.load("sbi.functionscatalog.label");}}</label>
-        					<input ng-model=shownFunction.label ng-disabled="!(isAdmin || (isDev && shownFunction.owner==ownerUserName))">
-      					</md-input-container>    					
-      					
-      					<md-input-container class="md-block" >
-        					<label>{{translate.load("sbi.functionscatalog.owner");}}</label>
-        					<input ng-model=shownFunction.owner ng-disabled=true>
-      					</md-input-container> 
-
-						<md-input-container class="md-block" >
-        					<label>{{translate.load("sbi.functionscatalog.type");}}</label>
-        					<md-select ng-model=shownFunction.type ng-disabled="!(isAdmin || (isDev && shownFunction.owner==ownerUserName))">
-              					<md-option ng-repeat="functionType in functionTypesList" value="{{functionType.valueCd}}">
-                					{{functionType.valueCd}}
-              					</md-option>
-           					</md-select>
-      					</md-input-container>
-      					
-      					</br>
-        				
-        				<md-input-container class="md-block">
-        					<label class="customColorLabel">{{translate.load("sbi.functionscatalog.keywords");}}</label>   					
-							<md-chips ng-model="shownFunction.keywords" readonly="!(isAdmin || (isDev && shownFunction.owner==ownerUserName))" ></md-chips>
-						</md-input-container>
-						
-          				<label class="customLabel">{{translate.load("sbi.functionscatalog.description");}}</label>
-	          			<wysiwyg-edit ng-if="(isAdmin || (isDev && shownFunction.owner==ownerUserName))" content="shownFunction.description"  layout-fill config="editorConfig"></wysiwyg-edit>
-	          			<div ng-if="!(isAdmin || (isDev && shownFunction.owner==ownerUserName))" ng-bind-html=shownFunction.description></div> 
-			
+					<md-card>
+						<md-card-content>
+							<div layout="row">
+								<md-input-container class="md-block" flex>
+		        					<label>{{translate.load("sbi.functionscatalog.functionname");}}</label>
+		        					<input ng-model=shownFunction.name ng-disabled="!(isAdmin || (isDev && shownFunction.owner==ownerUserName))">
+		        					<div class="hint">Name of the function</div>
+		      					</md-input-container>
+		  
+		  						<md-input-container class="md-block" flex>
+		        					<label>{{translate.load("sbi.functionscatalog.label");}}</label>
+		        					<input ng-model=shownFunction.label ng-disabled="!(isAdmin || (isDev && shownFunction.owner==ownerUserName))">
+		        					<div class="hint">Name of the function that will be displayed</div>
+		      					</md-input-container> 
+							</div>
+							   					
+	      					<div layout="row">
+		      					<md-input-container class="md-block" flex>
+		        					<label>{{translate.load("sbi.functionscatalog.owner");}}</label>
+		        					<input ng-model=shownFunction.owner ng-disabled=true>
+		      					</md-input-container> 
+		
+								<md-input-container class="md-block" flex>
+		        					<label>{{translate.load("sbi.functionscatalog.type");}}</label>
+		        					<md-select ng-model=shownFunction.type ng-disabled="!(isAdmin || (isDev && shownFunction.owner==ownerUserName))">
+		              					<md-option ng-repeat="functionType in functionTypesList" value="{{functionType.valueCd}}">
+		                					{{functionType.valueCd}}
+		              					</md-option>
+		           					</md-select>
+		      					</md-input-container>
+	      					</div>
+	      					
+							<md-chips ng-model="shownFunction.keywords" readonly="!(isAdmin || (isDev && shownFunction.owner==ownerUserName))" placeholder="{{translate.load('sbi.functionscatalog.keywords');}}" class="noPadding" style="margin-bottom:10px;"></md-chips>
+	      					
+	          				<label class="customLabel">{{translate.load("sbi.functionscatalog.description");}}</label>
+		          			<wysiwyg-edit ng-if="(isAdmin || (isDev && shownFunction.owner==ownerUserName))" content="shownFunction.description"  layout-fill config="editorConfig"></wysiwyg-edit>
+		          			<div ng-if="!(isAdmin || (isDev && shownFunction.owner==ownerUserName))" ng-bind-html=shownFunction.description></div> 
+						</md-card-content>
 					</md-card>
 				</md-tab>
        		
 				<md-tab label='{{translate.load("sbi.functionscatalog.input");}}' >
 				
-				<!--  Author: Davverna -- Changed structure to card one -->
 					<md-card class="noMdError smallInputs">
-						<md-toolbar class="md-toolbar-tools secondaryToolbar">
-									{{translate.load("sbi.functionscatalog.inputdatasets");}}
-									<div flex></div>
-									<md-button class="md-secondary" ng-click="input=addInputDataset()" ng-show="(isAdmin || (isDev && shownFunction.owner==ownerUserName))">{{translate.load("sbi.functionscatalog.adddataset");}}</md-button> 	
+						<md-toolbar class="secondaryToolbar">
+							<div class="md-toolbar-tools">
+								<h2>{{translate.load("sbi.functionscatalog.inputdatasets");}}</h2>
+								<div flex></div>
+								<md-button class="md-secondary" ng-click="input=addInputDataset()" ng-show="(isAdmin || (isDev && shownFunction.owner==ownerUserName))">{{translate.load("sbi.functionscatalog.adddataset");}}</md-button>
+							</div>
 						</md-toolbar>	
 						<md-card-content>					
 							<md-list>
@@ -279,10 +276,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 					</md-card>
 					
 					<md-card class="noMdError smallInputs">
-						<md-toolbar class="md-toolbar-tools secondaryToolbar">
-									{{translate.load("sbi.functionscatalog.inputvariables");}}
-									<div flex></div>
-									<md-button class="md-secondary" ng-click="input=addInputVariable()" ng-show="(isAdmin || (isDev && shownFunction.owner==ownerUserName))">{{translate.load("sbi.functionscatalog.addinputvariable");}}</md-button> 		
+						<md-toolbar class="secondaryToolbar">
+							<div class="md-toolbar-tools">
+								<h2>{{translate.load("sbi.functionscatalog.inputvariables");}}</h2>
+								<div flex></div>
+								<md-button class="md-secondary" ng-click="input=addInputVariable()" ng-show="(isAdmin || (isDev && shownFunction.owner==ownerUserName))">{{translate.load("sbi.functionscatalog.addinputvariable");}}</md-button> 
+							</div>		
 						</md-toolbar>	
 						<md-card-content>
 							<md-list>
@@ -306,30 +305,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 					
 									
 					<md-card class="noMdError smallInputs">
-						<md-toolbar class="md-toolbar-tools secondaryToolbar">
-									{{translate.load("sbi.functionscatalog.inputFiles");}}
-									<div flex></div>
-									<md-button class="md-secondary" ng-click="input=addInputFile()" ng-show="(isAdmin || (isDev && shownFunction.owner==ownerUserName))">{{translate.load("sbi.functionscatalog.addinputfile");}}</md-button> 		
+						<md-toolbar class="secondaryToolbar">
+							<div class="md-toolbar-tools">
+								<h2>{{translate.load("sbi.functionscatalog.inputFiles");}}</h2>
+								<div flex></div>
+								<md-button class="md-secondary" ng-click="input=addInputFile()" ng-show="(isAdmin || (isDev && shownFunction.owner==ownerUserName))">{{translate.load("sbi.functionscatalog.addinputfile");}}</md-button> 	
+							</div>	
 						</md-toolbar>	
 						<md-card-content>
 							<md-list>
 								<md-list-item ng-if="shownFunction.inputFiles.length==0" class="messageItem" layout-align="center center">
 									&emsp;&emsp;{{translate.load("sbi.functionscatalog.noinputfilesrequired");}}
-						 
 								</md-list-item>
-						<!-- 		
-								<md-list-item ng-repeat="u in shownFunction.inputFiles">
-									<md-input-container class="md-block" flex>
-	           							<label>{{translate.load("sbi.functionscatalog.filename");}}</label>
-	       								<input ng-model="u.name" ng-disabled="!(isAdmin || (isDev && shownFunction.owner==ownerUserName))">
-	   								</md-input-container>
-	   								<md-input-container class="md-block" flex>
-	           							<label>{{translate.load("sbi.functionscatalog.filevalue");}}</label>
-	       								<input ng-model="u.value" ng-disabled="!(isAdmin || (isDev && shownFunction.owner==ownerUserName))">
-	   								</md-input-container>
-	  								<md-icon class="md-secondary" md-font-icon="fa fa-trash" ng-click="output=removeInputFile(i)" aria-hidden="true" ng-show="(isAdmin || (isDev && shownFunction.owner==ownerUserName))"></md-icon>
-								</md-list-item>
-						-->
 							  <md-list-item ng-repeat="inputFile in shownFunction.inputFiles" layout="row">
 							  	<md-input-container class="md-block" flex=40>
 	           						<label>{{translate.load("sbi.functionscatalog.filealias");}}</label>
@@ -344,11 +331,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 							</md-list>  
 						</md-card-content>
 					</md-card>
-					
-					
-					
-					
-					
 				</md-tab>
 				
 				<md-tab label='{{translate.load("sbi.functionscatalog.script");}}' ng-if="(isAdmin || (isDev && shownFunction.owner==ownerUserName))">
@@ -384,10 +366,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 				</md-tab>
 				<md-tab label='{{translate.load("sbi.functionscatalog.output");}}'>
 					<md-card class="noMdError smallInputs">
-						<md-toolbar class="md-toolbar-tools secondaryToolbar">
-							{{translate.load("sbi.functionscatalog.output");}} 
-							<div flex></div>
-							<md-button class="md-secondary" ng-click="output=addOutputItem()" ng-show="(isAdmin || (isDev && shownFunction.owner==ownerUserName))">{{translate.load("sbi.functionscatalog.addoutput");}}</md-button> 		
+						<md-toolbar class="secondaryToolbar">
+							<div class="md-toolbar-tools">
+								<h2>{{translate.load("sbi.functionscatalog.output");}}</h2>
+								<div flex></div>
+								<md-button class="md-secondary" ng-click="output=addOutputItem()" ng-show="(isAdmin || (isDev && shownFunction.owner==ownerUserName))">{{translate.load("sbi.functionscatalog.addoutput");}}</md-button> 		
+							</div>
 						</md-toolbar>	
 						<md-card-content>
 							<md-list>
@@ -413,17 +397,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 						</md-card-content>
 					</md-card>
 				</md-tab>
-		
-							
+	
        		</md-tabs>
        
        </detail>
-	
-		
+
 	</angular-list-detail>
-
-
-
 </div>
 
 </body>

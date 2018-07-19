@@ -5,19 +5,31 @@
 	<parent>
 		<groupId>it.eng.knowage</groupId>
 		<artifactId>knowage-ce-parent</artifactId>
-		<version>6.1.1-SNAPSHOT</version>
+		<version>6.2.0</version>
 		<relativePath>../knowage-ce-parent/pom.xml</relativePath>
 	</parent>
 
 	<artifactId>knowagemeta</artifactId>
 	<packaging>war</packaging>
 
+	<build>
+	    <plugins>
+	        <plugin>
+	            <artifactId>maven-war-plugin</artifactId>
+	            <configuration>
+	                <attachClasses>true</attachClasses>
+	                <classesClassifier>classes</classesClassifier>
+	            </configuration>
+	        </plugin>
+	    </plugins>
+	</build>
+	
 	<dependencies>
 		
 		<dependency>
 			<groupId>it.eng.knowage</groupId>
 			<artifactId>knowage-utils</artifactId>
-			<version>6.1.1-SNAPSHOT</version>
+			<version>6.2.0</version>
 			<scope>compile</scope>
 			<exclusions>
 				<exclusion>
@@ -30,15 +42,15 @@
 		<dependency>
 			<groupId>it.eng.knowage</groupId>
 			<artifactId>knowage-dao</artifactId>
-			<version>6.1.1-SNAPSHOT</version>
+			<version>6.2.0</version>
 			<scope>compile</scope>
 		</dependency>
 		
 		<dependency>
 			<groupId>it.eng.knowage</groupId>
 			<artifactId>qbe-core</artifactId>
-			<version>6.1.1-SNAPSHOT</version>
-			<scope>runtime</scope>
+			<version>6.2.0</version>
+			<scope>compile</scope>
 		</dependency>
 		
 		<dependency>
@@ -88,6 +100,16 @@
 			<artifactId>zjsonpatch</artifactId>
 			<version>0.2.1</version>
 			<scope>compile</scope>
+			<exclusions>
+				<exclusion>
+					<groupId>com.fasterxml.jackson.core</groupId>
+					<artifactId>jackson-databind</artifactId>
+				</exclusion>
+				<exclusion>
+					<groupId>com.fasterxml.jackson.core</groupId>
+					<artifactId>jackson-core</artifactId>
+				</exclusion>
+			</exclusions>
 		</dependency>
 		
 		<dependency>

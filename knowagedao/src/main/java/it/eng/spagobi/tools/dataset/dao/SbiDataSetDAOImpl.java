@@ -17,25 +17,13 @@
  */
 package it.eng.spagobi.tools.dataset.dao;
 
-import it.eng.spago.error.EMFErrorSeverity;
-import it.eng.spago.error.EMFUserError;
-import it.eng.spago.security.IEngUserProfile;
-import it.eng.spagobi.commons.bo.Domain;
-import it.eng.spagobi.commons.constants.SpagoBIConstants;
-import it.eng.spagobi.commons.dao.AbstractHibernateDAO;
-import it.eng.spagobi.commons.dao.DAOFactory;
-import it.eng.spagobi.commons.dao.SpagoBIDAOException;
-import it.eng.spagobi.commons.metadata.SbiDomains;
-import it.eng.spagobi.commons.utilities.UserUtilities;
-import it.eng.spagobi.tools.dataset.metadata.SbiDataSet;
-import it.eng.spagobi.utilities.assertion.Assert;
-
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
 import org.apache.log4j.Logger;
 import org.hibernate.Criteria;
+import org.hibernate.Hibernate;
 import org.hibernate.HibernateException;
 import org.hibernate.Query;
 import org.hibernate.Session;
@@ -45,6 +33,20 @@ import org.hibernate.criterion.Disjunction;
 import org.hibernate.criterion.MatchMode;
 import org.hibernate.criterion.Order;
 import org.hibernate.criterion.Restrictions;
+
+import it.eng.spago.error.EMFErrorSeverity;
+import it.eng.spago.error.EMFUserError;
+import it.eng.spago.security.IEngUserProfile;
+import it.eng.spagobi.commons.bo.Domain;
+import it.eng.spagobi.commons.bo.UserProfile;
+import it.eng.spagobi.commons.constants.SpagoBIConstants;
+import it.eng.spagobi.commons.dao.AbstractHibernateDAO;
+import it.eng.spagobi.commons.dao.DAOFactory;
+import it.eng.spagobi.commons.dao.SpagoBIDAOException;
+import it.eng.spagobi.commons.metadata.SbiDomains;
+import it.eng.spagobi.commons.utilities.UserUtilities;
+import it.eng.spagobi.tools.dataset.metadata.SbiDataSet;
+import it.eng.spagobi.utilities.assertion.Assert;
 
 public class SbiDataSetDAOImpl extends AbstractHibernateDAO implements ISbiDataSetDAO {
 
@@ -76,6 +78,7 @@ public class SbiDataSetDAOImpl extends AbstractHibernateDAO implements ISbiDataS
 			hibQuery.setBoolean(0, true);
 			hibQuery.setString(1, label);
 			SbiDataSet sbiDataSet = (SbiDataSet) hibQuery.uniqueResult();
+			initialize(sbiDataSet);
 
 			transaction.commit();
 
@@ -99,12 +102,9 @@ public class SbiDataSetDAOImpl extends AbstractHibernateDAO implements ISbiDataS
 	}
 
 	@Override
-	public SbiDataSet loadSbiDataSetByIdAndOrganiz(Integer id, String organiz) {
-		Session session;
-		List<SbiDataSet> list = null;
+	public SbiDataSet loadSbiDataSetByIdAndOrganiz(Integer id, String organiz, Session session) {
 		SbiDataSet sbiDataSet = null;
 		try {
-			session = getSession();
 			Criteria c = session.createCriteria(SbiDataSet.class);
 			c.addOrder(Order.asc("label"));
 			c.add(Restrictions.eq("id.dsId", id));
@@ -114,23 +114,38 @@ public class SbiDataSetDAOImpl extends AbstractHibernateDAO implements ISbiDataS
 			c.add(Restrictions.eq("active", true));
 
 			sbiDataSet = (SbiDataSet) c.uniqueResult();
+			initialize(sbiDataSet);
 
 		} catch (Exception e) {
-			e.printStackTrace();
+			throw new SpagoBIDAOException("An unexpected error occured while loading datasets", e);
+		} finally {
+			logger.debug("OUT");
+		}
+		return sbiDataSet;
+	}
+
+	@Override
+	public SbiDataSet loadSbiDataSetByIdAndOrganiz(Integer id, String organiz) {
+		Session session = null;
+		SbiDataSet sbiDataSet = null;
+		try {
+			session = getSession();
+			sbiDataSet = loadSbiDataSetByIdAndOrganiz(id, organiz, session);
+		} catch (Exception e) {
+			throw new SpagoBIDAOException("An unexpected error occured while loading datasets", e);
+		} finally {
+			if (session != null && session.isOpen()) {
+				session.close();
+			}
+			logger.debug("OUT");
 		}
 		return sbiDataSet;
 	}
 
 	@Override
 	public List<SbiDataSet> loadPaginatedSearchSbiDataSet(String search, Integer page, Integer item_per_page, IEngUserProfile finalUserProfile,
-			Boolean seeTechnical) {
-		return loadPaginatedSearchSbiDataSet(search, page, item_per_page, finalUserProfile, seeTechnical, null);
-	}
-
-	@Override
-	public List<SbiDataSet> loadPaginatedSearchSbiDataSet(String search, Integer page, Integer item_per_page, IEngUserProfile finalUserProfile,
 			Boolean seeTechnical, Integer[] ids) {
-		Session session;
+		Session session = null;
 		List<SbiDataSet> list = null;
 
 		try {
@@ -163,7 +178,7 @@ public class SbiDataSetDAOImpl extends AbstractHibernateDAO implements ISbiDataS
 				// OWNER OR
 
 				// take owned datasets
-				or.add(Restrictions.eq("owner", finalUserProfile.getUserUniqueIdentifier().toString()));
+				or.add(Restrictions.eq("owner", ((UserProfile) finalUserProfile).getUserId().toString()));
 
 				// get categories
 				Set<Domain> categoryList = UserUtilities.getDataSetCategoriesByUser(finalUserProfile);
@@ -211,8 +226,15 @@ public class SbiDataSetDAOImpl extends AbstractHibernateDAO implements ISbiDataS
 			}
 
 			list = c.list();
+			initialize(list);
+
 		} catch (Exception e) {
-			e.printStackTrace();
+			throw new SpagoBIDAOException("An unexpected error occured while loading datasets", e);
+		} finally {
+			if (session != null && session.isOpen()) {
+				session.close();
+			}
+			logger.debug("OUT");
 		}
 		return list;
 	}
@@ -221,11 +243,10 @@ public class SbiDataSetDAOImpl extends AbstractHibernateDAO implements ISbiDataS
 	public List<SbiDataSet> loadDataSets(String owner, Boolean includeOwned, Boolean includePublic, String scope, String type, String category,
 			String implementation, Boolean showDerivedDatasets) {
 
-		Session session = getSession();
+		Session session = null;
 
 		logger.debug("IN");
 
-		session = null;
 		try {
 			// open session
 			session = getSession();
@@ -259,9 +280,11 @@ public class SbiDataSetDAOImpl extends AbstractHibernateDAO implements ISbiDataS
 			if (implementation != null)
 				query.setString(paramIndex++, implementation);
 
-			return executeQuery(query, session);
-		} catch (Throwable t) {
-			throw new SpagoBIDAOException("An unexpected error occured while loading dataset whose owner is equal to [" + owner + "]", t);
+			List<SbiDataSet> datasets = executeQuery(query, session);
+			initialize(datasets);
+			return datasets;
+		} catch (Exception e) {
+			throw new SpagoBIDAOException("An unexpected error occured while loading dataset whose owner is equal to [" + owner + "]", e);
 		} finally {
 			if (session != null && session.isOpen()) {
 				session.close();
@@ -278,7 +301,7 @@ public class SbiDataSetDAOImpl extends AbstractHibernateDAO implements ISbiDataS
 
 		transaction = null;
 		try {
-			transaction = beginTransaction(session);
+			transaction = session.beginTransaction();
 			sbiDataSetList = query.list();
 
 			transaction.commit();
@@ -292,19 +315,6 @@ public class SbiDataSetDAOImpl extends AbstractHibernateDAO implements ISbiDataS
 		}
 
 		return sbiDataSetList;
-	}
-
-	private Transaction beginTransaction(Session session) {
-		Transaction transaction = null;
-		try {
-			Assert.assertNotNull(session, "session cannot be null");
-			transaction = session.beginTransaction();
-			Assert.assertNotNull(transaction, "transaction cannot be null");
-		} catch (Throwable t) {
-			throw new SpagoBIDAOException("An error occured while creating the new transaction", t);
-		}
-
-		return transaction;
 	}
 
 	@Override
@@ -358,6 +368,20 @@ public class SbiDataSetDAOImpl extends AbstractHibernateDAO implements ISbiDataS
 			result = sb.toString();
 		}
 		return result;
+	}
+
+	private static void initialize(SbiDataSet dataset) {
+		Hibernate.initialize(dataset.getId());
+		Hibernate.initialize(dataset.getCategory());
+		Hibernate.initialize(dataset.getTransformer());
+		Hibernate.initialize(dataset.getScope());
+		Hibernate.initialize(dataset.getFederation());
+	}
+
+	private static void initialize(List<SbiDataSet> datasets) {
+		for (SbiDataSet dataset : datasets) {
+			initialize(dataset);
+		}
 	}
 
 }

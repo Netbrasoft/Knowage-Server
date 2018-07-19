@@ -51,7 +51,6 @@ import it.eng.spago.error.EMFUserError;
 import it.eng.spago.security.IEngUserProfile;
 import it.eng.spagobi.analiticalmodel.document.bo.BIObject;
 import it.eng.spagobi.behaviouralmodel.analyticaldriver.bo.BIObjectParameter;
-import it.eng.spagobi.commons.SingletonConfig;
 import it.eng.spagobi.commons.bo.UserProfile;
 import it.eng.spagobi.commons.constants.SpagoBIConstants;
 import it.eng.spagobi.engines.InternalEngineIFace;
@@ -252,12 +251,6 @@ public class ExecutionProxy {
 
 			adjustParametersForExecutionProxy(aEngineDriver, mapPars, modality);
 
-			// pass ticket ...
-			String pass = SingletonConfig.getInstance().getConfigValue("SPAGOBI_SSO.PASS");
-			if (pass == null)
-				logger.warn("Pass Ticket is null");
-			mapPars.put(SpagoBIConstants.PASS_TICKET, pass);
-
 			// TODO merge with ExecutionInstance.addSystemParametersForExternalEngines for SBI_CONTEXT, locale parameters, etc...
 
 			// set spagobi host
@@ -314,7 +307,8 @@ public class ExecutionProxy {
 
 			// built the request to sent to the engine
 			HttpMethod httpMethod;
-			if ("it.eng.spagobi.engines.drivers.cockpit.CockpitDriver".equals(eng.getDriverName())) {
+			if ("it.eng.spagobi.engines.drivers.cockpit.CockpitDriver".equals(eng.getDriverName())
+					|| "it.eng.spagobi.engines.drivers.chart.ChartDriver".equals(eng.getDriverName())) {
 				GetMethod getMethod = new GetMethod(urlEngine);
 				List<NameValuePair> nameValuePairs = new ArrayList<NameValuePair>();
 				Iterator iterMapPar = mapPars.keySet().iterator();
@@ -350,7 +344,7 @@ public class ExecutionProxy {
 			int statusCode = client.executeMethod(httpMethod);
 			logger.debug("statusCode=" + statusCode);
 			response = httpMethod.getResponseBody();
-			logger.debug("response=" + new String(response));
+
 			Header headContetType = httpMethod.getResponseHeader("Content-Type");
 			if (headContetType != null) {
 				returnedContentType = headContetType.getValue();
@@ -380,7 +374,10 @@ public class ExecutionProxy {
 		Assert.assertTrue(urlEngine != null && !urlEngine.trim().equals(""), "External engine url is not defined!!");
 		urlEngine = resolveRelativeUrls(urlEngine);
 
-		if (!"it.eng.spagobi.engines.drivers.cockpit.CockpitDriver".equals(eng.getDriverName())) {
+		if (!"it.eng.spagobi.engines.drivers.cockpit.CockpitDriver".equals(eng.getDriverName())
+				&& !"it.eng.spagobi.engines.drivers.chart.ChartDriver".equals(eng.getDriverName())
+
+		) {
 			// ADD this extension because this is a BackEnd engine invocation
 			urlEngine = urlEngine + backEndExtension;
 		}

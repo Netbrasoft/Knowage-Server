@@ -3,7 +3,8 @@
 
 #foreach ($dataField in $dataFields) ## conversion column name to internal column name
 	#if($dataField.class.name == 'java.util.LinkedHashMap')
-		#set($workAroundNoPrint = $dataColumnsMapper.put($dataField.header , $dataField.name))
+		#set($dataFieldHeader = $datasettransformer.setGroupingFunctionToLowerCase($dataField.header))
+    	#set($workAroundNoPrint = $dataColumnsMapper.put($dataFieldHeader , $dataField.name))
 	#end
 #end
 
@@ -318,7 +319,7 @@
 	            #if($yAxis.endOnTickGauge)
 	            	endOnTick: $yAxis.endOnTickGauge,
 	            #end
-	        	#if($yAxis.minorTickInterval == '' ||  $yAxis.minorTickInterval == '0')
+	        	#if($yAxis.minorTickInterval == '' ||  $yAxis.minorTickInterval == '0' || $yAxis.minorTickInterval == 'auto')
 	        		minorTickInterval: 'auto',
         		#else
         			minorTickInterval: $yAxis.minorTickInterval,
@@ -339,8 +340,10 @@
 	    						distance: $yAxis.LABELS.distance,
     					#end 
     			
-	    			 	#if ($yAxis.LABELS.rotation && $yAxis.LABELS.rotation!="")    	
+	    			 	#if ($yAxis.LABELS.rotation && $yAxis.LABELS.rotation!="" && $yAxis.LABELS.rotation!='auto')    	
 	    						rotation: $yAxis.LABELS.rotation,
+	    				#else
+	    						rotation: 'auto',
     					#end
 	                
 		    		#if($yAxis.style)
@@ -562,7 +565,7 @@
 		    	#set($counterYAxis = $counterYAxis + 1)	    	
 		    		    	
 		        data: [
-		    	    #set($relatedSerieColName = "$relatedSerie.name"+"_#if($relatedSerie.groupingFunction)$relatedSerie.groupingFunction#{else}SUM#end")
+		    	    #set($relatedSerieColName = "$relatedSerie.name"+"_#if($relatedSerie.groupingFunction)$relatedSerie.groupingFunction.toLowerCase()#{else}sum#end")
 		    	    #set($serieColumnsMapped = $dataColumnsMapper.get($relatedSerieColName)) ## "Vendite_AVG" -> "column_5" ## "Ricavi_SUM" -> "column_6"
 					
 					#foreach($row in $rows)

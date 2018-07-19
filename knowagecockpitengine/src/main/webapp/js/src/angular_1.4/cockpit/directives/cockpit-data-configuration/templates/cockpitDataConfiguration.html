@@ -16,73 +16,100 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-
-
 <md-card class="flexCard" style="position:absolute;" layout-fill id="cockpitDataConfig">
  <md-card-content flex layout="column" class="noPadding">
-	<md-toolbar>
+	<md-toolbar class="secondaryToolbar">
 		<div class="md-toolbar-tools">
 			<h2> Data {{translate.load("sbi.cockpit.settings")}}</h2>
 		</div>
 	</md-toolbar>
 	<md-content flex layout="column">
 	
-	
 		<md-tabs  flex md-border-bottom layout-column>
 		
 			<md-tab  label="{{translate.load('sbi.cockpit.source')}}">
-		        <md-content  layout-fill layout="column" layout-gt-md="row">
+		        <md-content  layout-fill layout="row">
 		         		<md-card  class="flexCard" style="position:relative" layout="column" flex ng-controller="datasetManagerController"  >
 			         		<div ng-show="displayDatasetCard!=true;" layout-fill style='position:absolute;z-index: 500;background:rgba(0,0,0, 0.3);'>
 						       <md-progress-circular  md-mode='indeterminate' style='top:50%;left:50%;margin-left:-25px;' ></md-progress-circular>
 						    </div>
-							<md-card-content flex layout="column" ng-if="displayDatasetCard==true;">
-							<md-toolbar style="background-color: transparent!important;   color: black!important;">
+						    <md-toolbar class="secondaryToolbar">
 								  <div class="md-toolbar-tools" >
 								    <h2>{{translate.load("sbi.cockpit.datasets")}}</h2>
 								    <span flex></span>
+								    <md-button class="md-fab md-mini" ng-click="addDataset($event);">
+										<md-tooltip>{{translate.load("sbi.cockpit.add.dataset")}}</md-tooltip>
+							            <md-icon md-font-icon="fa fa-plus"></md-icon>
+							        </md-button>
 								  </div>
 								</md-toolbar>
-								  <angular-table flex 
-										id="cockpit-dataset" ng-model='tmpAvaiableDataset'
-										columns='cockpitDatasetTableColumns'
-										columns-search='["label"]'
-										show-search-bar="false"
-										no-pagination="true"
-										speed-menu-option="datasetTableActions"
-										scope-functions="datasetFunctions"
-										show-expander-row-condition="datasetHaveParameter(row)"
-										>
-										<queue-table>
-											<div layout="row" style="background: white;"> 
-												<span flex></span>
-												<md-button type="button" id="add-dataset" ng-click="scopeFunctions.addDataset($event);">{{scopeFunctions.translate.load("sbi.cockpit.add.dataset")}}</md-button>
-											</div>
-										</queue-table>
-										<row-detail>
-										
-											<md-card  layout="column" class="flexCard datasetParameterDetail" >
-												<md-card-content flex layout="column" >
-													<md-toolbar>
-													  <div class="md-toolbar-tools">
-													    <h2>{{scopeFunctions.translate.load("sbi.cockpit.mainpanel.btn.parameters")}}</h2>
-													    <span flex></span>
-													  </div>
-													</md-toolbar>
-													<div  layout-wrap layout="row" >
-												
-														<md-input-container class="md-icon-right" ng-repeat="par in row.parameters" flex="33" >
-												          <label>{{par.name}}</label>
-												          <input  ng-model="par.value" ng-init="par.value=par.value==undefined ? par.defaultValue : par.value" required>
-												          <md-icon ng-if="scopeFunctions.haveAnaliticalDriver" md-font-icon="fa fa-search datasetParameterChoices{{$parent.$parent.$index}}{{$index}}" ng-click="scopeFunctions.selectParameterFromPanel(par,'datasetParameterChoices'+$parent.$parent.$index+''+$index)"></md-icon>
-												        </md-input-container>
-											        </div>
-												</md-card-content>
-											</md-card>
-										
-											
-										</row-detail> 
-									</angular-table>
+							<md-card-content layout="column" ng-if="displayDatasetCard==true;" style="overflow:auto;">
+									<div layout="row" layout-align="center" ng-if="tmpAvaiableDataset.length == 0">
+										<div class="kn-noItems">
+											{{translate.load("sbi.cockpit.mainpanel.nodataset")}}
+										</div>
+									</div>
+									<table class="kn-table" ng-if="tmpAvaiableDataset.length > 0">
+										<thead>
+											<tr>
+												<th ng-repeat="column in cockpitDatasetColumns" ng-class="{'tableAction':column.type=='expand'}">{{column.label}}</th>
+												<th></th>
+											</tr>
+										</thead>
+										<tbody>
+											<tr ng-repeat-start="row in tmpAvaiableDataset">
+												<td ng-repeat="column in cockpitDatasetColumns" ng-class="{'tableAction':column.type=='expand'}">
+													<md-button class="md-icon-button" ng-click="expandRow(row)" ng-if="column.type=='expand' && row.parameters && row.parameters.length > 0">
+														<md-icon md-font-icon="fa" ng-class="{'fa-chevron-up':row.expanded, 'fa-chevron-down':!row.expanded}">
+													</md-button>
+													<span ng-if="column.type == 'text'">{{row[column.name]}}</span>
+													<md-checkbox ng-if="column.type == 'checkbox'" ng-disabled="(row.isCachingSupported && !row.isNearRealtimeSupported) || (!row.isCachingSupported && row.isNearRealtimeSupported)" ng-show='!row.isRealtime' ng-model="row.useCache"></md-checkbox>
+													<md-input-container ng-if="column.type == 'input'">
+												        <input type="number" ng-model="row.frequency" ng-disabled="row.useCache" ng-show='showNearRealTimeCockpit && !row.useCache && !row.isRealtime'>
+												    </md-input-container>
+												</td>
+												<td class="tableAction">
+													<md-button ng-repeat="action in datasetTableActions" class="md-icon-button" ng-click="action.action(row,$event)">
+														<md-tooltip>{{action.label}}</md-tooltip>
+														<md-icon md-font-icon="{{action.icon}}">
+													</md-button>
+												</td>
+											</tr>
+											<tr ng-repeat-end ng-show="row.parameters && row.parameters.length > 0 && row.expanded">
+												<td colspan="100">
+													<md-card layout="column" class="datasetParameterDetail">
+														<md-toolbar class="ternaryToolbar">
+														  <div class="md-toolbar-tools">
+														    <h2>{{translate.load("sbi.cockpit.mainpanel.btn.parameters")}}</h2>
+														    <span flex></span>
+														  </div>
+														</md-toolbar>
+														<md-card-content flex layout="column" >
+															<div  layout-wrap layout="row" >
+																<div layout="row" flex="30" style="margin:8px;" ng-repeat="par in row.parameters" >
+																	<md-input-container>
+															          <label>{{par.name}}</label>
+															          <input  ng-model="par.value" ng-init="par.value=par.value==undefined ? par.defaultValue : par.value" required>
+															        </md-input-container>
+															        <md-menu class="noPadding" ng-if="haveAnaliticalDriver()">
+																	      <md-button aria-label="Open parameters panel" class="md-icon-button" ng-click="$mdOpenMenu()">
+																	        <md-icon md-menu-origin md-font-icon="fa fa-search"></md-icon>
+																	      </md-button>
+																	      <md-menu-content width="3">
+																	        <md-menu-item ng-repeat="driver in cockpitModule_analyticalDriversUrls">
+																	          <md-button ng-click="addParameter(par,driver.url)">{{driver.url}}</md-button>
+																	        </md-menu-item>
+																        </md-menu-content>
+															        </md-menu>
+														        </div>
+													        </div>
+														</md-card-content>
+													</md-card>
+												</td>
+											</tr>
+										</tbody>
+									</table>
+
 							</md-card-content>
 						</md-card>
 		         		
@@ -90,55 +117,82 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 		         		<div ng-show="displayDocumentCard!=true;" layout-fill style='position:absolute;z-index: 500;background:rgba(0,0,0, 0.3);'>
 					       <md-progress-circular  md-mode='indeterminate' style='top:50%;left:50%;margin-left:-25px;' ></md-progress-circular>
 					    </div>
-    
-							<md-card-content flex layout="column" ng-if="displayDocumentCard==true;" >
-								<md-toolbar style="background-color: transparent!important;   color: black!important;">
-								  <div class="md-toolbar-tools" >
-								    <h2>{{translate.load("Documents")}}</h2>
-								    <span flex></span>
-								  </div>
-								</md-toolbar>
-								  <angular-table flex 
-										id="cockpit-document" ng-model='tmpAvaiableDocument'
-										columns='cockpitDocumentTableColumns'
-										columns-search='["label"]'
-										show-search-bar="false"
-										no-pagination="true"
-										speed-menu-option="documentTableActions"
-										scope-functions="documentFunctions"
-										show-expander-row-condition="documentHaveParameter(row)"
-										>
-										<queue-table>
-											<div layout="row" style="background: white;"> 
-												<span flex></span>
-												<md-button type="button" id="add-dataset" ng-click="scopeFunctions.addDocument($event);">{{scopeFunctions.translate.load("sbi.cockpit.add.document")}}</md-button>
-											</div>
-										</queue-table>
-										<row-detail>
-										
-											<md-card   class="flexCard analiticalParameterDetail" >
-												<md-card-content layout="column" flex layout="column" >
-													<md-toolbar>
-													  <div class="md-toolbar-tools">
-													    <h2>{{scopeFunctions.translate.load("sbi.cockpit.mainpanel.btn.parameters")}}</h2>
-													    <span flex></span>
-													  </div>
-													</md-toolbar>
-													<div  layout-wrap layout="row" >
-												
-														<md-input-container class="md-icon-right" ng-repeat="par in row.objParameter" flex="33"  >
-												          <label>{{par.urlName}}</label>
-												          <input  ng-model="par.value">
-												          <md-icon ng-if="scopeFunctions.haveAnaliticalDriver" md-font-icon="fa fa-search documentParameterChoices{{$parent.$parent.$index}}{{$index}}" ng-click="scopeFunctions.selectParameterFromPanel(par,'documentParameterChoices'+$parent.$parent.$index+''+$index)"></md-icon>
-												        </md-input-container>
-												         
-											        </div>
-												</md-card-content>
-											</md-card>
-										
-											
-										</row-detail> 
-									</angular-table>
+    						<md-toolbar class="secondaryToolbar">
+							  <div class="md-toolbar-tools" >
+							    <h2>{{translate.load("Documents")}}</h2>
+							    <span flex></span>
+							    <md-button class="md-fab md-mini" ng-click="addDocument($event);">
+									<md-tooltip>{{translate.load("sbi.cockpit.add.dataset")}}</md-tooltip>
+						            <md-icon md-font-icon="fa fa-plus"></md-icon>
+						        </md-button>
+							  </div>
+							</md-toolbar>
+							<md-card-content flex layout="column" ng-if="displayDocumentCard==true;" style="overflow:auto;">
+							<div layout="row" layout-align="center" ng-if="tmpAvaiableDocument.length == 0">
+								<div class="kn-noItems">
+									{{translate.load("sbi.cockpit.mainpanel.nodocument")}}
+								</div>
+							</div>
+							
+							<table class="kn-table" ng-if="tmpAvaiableDocument.length > 0">
+										<thead>
+											<tr>
+												<th ng-repeat="column in cockpitDocumentTableColumns">{{column.label}}</th>
+												<th></th>
+											</tr>
+										</thead>
+										<tbody>
+											<tr ng-repeat-start="row in tmpAvaiableDocument">
+												<td ng-repeat="column in cockpitDocumentTableColumns" ng-class="{'tableAction':column.type=='expand' && row.objParameter && row.objParameter.length > 0}">
+													<md-button class="md-icon-button" ng-click="expandRow(row)" ng-if="column.type=='expand' && row.objParameter && row.objParameter.length > 0">
+														<md-icon md-font-icon="fa" ng-class="{'fa-chevron-up':row.expanded, 'fa-chevron-down':!row.expanded}">
+													</md-button>
+													<span ng-if="column.type == 'text'">{{row[column.name]}}</span>
+												</td>
+												<td class="tableAction">
+													<md-button ng-repeat="action in documentTableActions" class="md-icon-button" ng-click="action.action(row,$event)">
+														<md-tooltip>{{action.label}}</md-tooltip>
+														<md-icon md-font-icon="{{action.icon}}">
+													</md-button>
+												</td>
+											</tr>
+											<tr ng-repeat-end ng-show="row.objParameter && row.objParameter.length > 0 && row.expanded">
+												<td colspan="100">
+													<md-card layout="column" class="datasetParameterDetail">
+														<md-toolbar class="ternaryToolbar">
+														  <div class="md-toolbar-tools">
+														    <h2>{{translate.load("sbi.cockpit.mainpanel.btn.parameters")}}</h2>
+														    <span flex></span>
+														  </div>
+														</md-toolbar>
+														<md-card-content flex layout="column" >
+															<div  layout-wrap layout="row" >
+																<div layout="row" flex="30" style="margin:8px;" ng-repeat="par in row.objParameter" >
+																	<md-input-container class="" >
+															          <label>{{par.label}}</label>
+															          <input  ng-model="par.value" ng-init="par.value=par.value==undefined ? par.defaultValue : par.value" required>
+															          
+															          <!-- md-icon ng-if="haveAnaliticalDriver()" md-font-icon="fa fa-search docChoices{{row.DOCUMENT_ID}}-{{$index}}" ng-click="selectParameterFromPanel(par,'docChoices'+row.DOCUMENT_ID+'-'+$index)"></md-icon-->
+														        	</md-input-container>
+														        	<md-menu class="noPadding" ng-if="haveAnaliticalDriver()">
+																	      <md-button aria-label="Open parameters panel" class="md-icon-button" ng-click="$mdOpenMenu()">
+																	        <md-icon md-menu-origin md-font-icon="fa fa-search"></md-icon>
+																	      </md-button>
+																	      <md-menu-content width="3">
+																	        <md-menu-item ng-repeat="driver in cockpitModule_analyticalDriversUrls">
+																	          <md-button ng-click="addParameter(par,driver.url)">{{driver.url}}</md-button>
+																	        </md-menu-item>
+																        </md-menu-content>
+															        </md-menu>
+																</div>
+													        </div>
+														</md-card-content>
+													</md-card>
+												</td>
+											</tr>
+										</tbody>
+									</table>
+
 							</md-card-content>
 						</md-card>
 		       
@@ -149,7 +203,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 		        <md-content  layout-fill layout="row" ng-controller="dataAssociationController"> 
 		          <div layout="column" layout-fill ng-if="displayAssociationsContent==true">
 		          	<div flex="50" layout="row" style="overflow: auto;">
-<!-- 		          	Dataset card -->
 						<md-card class=" associationCard flexCard"  ng-repeat="avDataset in tmpAvaiableDataset" layout="column"> 
 							<md-card-content flex="" layout="column" class="noPadding">
 								<md-toolbar class="secondaryToolbar" >
@@ -160,7 +213,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 								<md-content flex layout>
 									<md-list class="md-dense" flex>
 										<md-list-item class="md-long-text" ng-repeat="meta in avDataset.metadata.fieldsMeta" 
-										ng-click="toggleAssociation(avDataset.label,meta.name,'dataset')" ng-class="{'selectedRow':jsonCurrentAss[avDataset.label]==('dataset'+meta.name)}">
+										ng-click="toggleAssociation(avDataset.label,meta.alias,'dataset')" ng-class="{'selectedRow':jsonCurrentAss[avDataset.label]==('dataset'+meta.name)}">
 											<span layout="row" flex>
 												<p flex=70 class="metaname" >{{meta.alias}}</p>
                                                 <!--  <p flex=70 class="metaname" ng-if="meta.alias==''">{{meta.name}}</p>   -->
@@ -182,7 +235,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 								</md-content>
 							</md-card-content>
 						</md-card>
-<!-- 						Document card -->
 						<md-card class=" associationCard flexCard"  ng-repeat="avDocument in tmpAvaiableDocument" layout="column" ng-if="avDocument.objParameter.length>0"> 
 							<md-card-content flex="" layout="column" class="noPadding">
 								<md-toolbar class="documentAssociationToolbar" >
@@ -216,7 +268,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 						</md-toolbar>
 						<md-content flex  >
 							<div  class="associationBox editingAssociation" layout="row"   >
-								<div layout="row" layout-wrap flex>
+								<div layout="row" layout-wrap flex layout-align="center center">
 									<span layout="row" ng-repeat="item in utils.currentAss.fields">
 										<span>{{item.store}}.{{item.column}}</span>
 										<i class="fa fa-arrows-h associationsArrow" aria-hidden="true" ng-if="!$last"></i>
@@ -231,10 +283,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 								      </md-button>
 								</div>
 							</div>
-<!-- 							saved associations -->
-
 							<div  class="associationBox " layout="row"   ng-repeat="ass in tmpAssociations" >
-								<div layout="row" layout-wrap flex>
+								<div layout="row" layout-wrap flex layout-align="center center">
 									<span layout="row" ng-repeat="item in ass.fields">
 										<span>{{item.store}}.{{item.column}}</span>
 										<i class="fa fa-arrows-h associationsArrow" aria-hidden="true" ng-if="!$last"></i>
@@ -262,8 +312,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 		        </md-content>
 		 	</md-tab>
 		 	<md-tab label="template">
-		        <md-content    >
-		        <pre>{{cockpitModule_template | json}}</pre>
+		        <md-content ng-controller="dataAssociationController">
+		        	<md-card>
+		        		<md-toolbar class="ternaryToolbar" >
+							<div class="md-toolbar-tools" layout="row">
+								<md-switch ng-model="showIndented">smart json visualization</md-switch>
+							</div>
+						</md-toolbar>
+		        		<md-card-content>
+		        			<json-formatter ng-show="showIndented" json="cockpitModule_template" open="3"></json-formatter>
+		        			<pre ng-show="!showIndented">{{cockpitModule_template | json:4}}</pre>
+		        		</md-card-content>
+		        	</md-card>
+		        
 		        </md-content>
 		 	</md-tab>
 		</md-tabs>
@@ -271,10 +332,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 	
 </md-card-content>
 <md-card-actions layout="row" layout-align="end center">
-	  <md-button ng-click="cancelConfiguration()">
+	  <md-button ng-click="cancelConfiguration()" class="md-raised">
 	    {{translate.load("sbi.generic.cancel")}}
 	  </md-button>
-	  <md-button ng-click="saveConfiguration()">
+	  <md-button ng-click="saveConfiguration()" class="md-raised md-primary">
 	    {{translate.load("sbi.generic.save")}}
 	  </md-button>
 </md-card-actions>

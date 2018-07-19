@@ -17,27 +17,6 @@
  */
 package it.eng.spagobi.engines.birt;
 
-import it.eng.spago.base.SourceBean;
-import it.eng.spago.error.EMFInternalError;
-import it.eng.spago.security.IEngUserProfile;
-import it.eng.spagobi.commons.bo.UserProfile;
-import it.eng.spagobi.commons.constants.SpagoBIConstants;
-import it.eng.spagobi.engines.birt.exceptions.ConnectionDefinitionException;
-import it.eng.spagobi.engines.birt.exceptions.ConnectionParameterNotValidException;
-import it.eng.spagobi.engines.birt.utilities.ParameterConverter;
-import it.eng.spagobi.services.common.EnginConf;
-import it.eng.spagobi.services.common.SsoServiceFactory;
-import it.eng.spagobi.services.common.SsoServiceInterface;
-import it.eng.spagobi.services.content.bo.Content;
-import it.eng.spagobi.services.proxy.ContentServiceProxy;
-import it.eng.spagobi.services.proxy.DataSourceServiceProxy;
-import it.eng.spagobi.tools.dataset.common.behaviour.UserProfileUtils;
-import it.eng.spagobi.tools.datasource.bo.IDataSource;
-import it.eng.spagobi.utilities.DynamicClassLoader;
-import it.eng.spagobi.utilities.ParametersDecoder;
-import it.eng.spagobi.utilities.SpagoBIAccessUtils;
-import it.eng.spagobi.utilities.callbacks.audit.AuditAccessUtils;
-
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -47,6 +26,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PrintWriter;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Enumeration;
@@ -77,8 +57,11 @@ import org.eclipse.birt.report.engine.api.HTMLServerImageHandler;
 import org.eclipse.birt.report.engine.api.IDataExtractionTask;
 import org.eclipse.birt.report.engine.api.IGetParameterDefinitionTask;
 import org.eclipse.birt.report.engine.api.IImage;
+import org.eclipse.birt.report.engine.api.IPageHandler;
 import org.eclipse.birt.report.engine.api.IRenderOption;
+import org.eclipse.birt.report.engine.api.IRenderTask;
 import org.eclipse.birt.report.engine.api.IReportDocument;
+import org.eclipse.birt.report.engine.api.IReportDocumentInfo;
 import org.eclipse.birt.report.engine.api.IReportEngine;
 import org.eclipse.birt.report.engine.api.IReportRunnable;
 import org.eclipse.birt.report.engine.api.IResultSetItem;
@@ -94,6 +77,26 @@ import org.eclipse.birt.report.utility.DataExtractionParameterUtil;
 import org.safehaus.uuid.UUID;
 import org.safehaus.uuid.UUIDGenerator;
 
+import it.eng.spago.base.SourceBean;
+import it.eng.spago.error.EMFInternalError;
+import it.eng.spago.security.IEngUserProfile;
+import it.eng.spagobi.commons.constants.SpagoBIConstants;
+import it.eng.spagobi.engines.birt.exceptions.ConnectionDefinitionException;
+import it.eng.spagobi.engines.birt.exceptions.ConnectionParameterNotValidException;
+import it.eng.spagobi.engines.birt.utilities.ParameterConverter;
+import it.eng.spagobi.engines.birt.utilities.Utils;
+import it.eng.spagobi.services.common.EnginConf;
+import it.eng.spagobi.services.common.SsoServiceFactory;
+import it.eng.spagobi.services.common.SsoServiceInterface;
+import it.eng.spagobi.services.content.bo.Content;
+import it.eng.spagobi.services.proxy.ContentServiceProxy;
+import it.eng.spagobi.services.proxy.DataSourceServiceProxy;
+import it.eng.spagobi.tools.dataset.common.behaviour.UserProfileUtils;
+import it.eng.spagobi.tools.datasource.bo.IDataSource;
+import it.eng.spagobi.utilities.DynamicClassLoader;
+import it.eng.spagobi.utilities.ParametersDecoder;
+import it.eng.spagobi.utilities.SpagoBIAccessUtils;
+import it.eng.spagobi.utilities.callbacks.audit.AuditAccessUtils;
 import sun.misc.BASE64Decoder;
 
 /**
@@ -111,6 +114,13 @@ public class BirtReportServlet extends HttpServlet {
 	public static final String RTF_FORMAT = "RTF";
 	public static final String predefinedGroovyScriptFileName = "predefinedGroovyScript.groovy";
 	public static final String predefinedJsScriptFileName = "predefinedJavascriptScript.js";
+
+	public static final String OUTPUT_FOLDER = System.getProperty("java.io.tmpdir") != null && System.getProperty("java.io.tmpdir").endsWith(File.separator)
+			? System.getProperty("java.io.tmpdir") + "birt" + File.separator
+			: System.getProperty("java.io.tmpdir") + File.separator + "birt" + File.separator;
+
+	public static final String PAGE_FILE_NAME = "page";
+	public static final String REPORT_EXECUTION_ID = "REPORT_EXECUTION_ID";
 
 	/*
 	 * (non-Javadoc)
@@ -189,8 +199,8 @@ public class BirtReportServlet extends HttpServlet {
 			// AUDIT UPDATE
 			if (auditId != null) {
 				if (auditAccessUtils != null)
-					auditAccessUtils
-							.updateAudit(session, userId, auditId, null, new Long(System.currentTimeMillis()), "EXECUTION_FAILED", e.getMessage(), null);
+					auditAccessUtils.updateAudit(session, userId, auditId, null, new Long(System.currentTimeMillis()), "EXECUTION_FAILED", e.getMessage(),
+							null);
 			}
 		}
 
@@ -219,16 +229,15 @@ public class BirtReportServlet extends HttpServlet {
 		}
 	}
 
-	
-	protected HTMLRenderOption prepareHtmlRenderOption(ServletContext servletContext, HttpServletRequest servletRequest) throws Exception {
+	protected HTMLRenderOption prepareHtmlRenderOption(HttpServletRequest servletRequest) throws Exception {
 		boolean isBackEndRequest = isBackEndRequest(servletRequest);
 		if (isBackEndRequest) {
 			return prerareBackEndHtmlRenderOption();
 		} else {
-			return prepareFrontEndHtmlRenderOption(servletRequest);
+			return prepareFrontEndHtmlRenderOption();
 		}
 	}
-	
+
 	private boolean isBackEndRequest(HttpServletRequest servletRequest) {
 		logger.debug("IN");
 		String requestURL = servletRequest.getRequestURL().toString();
@@ -237,14 +246,12 @@ public class BirtReportServlet extends HttpServlet {
 		logger.debug("OUT : " + toReturn);
 		return toReturn;
 	}
-	
-	private HTMLRenderOption prepareFrontEndHtmlRenderOption(
-			HttpServletRequest servletRequest) {
+
+	private HTMLRenderOption prepareFrontEndHtmlRenderOption() {
 		logger.debug("IN");
 		String tmpDir = System.getProperty("java.io.tmpdir");
 		String imageDirectory = tmpDir.endsWith(File.separator) ? tmpDir + "birt" : tmpDir + File.separator + "birt";
-		String contextPath = servletRequest.getContextPath();
-		String imageBaseUrl = "/BirtImageServlet?imageID=";
+		String imageBaseUrl = "BirtImageServlet?imageID=";
 
 		// Register new image handler
 		HTMLRenderOption renderOption = new HTMLRenderOption();
@@ -252,38 +259,31 @@ public class BirtReportServlet extends HttpServlet {
 		HTMLServerImageHandler imageHandler = new HTMLServerImageHandler();
 		renderOption.setImageHandler(imageHandler);
 		renderOption.setImageDirectory(imageDirectory);
-		renderOption.setBaseImageURL(contextPath + imageBaseUrl);
+		renderOption.setBaseImageURL(imageBaseUrl);
 		renderOption.setEmbeddable(false);
-		this.birtReportEngine.getConfig().getEmitterConfigs().put("html", renderOption);
 		logger.debug("OUT");
 		return renderOption;
 	}
 
-	
 	private HTMLRenderOption prerareBackEndHtmlRenderOption() {
 		logger.debug("IN");
 		HTMLRenderOption renderOption = new HTMLRenderOption();
 		renderOption.setOutputFormat(HTMLRenderOption.HTML);
 		renderOption.setSupportedImageFormats("PNG;GIF;JPG;BMP");
-		((HTMLRenderOption) renderOption).setEmbeddable(false);
+		renderOption.setEmbeddable(false);
 		renderOption.setImageHandler(new HTMLServerImageHandler() {
 			@Override
-			protected String handleImage(IImage image, Object context,
-					String prefix, boolean needMap) {
-				byte[] encodedBytes = Base64.encodeBase64(image
-						.getImageData());
+			protected String handleImage(IImage image, Object context, String prefix, boolean needMap) {
+				byte[] encodedBytes = Base64.encodeBase64(image.getImageData());
 				String embeddedImage = new String(encodedBytes);
-				String extension = image.getExtension().substring(1)
-						.toLowerCase(); // it starts with "."
+				String extension = image.getExtension().substring(1).toLowerCase(); // it starts with "."
 				return "data:image/" + extension + ";base64," + embeddedImage;
 			}
 		});
-		this.birtReportEngine.getConfig().getEmitterConfigs()
-				.put("html", renderOption);
 		logger.debug("OUT");
 		return renderOption;
 	}
-	
+
 	private InputStream getTemplateContent(HttpServletRequest servletRequest, ServletContext servletContext) throws IOException {
 		logger.debug("IN");
 		HttpSession session = servletRequest.getSession();
@@ -503,6 +503,17 @@ public class BirtReportServlet extends HttpServlet {
 		ServletContext servletContext = getServletContext();
 		this.birtReportEngine = BirtEngine.getBirtEngine(request, servletContext);
 		IReportRunnable design = null;
+
+		// retrieve once in order to convert into string and check if contains javascript for progressive view
+		InputStream isToString = getTemplateContent(request, servletContext);
+		int n = isToString.available();
+		byte[] bytes = new byte[n];
+		isToString.read(bytes, 0, n);
+		String result = new String(bytes, StandardCharsets.UTF_8);
+		isToString.close();
+
+		// reds again in order to make template
+
 		InputStream is = getTemplateContent(request, servletContext);
 		logger.debug("runReport(): template document retrieved.");
 		// Open the report design
@@ -553,12 +564,40 @@ public class BirtReportServlet extends HttpServlet {
 		}
 		String outputFormat = request.getParameter("outputType");
 		logger.debug("outputType -- [" + outputFormat + "]");
+		String outputType = getOutputType(outputFormat);
+
+		boolean progressiveViewing = false;
+		boolean isHTML = outputType.equalsIgnoreCase("text/html") ? true : false;
+		boolean containsJQuery = false;
+
+		// check if there is script for progressive pagination inside the report
+		if (result.contains("<script src=\"./js/lib/jquery")) {
+			containsJQuery = true;
+			logger.debug("JQuery to enable progressive viewing is contained");
+		}
+		if (isHTML && containsJQuery) {
+			logger.debug("Enabling progressive viewing");
+			progressiveViewing = true;
+		}
+
+		logger.debug("outputFormat -- [" + outputFormat + "]");
+		logger.debug("outputType -- [" + outputType + "]");
+		logger.debug("Run birt with progressive viewing -- [" + progressiveViewing + "]");
 
 		logger.debug("runReport(): report design opened successfully.");
+
+		// task.setParameterValues(reportParams); NO PATCH
+		// task.validateParameters();
+		// Map userProfileAttrs = UserProfileUtils.getProfileAttributes(profile); // NO PATCH
+		// Map context = getTaskContext(userId, params, request, resPathJNDI, userProfileAttrs); // NO PATCH
+		// task.setAppContext(context); NO PATCH
+		// renderOption.setOutputStream(response.getOutputStream());
+		// task.setRenderOption(renderOption);
 		// Create task to run and render the report,
-		IRunAndRenderTask task = birtReportEngine.createRunAndRenderTask(design);
-		task.setLocale(locale);
+		// IRunAndRenderTask task = birtReportEngine.createRunAndRenderTask(design); // NO PATCH
+		// task.setLocale(locale);
 		logger.debug("runReport(): RunAndRenderTask created successfully.");
+
 		// Set parameters for the report
 		Map reportParams = findReportParams(request, design);
 
@@ -606,18 +645,14 @@ public class BirtReportServlet extends HttpServlet {
 		logger.debug("SetUp resourcePath:" + resourcePath);
 		reportParams.put("SBI_RESOURCE_PATH", resourcePath);
 
-		task.setParameterValues(reportParams);
-		task.validateParameters();
+		Map userProfileAttrs = UserProfileUtils.getProfileAttributes(profile);
+		Map context = getTaskContext(userId, params, request, resPathJNDI, userProfileAttrs);
 
 		String templateFileName = request.getParameter("template_file_name");
 		logger.debug("templateFileName -- [" + templateFileName + "]");
 		if (templateFileName == null || templateFileName.trim().equals(""))
 			templateFileName = "report";
 		IRenderOption renderOption = null;
-
-		Map userProfileAttrs = UserProfileUtils.getProfileAttributes(profile);
-		Map context = getTaskContext(userId, params, request, resPathJNDI, userProfileAttrs);
-		// Map context = BirtUtility.getAppContext(request);
 
 		if (outputFormat != null && outputFormat.equalsIgnoreCase(IBirtConstants.PDF_RENDER_FORMAT)) {
 			renderOption = new PDFRenderOption();
@@ -626,7 +661,7 @@ public class BirtReportServlet extends HttpServlet {
 			response.setContentType("application/pdf");
 			response.setHeader("Content-disposition", "inline; filename=" + templateFileName + ".pdf");
 		} else if (outputFormat != null && outputFormat.equalsIgnoreCase(IBirtConstants.HTML_RENDER_FORMAT)) {
-			renderOption = prepareHtmlRenderOption(servletContext, request);
+			renderOption = prepareHtmlRenderOption(request);
 			renderOption.setOutputFormat(IBirtConstants.HTML_RENDER_FORMAT);
 			response.setHeader("Content-Type", "text/html");
 			response.setContentType("text/html");
@@ -641,7 +676,7 @@ public class BirtReportServlet extends HttpServlet {
 			response.setContentType("application/vnd.openxmlformats-officedocument.wordprocessingml.document");
 			response.setHeader("Content-disposition", "inline; filename=" + templateFileName + ".docx");
 		} else if (outputFormat != null && outputFormat.equalsIgnoreCase(RTF_FORMAT)) {
-			renderOption = prepareHtmlRenderOption(servletContext, request);
+			renderOption = prepareHtmlRenderOption(request);
 			renderOption.setOutputFormat(RTF_FORMAT);
 			response.setContentType("application/rtf");
 			response.setHeader("Content-disposition", "inline; filename=" + templateFileName + ".rtf");
@@ -679,15 +714,76 @@ public class BirtReportServlet extends HttpServlet {
 		} else {
 			logger.debug(" Output format parameter not set or not valid. Using default output format: HTML.");
 			outputFormat = IBirtConstants.HTML_RENDER_FORMAT;
-			renderOption = prepareHtmlRenderOption(servletContext, request);
+			renderOption = prepareHtmlRenderOption(request);
 			renderOption.setOutputFormat(IBirtConstants.HTML_RENDER_FORMAT);
 			response.setContentType("text/html");
 			response.setHeader("Content-Type", "text/html");
 		}
 
-		task.setAppContext(context);
-		renderOption.setOutputStream(response.getOutputStream());
-		task.setRenderOption(renderOption);
+		IRunAndRenderTask runAndRenderTask = null;
+		IRunTask runTask = null;
+
+		if (progressiveViewing == false) { // Traditional run and rendering
+			// Create task to run and render the report,
+			runAndRenderTask = birtReportEngine.createRunAndRenderTask(design);
+			runAndRenderTask.setLocale(locale);
+			runAndRenderTask.setParameterValues(reportParams);
+			runAndRenderTask.validateParameters();
+			runAndRenderTask.setAppContext(context);
+			renderOption.setOutputStream(response.getOutputStream());
+			runAndRenderTask.setRenderOption(renderOption);
+			logger.debug("runReport(): RunAndRenderTask created successfully.");
+		} else { // progressive run
+			ProgressiveCustomPageHandler myPageHandler = new ProgressiveCustomPageHandler((String) context.get(REPORT_EXECUTION_ID));
+			runTask = birtReportEngine.createRunTask(design);
+			runTask.setLocale(locale);
+			runTask.setPageHandler(myPageHandler);
+			runTask.setParameterValues(reportParams);
+			runTask.validateParameters();
+			runTask.setAppContext(context);
+			renderOption.setOutputStream(response.getOutputStream());
+		}
+
+		String reportExecutionId = (String) context.get(REPORT_EXECUTION_ID);
+		String pattern = "^[a-zA-Z0-9]*$";
+		if (!reportExecutionId.matches(pattern)) {
+			throw new RuntimeException("Security Exception: Report Executio Id [" + reportExecutionId + "] is not alfanumeric.");
+		}
+
+		logger.debug("Execution id is : " + reportExecutionId);
+
+		try {
+			if (progressiveViewing == false) {
+				runAndRenderTask.run();
+			} else {
+				String file = OUTPUT_FOLDER + reportExecutionId + ".rptdocument";
+				logger.debug("output file path is  " + file);
+
+				runTask.run(file);
+
+				Utils.sendPage(response, 1, (String) context.get(REPORT_EXECUTION_ID));
+
+			}
+		} catch (Exception e) {
+			throw e; // we throw the exception as it is, since this is caught in
+		} finally {
+			if (runAndRenderTask != null)
+				runAndRenderTask.close();
+			if (runTask != null)
+				runTask.close();
+			if (is != null)
+				is.close();
+		}
+
+		// NO PATCH
+		// task.setParameterValues(reportParams); NO PATCH
+		// task.validateParameters();
+		// task.setAppContext(context); NO PATCH
+		// renderOption.setOutputStream(response.getOutputStream());
+		// task.setRenderOption(renderOption);
+		// Create task to run and render the report,
+		// IRunAndRenderTask task = birtReportEngine.createRunAndRenderTask(design); // NO PATCH
+		// task.setLocale(locale);
 
 		// setting HTML header if output format is HTML: this is necessary in
 		// order to inject the document.domain directive
@@ -697,15 +793,13 @@ public class BirtReportServlet extends HttpServlet {
 		 * if (outputFormat.equalsIgnoreCase(IBirtConstants.HTML_RENDER_FORMAT)) { ((HTMLRenderOption) renderOption).setEmbeddable(true);
 		 * injectHTMLHeader(response); }
 		 */
-
-		try {
-			task.run();
-		} catch (Exception e) {
-			logger.error("Error while running the report: " + e);
-			e.printStackTrace();
-		}
-		task.close();
-
+		// try {
+		// task.run();
+		// } catch (Exception e) {
+		// logger.error("Error while running the report: " + e);
+		// e.printStackTrace();
+		// }
+		// task.close();
 		// commented by Davide Zerbetto on 12/10/2009: there are problems with
 		// MIF (Ext ManagedIFrame library) library
 		/*
@@ -714,6 +808,15 @@ public class BirtReportServlet extends HttpServlet {
 
 		logger.debug("OUT");
 
+	}
+
+	public static String createNewExecutionId() {
+		String executionId = null;
+		UUIDGenerator uuidGen = UUIDGenerator.getInstance();
+		UUID uuidObj = uuidGen.generateTimeBasedUUID();
+		executionId = uuidObj.toString();
+		executionId = executionId.replaceAll("-", "");
+		return executionId;
 	}
 
 	private void setMSOfficeEmitterId(String output, IRenderOption renderOption) {
@@ -743,7 +846,6 @@ public class BirtReportServlet extends HttpServlet {
 	private Map getTaskContext(String userId, Map reportParams, HttpServletRequest request, String resourcePath, Map userProfileAttrs) throws IOException {
 		Map context = BirtUtility.getAppContext(request);
 
-		String pass = EnginConf.getInstance().getPass();
 		String spagoBiServerURL = EnginConf.getInstance().getSpagoBiServerUrl();
 		HttpSession session = request.getSession();
 		String secureAttributes = (String) session.getAttribute("isBackend");
@@ -753,22 +855,11 @@ public class BirtReportServlet extends HttpServlet {
 			SourceBean sourceBeanConf = (SourceBean) engineConfig.getAttribute("DataSetServiceProxy_URL");
 			serviceUrlStr = sourceBeanConf.getCharacters();
 		}
-		String token = null;
-		boolean isSecure = true;
-		if (secureAttributes != null && secureAttributes.equals("true")) {
-			isSecure = false;
-		}
 
-		if (!isSecure) {
-			token = pass;
-		}
-		if (!UserProfile.isSchedulerUser(userId)) {
-			SsoServiceInterface proxyService = SsoServiceFactory.createProxyService();
-			token = proxyService.readTicket(session);
-		} else {
-			token = "";
-		}
+		SsoServiceInterface proxyService = SsoServiceFactory.createProxyService();
+		String token = proxyService.readTicket(session);
 
+		context.put(REPORT_EXECUTION_ID, createNewExecutionId());
 		context.put("RESOURCE_PATH_JNDI_NAME", resourcePath);
 		context.put("SBI_BIRT_RUNTIME_IS_RUNTIME", "true");
 		context.put("SBI_BIRT_RUNTIME_USER_ID", userId);
@@ -776,7 +867,6 @@ public class BirtReportServlet extends HttpServlet {
 		context.put("SBI_BIRT_RUNTIME_SERVICE_URL", serviceUrlStr);
 		context.put("SBI_BIRT_RUNTIME_SERVER_URL", spagoBiServerURL);
 		context.put("SBI_BIRT_RUNTIME_TOKEN", token);
-		context.put("SBI_BIRT_RUNTIME_PASS", pass);
 		context.put("SBI_BIRT_RUNTIME_PARS_MAP", reportParams);
 		context.put("SBI_BIRT_RUNTIME_PROFILE_USER_ATTRS", userProfileAttrs);
 		context.put("SBI_BIRT_RUNTIME_GROOVY_SCRIPT_FILE_NAME", predefinedGroovyScriptFileName);
@@ -804,7 +894,7 @@ public class BirtReportServlet extends HttpServlet {
 
 	/**
 	 * This method injects the HTML footer into the report HTML output. See injectHTMLHeader method
-	 * 
+	 *
 	 * @param context
 	 */
 	/*
@@ -1006,4 +1096,99 @@ public class BirtReportServlet extends HttpServlet {
 		}
 	}
 
+	private String getOutputType(String outputFormat) {
+		String toReturn = null;
+		if (outputFormat != null && outputFormat.equalsIgnoreCase(IBirtConstants.PDF_RENDER_FORMAT)) {
+			toReturn = "application/pdf";
+		} else if (outputFormat != null && outputFormat.equalsIgnoreCase(IBirtConstants.HTML_RENDER_FORMAT)) {
+			toReturn = "text/html";
+		} else if (outputFormat != null && outputFormat.equalsIgnoreCase(IBirtConstants.DOC_RENDER_FORMAT)) {
+			toReturn = "application/msword";
+		} else if (outputFormat != null && outputFormat.equalsIgnoreCase(RTF_FORMAT)) {
+			toReturn = "application/rtf";
+		} else if (outputFormat != null && outputFormat.equalsIgnoreCase(IBirtConstants.EXCEL_RENDER_FORMAT)) {
+			toReturn = "application/vnd.ms-excel";
+		} else if (outputFormat != null && outputFormat.equalsIgnoreCase("xlsx")) {
+			toReturn = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+		} else if (outputFormat != null && outputFormat.equalsIgnoreCase("ppt")) {
+			toReturn = "application/vnd.ms-powerpoint";
+		} else if (outputFormat != null && outputFormat.equalsIgnoreCase(IBirtConstants.POSTSCRIPT_RENDER_FORMAT)) {
+			toReturn = "IBirtConstants.POSTSCRIPT_RENDER_FORMAT";
+		} else if (outputFormat != null && outputFormat.equalsIgnoreCase(DataExtractionParameterUtil.EXTRACTION_FORMAT_CSV)) {
+			toReturn = "CSV";
+		} else {
+			toReturn = "text/html";
+		}
+		return toReturn;
+	}
+
+	public class ProgressiveCustomPageHandler implements IPageHandler {
+
+		// Define local variables for the callback class
+		private int lastCheckpoint = 0;
+		private String reportExecutionId = null;
+
+		public ProgressiveCustomPageHandler(String reportExecutionId) {
+			this.reportExecutionId = reportExecutionId;
+		}
+
+		// @Override
+		@Override
+		public void onPage(int pageNumber, boolean readyForViewing, IReportDocumentInfo reportDocument) {
+			// we only want to do something if this is a checkpoint event
+			if (readyForViewing) {
+				// Just let the user know that the next page ranges are ready,
+				// then set the last check point to the
+				// current page
+				logger.debug("Pages " + lastCheckpoint + " through " + pageNumber + " are ready for viewing");
+
+				int pageStart;
+				int pageEnd;
+
+				if (lastCheckpoint == 0) {
+					// pageRange = 1 + "-" + pageNumber;
+					pageStart = 1;
+					pageEnd = pageNumber;
+				} else {
+					// pageRange = (lastCheckpoint + 1) + "-" + pageNumber;
+					pageStart = lastCheckpoint + 1;
+					pageEnd = pageNumber;
+
+				}
+
+				lastCheckpoint = pageNumber;
+
+				IRenderTask task = null;
+				IReportDocument iReportDocument = null;
+				try {
+					// open the report document then create the render task from it
+					iReportDocument = reportDocument.openReportDocument();
+					task = birtReportEngine.createRenderTask(iReportDocument);
+
+					IRenderOption renderOption = prepareFrontEndHtmlRenderOption();
+					renderOption.setOutputFormat(IBirtConstants.HTML_RENDER_FORMAT);
+
+					for (int i = pageStart; i <= pageEnd; i++) {
+						renderOption.setOutputFileName(
+								BirtReportServlet.OUTPUT_FOLDER + reportExecutionId + File.separator + BirtReportServlet.PAGE_FILE_NAME + i + ".html");
+
+						task.setRenderOption(renderOption);
+						logger.debug("Page number " + i + " is ready for viewing");
+						task.setPageNumber(i);
+						task.render();
+
+					}
+
+				} catch (Exception e) {
+					logger.error("Exception while rendering page " + pageNumber, e);
+				} finally {
+					if (iReportDocument != null)
+						iReportDocument.close();
+					if (task != null)
+						task.close();
+				}
+			}
+		}
+
+	}
 }

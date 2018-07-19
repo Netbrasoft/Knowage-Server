@@ -43,7 +43,6 @@ function chartTabControllerFunction($scope,$timeout,sbiModule_translate,sbiModul
 		$scope.minMaxCategories = {};
 		$scope.minMaxSeries = {};		
 		switch(newValue){
-		
 		case 'parallel':
 			$scope.minMaxCategories.min = 1;
 			$scope.minMaxSeries.min = 2;
@@ -64,6 +63,7 @@ function chartTabControllerFunction($scope,$timeout,sbiModule_translate,sbiModul
 			break;
 		case 'wordcloud':
 			$scope.minMaxCategories.min = 1;
+			$scope.minMaxCategories.max = 1;
 			$scope.minMaxSeries.min = 1;
 			$scope.minMaxSeries.max = 1;
 			break;
@@ -82,7 +82,6 @@ function chartTabControllerFunction($scope,$timeout,sbiModule_translate,sbiModul
 			break;
 		case 'radar':
 			$scope.minMaxCategories.min = 1;
-			$scope.minMaxCategories.max = 1;
 			$scope.minMaxSeries.min = 1;
 			break;
 		case 'bar':
@@ -109,9 +108,9 @@ function chartTabControllerFunction($scope,$timeout,sbiModule_translate,sbiModul
 			break;
 		}
 	});
-	
+
 	$scope.$watch('chartTemplate',function(newValue,oldValue){
-		if($scope.chartTemplate.type.toLowerCase()=="bar" || $scope.chartTemplate.type.toLowerCase()=="line"){
+		if($scope.chartTemplate.type.toLowerCase()=="bar" || $scope.chartTemplate.type.toLowerCase()=="line" || $scope.chartTemplate.type.toLowerCase()=="radar"){
 			$scope.minMaxCategories = {};
 			$scope.minMaxSeries = {};
 			if(newValue.groupCategories){
@@ -127,10 +126,6 @@ function chartTabControllerFunction($scope,$timeout,sbiModule_translate,sbiModul
 				$scope.minMaxCategories.max = 2; 
 				$scope.minMaxCategories.min = 2; 
 				$scope.minMaxSeries.max = 1;
-				$scope.minMaxSeries.min = 1;
-			} else if (newValue.dateTime){
-				$scope.minMaxCategories.max = 1; 
-				$scope.minMaxCategories.min = 1;
 				$scope.minMaxSeries.min = 1;
 			}else {
 				$scope.minMaxCategories.min = 1;
@@ -327,8 +322,7 @@ function chartTabControllerFunction($scope,$timeout,sbiModule_translate,sbiModul
 					for (var attrname in chartSpecificStyle) { 
 						genericStyle[attrname] = chartSpecificStyle[attrname]; 
 					}
-					genericStyle.VALUES.SERIE = [];
-					genericStyle.VALUES.CATEGORY = {};
+				
 					$scope.getObjectProperties($scope.chartTemplate, genericStyle);
 
 				}
@@ -364,15 +358,15 @@ function chartTabControllerFunction($scope,$timeout,sbiModule_translate,sbiModul
 		for (var attrname in chartSpecificStyle) { 
 			genericStyle[attrname] = chartSpecificStyle[attrname]; 
 		}
-		genericStyle.VALUES.SERIE = [];
-		genericStyle.VALUES.CATEGORY = {};
+
+
 		$scope.getObjectProperties($scope.chartTemplate, genericStyle);
 	}
 	$scope.selectChartType = function(chart) {
 		
 		var ifNeededTrimDownCategoriesToSizeNeededByChartType = function () {
 			var categoriesLimit = 0;
-			if(chart == "pie" || chart == "radar" || chart == "sunburst" || chart == "wordcloud" || chart == "scatter") {
+			if(chart == "pie" || chart == "sunburst" || chart == "wordcloud" || chart == "scatter") {
 				categoriesLimit = 1;
 			} else if (chart == "chord" || chart == "heatmap" || chart == "parallel") {
 				categoriesLimit = 2;

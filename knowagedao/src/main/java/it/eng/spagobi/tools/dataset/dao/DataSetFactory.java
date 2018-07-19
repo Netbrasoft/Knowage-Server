@@ -17,49 +17,6 @@
  */
 package it.eng.spagobi.tools.dataset.dao;
 
-import it.eng.qbe.dataset.FederatedDataSet;
-import it.eng.qbe.dataset.QbeDataSet;
-import it.eng.spago.security.IEngUserProfile;
-import it.eng.spagobi.commons.bo.Domain;
-import it.eng.spagobi.commons.bo.UserProfile;
-import it.eng.spagobi.commons.constants.SpagoBIConstants;
-import it.eng.spagobi.commons.dao.DAOConfig;
-import it.eng.spagobi.commons.dao.DAOFactory;
-import it.eng.spagobi.commons.utilities.StringUtilities;
-import it.eng.spagobi.container.ObjectUtils;
-import it.eng.spagobi.federateddataset.dao.ISbiFederationDefinitionDAO;
-import it.eng.spagobi.federateddataset.dao.SbiFederationUtils;
-import it.eng.spagobi.federateddataset.metadata.SbiFederationDefinition;
-import it.eng.spagobi.services.dataset.bo.SpagoBiDataSet;
-import it.eng.spagobi.tools.dataset.bo.CkanDataSet;
-import it.eng.spagobi.tools.dataset.bo.ConfigurableDataSet;
-import it.eng.spagobi.tools.dataset.bo.CustomDataSet;
-import it.eng.spagobi.tools.dataset.bo.FileDataSet;
-import it.eng.spagobi.tools.dataset.bo.FlatDataSet;
-import it.eng.spagobi.tools.dataset.bo.IDataSet;
-import it.eng.spagobi.tools.dataset.bo.JDBCDataSet;
-import it.eng.spagobi.tools.dataset.bo.JDBCHBaseDataSet;
-import it.eng.spagobi.tools.dataset.bo.JDBCHiveDataSet;
-import it.eng.spagobi.tools.dataset.bo.JDBCOrientDbDataSet;
-import it.eng.spagobi.tools.dataset.bo.JavaClassDataSet;
-import it.eng.spagobi.tools.dataset.bo.MongoDataSet;
-import it.eng.spagobi.tools.dataset.bo.RESTDataSet;
-import it.eng.spagobi.tools.dataset.bo.ScriptDataSet;
-import it.eng.spagobi.tools.dataset.bo.VersionedDataSet;
-import it.eng.spagobi.tools.dataset.bo.WebServiceDataSet;
-import it.eng.spagobi.tools.dataset.common.behaviour.UserProfileUtils;
-import it.eng.spagobi.tools.dataset.common.transformer.PivotDataSetTransformer;
-import it.eng.spagobi.tools.dataset.constants.DataSetConstants;
-import it.eng.spagobi.tools.dataset.federation.FederationDefinition;
-import it.eng.spagobi.tools.dataset.metadata.SbiDataSet;
-import it.eng.spagobi.tools.dataset.utils.datamart.SpagoBICoreDatamartRetriever;
-import it.eng.spagobi.tools.datasource.bo.IDataSource;
-import it.eng.spagobi.tools.datasource.dao.DataSourceDAOHibImpl;
-import it.eng.spagobi.tools.datasource.dao.IDataSourceDAO;
-import it.eng.spagobi.utilities.exceptions.SpagoBIRuntimeException;
-import it.eng.spagobi.utilities.json.JSONUtils;
-import it.eng.spagobi.utilities.sql.SqlUtils;
-
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -70,6 +27,53 @@ import java.util.Set;
 
 import org.apache.log4j.Logger;
 import org.json.JSONObject;
+
+import it.eng.qbe.dataset.FederatedDataSet;
+import it.eng.qbe.dataset.QbeDataSet;
+import it.eng.spago.security.IEngUserProfile;
+import it.eng.spagobi.commons.bo.Domain;
+import it.eng.spagobi.commons.bo.UserProfile;
+import it.eng.spagobi.commons.constants.SpagoBIConstants;
+import it.eng.spagobi.commons.dao.DAOConfig;
+import it.eng.spagobi.commons.dao.DAOFactory;
+import it.eng.spagobi.container.ObjectUtils;
+import it.eng.spagobi.federateddataset.dao.ISbiFederationDefinitionDAO;
+import it.eng.spagobi.federateddataset.dao.SbiFederationUtils;
+import it.eng.spagobi.federateddataset.metadata.SbiFederationDefinition;
+import it.eng.spagobi.services.dataset.bo.SpagoBiDataSet;
+import it.eng.spagobi.tools.dataset.bo.CkanDataSet;
+import it.eng.spagobi.tools.dataset.bo.ConfigurableDataSet;
+import it.eng.spagobi.tools.dataset.bo.CustomDataSet;
+import it.eng.spagobi.tools.dataset.bo.DataSetParameterItem;
+import it.eng.spagobi.tools.dataset.bo.FileDataSet;
+import it.eng.spagobi.tools.dataset.bo.FlatDataSet;
+import it.eng.spagobi.tools.dataset.bo.IDataSet;
+import it.eng.spagobi.tools.dataset.bo.JDBCDataSet;
+import it.eng.spagobi.tools.dataset.bo.JDBCDatasetFactory;
+import it.eng.spagobi.tools.dataset.bo.JDBCHiveDataSet;
+import it.eng.spagobi.tools.dataset.bo.JDBCOrientDbDataSet;
+import it.eng.spagobi.tools.dataset.bo.JavaClassDataSet;
+import it.eng.spagobi.tools.dataset.bo.MongoDataSet;
+import it.eng.spagobi.tools.dataset.bo.RESTDataSet;
+import it.eng.spagobi.tools.dataset.bo.SPARQLDataSet;
+import it.eng.spagobi.tools.dataset.bo.ScriptDataSet;
+import it.eng.spagobi.tools.dataset.bo.SolrDataSet;
+import it.eng.spagobi.tools.dataset.bo.VersionedDataSet;
+import it.eng.spagobi.tools.dataset.cache.query.DatabaseDialect;
+import it.eng.spagobi.tools.dataset.common.behaviour.UserProfileUtils;
+import it.eng.spagobi.tools.dataset.common.transformer.PivotDataSetTransformer;
+import it.eng.spagobi.tools.dataset.constants.DataSetConstants;
+import it.eng.spagobi.tools.dataset.federation.FederationDefinition;
+import it.eng.spagobi.tools.dataset.metadata.SbiDataSet;
+import it.eng.spagobi.tools.dataset.utils.datamart.SpagoBICoreDatamartRetriever;
+import it.eng.spagobi.tools.datasource.bo.IDataSource;
+import it.eng.spagobi.tools.datasource.dao.DataSourceDAOHibImpl;
+import it.eng.spagobi.tools.datasource.dao.IDataSourceDAO;
+import it.eng.spagobi.utilities.assertion.Assert;
+import it.eng.spagobi.utilities.database.DataBaseFactory;
+import it.eng.spagobi.utilities.exceptions.SpagoBIRuntimeException;
+import it.eng.spagobi.utilities.json.JSONUtils;
+import it.eng.spagobi.utilities.sql.SqlUtils;
 
 /**
  * @author Andrea Gioia (andrea.gioia@eng.it)
@@ -86,6 +90,7 @@ public class DataSetFactory {
 	public static final String CUSTOM_DS_TYPE = "Custom";
 	public static final String FEDERATED_DS_TYPE = "Federated";
 	public static final String FLAT_DS_TYPE = "Flat";
+	public static final String SPARQL_DS_TYPE = "SPARQL";
 
 	static private Logger logger = Logger.getLogger(DataSetFactory.class);
 
@@ -130,6 +135,10 @@ public class DataSetFactory {
 			toReturn.setDsType(JDBC_DS_TYPE);
 		}
 
+		if (dataSet instanceof SPARQLDataSet) {
+			toReturn.setDsType(SPARQL_DS_TYPE);
+		}
+
 		if (dataSet instanceof QbeDataSet) {
 
 			QbeDataSet aQbeDataSet = (QbeDataSet) dataSet;
@@ -141,10 +150,6 @@ public class DataSetFactory {
 			}
 
 			toReturn.setDsType(QBE_DS_TYPE);
-		}
-
-		if (dataSet instanceof WebServiceDataSet) {
-			toReturn.setDsType(WS_DS_TYPE);
 		}
 
 		if (dataSet instanceof ScriptDataSet) {
@@ -231,11 +236,12 @@ public class DataSetFactory {
 				ds = new FileDataSet();
 				FileDataSet fds = (FileDataSet) ds;
 
-				String resourcePath = jsonConf.optString("resourcePath");
-				if (StringUtilities.isEmpty(resourcePath)) {
-					resourcePath = DAOConfig.getResourcePath();
-					jsonConf.put("resourcePath", resourcePath);
-				}
+				// String resourcePath = jsonConf.optString("resourcePath");
+				// if (StringUtilities.isEmpty(resourcePath)) {
+				// resourcePath = DAOConfig.getResourcePath();
+				// jsonConf.put("resourcePath", resourcePath);
+				// }
+				String resourcePath = DAOConfig.getResourcePath();
 				fds.setResourcePath(resourcePath);
 
 				fds.setConfiguration(jsonConf.toString());
@@ -247,6 +253,10 @@ public class DataSetFactory {
 				fds.setDsType(FILE_DS_TYPE);
 			} else if (DataSetConstants.DS_REST_TYPE.equalsIgnoreCase(type)) {
 				ds = manageRESTDataSet(jsonConf);
+			} else if (DataSetConstants.DS_SPARQL.equalsIgnoreCase(type)) {
+				ds = manageSPARQLDataSet(jsonConf);
+			} else if (DataSetConstants.DS_SOLR_TYPE.equalsIgnoreCase(type)) {
+				ds = manageSolrDataSet(jsonConf, sbiDataSet.getParametersList());
 			} else if (type.equalsIgnoreCase(DataSetConstants.DS_CKAN)) {
 				ds = new CkanDataSet();
 				CkanDataSet cds = (CkanDataSet) ds;
@@ -264,6 +274,9 @@ public class DataSetFactory {
 				}
 				if (!jsonConf.isNull(DataSetConstants.CSV_FILE_QUOTE_CHARACTER)) {
 					jsonConf.put(DataSetConstants.CKAN_CSV_FILE_QUOTE_CHARACTER, jsonConf.getString(DataSetConstants.CSV_FILE_QUOTE_CHARACTER));
+				}
+				if (!jsonConf.isNull(DataSetConstants.FILE_DATE_FORMAT)) {
+					jsonConf.put(DataSetConstants.CKAN_CSV_DATE_FORMAT, jsonConf.getString(DataSetConstants.FILE_DATE_FORMAT));
 				}
 				if (!jsonConf.isNull(DataSetConstants.CSV_FILE_ENCODING)) {
 					jsonConf.put(DataSetConstants.CKAN_CSV_FILE_ENCODING, jsonConf.getString(DataSetConstants.CSV_FILE_ENCODING));
@@ -296,16 +309,12 @@ public class DataSetFactory {
 					dataSourceDao.setUserProfile(userProfile);
 				IDataSource dataSource = dataSourceDao.loadDataSourceByLabel(jsonConf.getString(DataSetConstants.DATA_SOURCE));
 
-				if (dataSource != null && dataSource.getHibDialectClass().toLowerCase().contains("mongo")) {
+				Assert.assertNotNull(dataSource, "Datasource cannot be null");
+				DatabaseDialect dialect = DataBaseFactory.getDataBase(dataSource).getDatabaseDialect();
+				if (dialect.equals(DatabaseDialect.MONGO)) {
 					ds = new MongoDataSet();
-				} else if (dataSource != null && dataSource.getHibDialectClass().toLowerCase().contains("hbase")) {
-					ds = new JDBCHBaseDataSet();
-				} else if (dataSource != null && SqlUtils.isHiveLikeDialect(dataSource.getHibDialectClass().toLowerCase())) {
-					ds = new JDBCHiveDataSet();
-				} else if (dataSource != null && dataSource.getHibDialectClass().toLowerCase().contains("orient")) {
-					ds = new JDBCOrientDbDataSet();
 				} else {
-					ds = new JDBCDataSet();
+					ds = JDBCDatasetFactory.getJDBCDataSet(dataSource);
 				}
 
 				ds.setConfiguration(sbiDataSet.getConfiguration());
@@ -325,13 +334,6 @@ public class DataSetFactory {
 					logger.error("Could not retrieve datasource with label " + jsonConf.getString(DataSetConstants.DATA_SOURCE) + " for dataset "
 							+ sbiDataSet.getLabel());
 				}
-
-			} else if (type.equalsIgnoreCase(DataSetConstants.DS_WS)) {
-				ds = new WebServiceDataSet();
-				ds.setConfiguration(sbiDataSet.getConfiguration());
-				((WebServiceDataSet) ds).setAddress(jsonConf.getString(DataSetConstants.WS_ADDRESS));
-				((WebServiceDataSet) ds).setOperation(jsonConf.getString(DataSetConstants.WS_OPERATION));
-				ds.setDsType(WS_DS_TYPE);
 			} else if (type.equalsIgnoreCase(DataSetConstants.DS_SCRIPT)) {
 				ds = new ScriptDataSet();
 				ds.setConfiguration(sbiDataSet.getConfiguration());
@@ -467,8 +469,8 @@ public class DataSetFactory {
 				ds.setOrganization(sbiDataSet.getId().getOrganization());
 
 				if (ds.getPivotColumnName() != null && ds.getPivotColumnValue() != null && ds.getPivotRowName() != null) {
-					ds.setDataStoreTransformer(new PivotDataSetTransformer(ds.getPivotColumnName(), ds.getPivotColumnValue(), ds.getPivotRowName(), ds
-							.isNumRows()));
+					ds.setDataStoreTransformer(
+							new PivotDataSetTransformer(ds.getPivotColumnName(), ds.getPivotColumnValue(), ds.getPivotRowName(), ds.isNumRows()));
 				}
 				ds.setPersisted(sbiDataSet.isPersisted());
 				ds.setPersistedHDFS(sbiDataSet.isPersistedHDFS());
@@ -530,11 +532,12 @@ public class DataSetFactory {
 				ds = new FileDataSet();
 				FileDataSet fds = (FileDataSet) ds;
 
-				String resourcePath = jsonConf.optString("resourcePath");
-				if (StringUtilities.isEmpty(resourcePath)) {
-					resourcePath = DAOConfig.getResourcePath();
-					jsonConf.put("resourcePath", resourcePath);
-				}
+				String resourcePath = DAOConfig.getResourcePath();
+				// String resourcePath = jsonConf.optString("resourcePath");
+				// if (StringUtilities.isEmpty(resourcePath)) {
+				// resourcePath = DAOConfig.getResourcePath();
+				// jsonConf.put("resourcePath", resourcePath);
+				// }
 				fds.setResourcePath(resourcePath);
 
 				fds.setConfiguration(jsonConf.toString());
@@ -597,16 +600,12 @@ public class DataSetFactory {
 					dataSourceDao.setUserProfile(userProfile);
 				IDataSource dataSource = dataSourceDao.loadDataSourceByLabel(jsonConf.getString(DataSetConstants.DATA_SOURCE));
 
-				if (dataSource != null && dataSource.getHibDialectClass().toLowerCase().contains("mongo")) {
+				Assert.assertNotNull(dataSource, "Datasource cannot be null");
+				DatabaseDialect dialect = DataBaseFactory.getDataBase(dataSource).getDatabaseDialect();
+				if (dialect.equals(DatabaseDialect.MONGO)) {
 					ds = new MongoDataSet();
-				} else if (dataSource != null && dataSource.getHibDialectClass().toLowerCase().contains("hbase")) {
-					ds = new JDBCHBaseDataSet();
-				} else if (dataSource != null && SqlUtils.isHiveLikeDialect(dataSource.getHibDialectClass().toLowerCase())) {
-					ds = new JDBCHiveDataSet();
-				} else if (dataSource != null && dataSource.getHibDialectClass().toLowerCase().contains("orient")) {
-					ds = new JDBCOrientDbDataSet();
 				} else {
-					ds = new JDBCDataSet();
+					ds = JDBCDatasetFactory.getJDBCDataSet(dataSource);
 				}
 
 				ds.setConfiguration(sbiDataSet.getConfiguration());
@@ -627,14 +626,6 @@ public class DataSetFactory {
 							+ sbiDataSet.getLabel());
 				}
 
-			}
-
-			if (sbiDataSet.getType().equalsIgnoreCase(DataSetConstants.DS_WS)) {
-				ds = new WebServiceDataSet();
-				ds.setConfiguration(sbiDataSet.getConfiguration());
-				((WebServiceDataSet) ds).setAddress(jsonConf.getString(DataSetConstants.WS_ADDRESS));
-				((WebServiceDataSet) ds).setOperation(jsonConf.getString(DataSetConstants.WS_OPERATION));
-				ds.setDsType(WS_DS_TYPE);
 			}
 
 			if (sbiDataSet.getType().equalsIgnoreCase(DataSetConstants.DS_SCRIPT)) {
@@ -733,8 +724,8 @@ public class DataSetFactory {
 				ds.setOrganization(sbiDataSet.getOrganization());
 
 				if (ds.getPivotColumnName() != null && ds.getPivotColumnValue() != null && ds.getPivotRowName() != null) {
-					ds.setDataStoreTransformer(new PivotDataSetTransformer(ds.getPivotColumnName(), ds.getPivotColumnValue(), ds.getPivotRowName(), ds
-							.isNumRows()));
+					ds.setDataStoreTransformer(
+							new PivotDataSetTransformer(ds.getPivotColumnName(), ds.getPivotColumnValue(), ds.getPivotRowName(), ds.isNumRows()));
 				}
 				ds.setPersisted(sbiDataSet.isPersisted());
 				ds.setPersistedHDFS(sbiDataSet.isPersistedHDFS());
@@ -797,11 +788,12 @@ public class DataSetFactory {
 				ds = new FileDataSet();
 				FileDataSet fds = (FileDataSet) ds;
 
-				String resourcePath = jsonConf.optString("resourcePath");
-				if (StringUtilities.isEmpty(resourcePath)) {
-					resourcePath = DAOConfig.getResourcePath();
-					jsonConf.put("resourcePath", resourcePath);
-				}
+				String resourcePath = DAOConfig.getResourcePath();
+				// String resourcePath = jsonConf.optString("resourcePath");
+				// if (StringUtilities.isEmpty(resourcePath)) {
+				// resourcePath = DAOConfig.getResourcePath();
+				// jsonConf.put("resourcePath", resourcePath);
+				// }
 				fds.setResourcePath(resourcePath);
 
 				fds.setConfiguration(jsonConf.toString());
@@ -815,6 +807,14 @@ public class DataSetFactory {
 
 			if (DataSetConstants.DS_REST_TYPE.equalsIgnoreCase(sbiDataSet.getType())) {
 				ds = manageRESTDataSet(jsonConf);
+			}
+
+			if (DataSetConstants.DS_SPARQL.equalsIgnoreCase(sbiDataSet.getType())) {
+				ds = manageSPARQLDataSet(jsonConf);
+			}
+
+			if (DataSetConstants.DS_SOLR_TYPE.equalsIgnoreCase(sbiDataSet.getType())) {
+				ds = manageSolrDataSet(jsonConf, sbiDataSet.getParametersList());
 			}
 
 			if (sbiDataSet.getType().equalsIgnoreCase(DataSetConstants.DS_CKAN)) {
@@ -870,8 +870,6 @@ public class DataSetFactory {
 
 				if (dataSource != null && dataSource.getHibDialectClass().toLowerCase().contains("mongo")) {
 					ds = new MongoDataSet();
-				} else if (dataSource != null && dataSource.getHibDialectClass().toLowerCase().contains("hbase")) {
-					ds = new JDBCHBaseDataSet();
 				} else if (dataSource != null && SqlUtils.isHiveLikeDialect(dataSource.getHibDialectClass().toLowerCase())) {
 					ds = new JDBCHiveDataSet();
 				} else if (dataSource != null && dataSource.getHibDialectClass().toLowerCase().contains("orient")) {
@@ -898,14 +896,6 @@ public class DataSetFactory {
 							+ sbiDataSet.getLabel());
 				}
 
-			}
-
-			if (sbiDataSet.getType().equalsIgnoreCase(DataSetConstants.DS_WS)) {
-				ds = new WebServiceDataSet();
-				ds.setConfiguration(sbiDataSet.getConfiguration());
-				((WebServiceDataSet) ds).setAddress(jsonConf.getString(DataSetConstants.WS_ADDRESS));
-				((WebServiceDataSet) ds).setOperation(jsonConf.getString(DataSetConstants.WS_OPERATION));
-				ds.setDsType(DataSetConstants.DS_WS);
 			}
 
 			if (sbiDataSet.getType().equalsIgnoreCase(DataSetConstants.DS_SCRIPT)) {
@@ -1061,8 +1051,8 @@ public class DataSetFactory {
 				ds.setOrganization(sbiDataSet.getId().getOrganization());
 
 				if (ds.getPivotColumnName() != null && ds.getPivotColumnValue() != null && ds.getPivotRowName() != null) {
-					ds.setDataStoreTransformer(new PivotDataSetTransformer(ds.getPivotColumnName(), ds.getPivotColumnValue(), ds.getPivotRowName(), ds
-							.isNumRows()));
+					ds.setDataStoreTransformer(
+							new PivotDataSetTransformer(ds.getPivotColumnName(), ds.getPivotColumnValue(), ds.getPivotRowName(), ds.isNumRows()));
 				}
 				ds.setPersisted(sbiDataSet.isPersisted());
 				ds.setPersistedHDFS(sbiDataSet.isPersistedHDFS());
@@ -1112,6 +1102,25 @@ public class DataSetFactory {
 	private static RESTDataSet manageRESTDataSet(JSONObject jsonConf) {
 		RESTDataSet res = new RESTDataSet(jsonConf);
 		res.setDsType(DataSetConstants.DS_REST_NAME);
+		return res;
+	}
+
+	private static SPARQLDataSet manageSPARQLDataSet(JSONObject jsonConf) {
+		SPARQLDataSet res = new SPARQLDataSet(jsonConf);
+		res.setDsType(DataSetConstants.SPARQL);
+		return res;
+	}
+
+	private static RESTDataSet manageSolrDataSet(JSONObject jsonConf, List<DataSetParameterItem> parameters) {
+		HashMap<String, String> parametersMap = new HashMap<String, String>();
+		if (parameters != null) {
+			for (Iterator iterator = parameters.iterator(); iterator.hasNext();) {
+				DataSetParameterItem dataSetParameterItem = (DataSetParameterItem) iterator.next();
+				parametersMap.put(dataSetParameterItem.getDefaultValue(), dataSetParameterItem.getName());
+			}
+		}
+		SolrDataSet res = new SolrDataSet(jsonConf, parametersMap);
+		res.setDsType(DataSetConstants.DS_SOLR_NAME);
 		return res;
 	}
 }

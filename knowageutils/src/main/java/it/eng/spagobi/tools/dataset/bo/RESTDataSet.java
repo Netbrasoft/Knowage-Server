@@ -17,6 +17,18 @@
  */
 package it.eng.spagobi.tools.dataset.bo;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+
+import org.apache.log4j.Logger;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import it.eng.spagobi.commons.bo.UserProfile;
 import it.eng.spagobi.container.ObjectUtils;
 import it.eng.spagobi.services.dataset.bo.SpagoBiDataSet;
@@ -35,19 +47,8 @@ import it.eng.spagobi.user.UserProfileManager;
 import it.eng.spagobi.utilities.Helper;
 import it.eng.spagobi.utilities.assertion.Assert;
 import it.eng.spagobi.utilities.exceptions.ConfigurationException;
+import it.eng.spagobi.utilities.objects.Couple;
 import it.eng.spagobi.utilities.rest.RestUtilities.HttpMethod;
-
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-
-import org.apache.log4j.Logger;
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
 
 public class RESTDataSet extends ConfigurableDataSet {
 
@@ -71,6 +72,9 @@ public class RESTDataSet extends ConfigurableDataSet {
 	private boolean ignoreConfigurationOnLoad;
 
 	private boolean notifiable;
+
+	public RESTDataSet() {
+	};
 
 	public RESTDataSet(SpagoBiDataSet dataSetConfig) {
 		super(dataSetConfig);
@@ -172,7 +176,7 @@ public class RESTDataSet extends ConfigurableDataSet {
 		this.ignoreConfigurationOnLoad = ignoreConfigurationOnLoad;
 	}
 
-	private void initConf(JSONObject jsonConf, boolean resolveParams) {
+	public void initConf(JSONObject jsonConf, boolean resolveParams) {
 		initNGSI(jsonConf, resolveParams);
 		initDataProxy(jsonConf, resolveParams);
 		initDataReader(jsonConf, resolveParams);
@@ -259,7 +263,7 @@ public class RESTDataSet extends ConfigurableDataSet {
 		return jsonConf;
 	}
 
-	private List<JSONPathAttribute> getJsonPathAttributes(String propName, JSONObject conf, boolean resolveParams) throws JSONException {
+	protected List<JSONPathAttribute> getJsonPathAttributes(String propName, JSONObject conf, boolean resolveParams) throws JSONException {
 		checkPropExists(propName, conf);
 
 		Object sub = conf.get(propName);
@@ -283,7 +287,7 @@ public class RESTDataSet extends ConfigurableDataSet {
 		return res;
 	}
 
-	private Map<String, String> getRequestHeadersPropMap(String propName, JSONObject conf, boolean resolveParams) throws JSONException {
+	protected Map<String, String> getRequestHeadersPropMap(String propName, JSONObject conf, boolean resolveParams) throws JSONException {
 		if (!conf.has(propName) || conf.getString(propName).isEmpty()) {
 			// optional property
 			return Collections.emptyMap();
@@ -309,6 +313,33 @@ public class RESTDataSet extends ConfigurableDataSet {
 		return res;
 	}
 
+	protected List<Couple<String, String>> getListProp(String propName, JSONObject conf, boolean resolveParams) throws JSONException {
+		if (!conf.has(propName) || conf.getString(propName).isEmpty()) {
+			// optional property
+			return Collections.emptyList();
+		}
+
+		Object c = conf.get(propName);
+		if (!(c instanceof JSONArray)) {
+			throw new ConfigurationException(String.format("%s is not another json object in configuration: %s", propName, conf.toString()));
+		}
+		Assert.assertNotNull(c, "property is null");
+		JSONArray r = (JSONArray) c;
+		List<Couple<String, String>> res = new ArrayList<Couple<String, String>>(r.length());
+
+		for (int i = 0; i < r.length(); i++) {
+			JSONObject jo = r.getJSONObject(i);
+			String key = jo.getString("name");
+			String value = jo.getString("value");
+			if (resolveParams) {
+				key = parametersResolver.resolveAll(key, this);
+				value = parametersResolver.resolveAll(value, this);
+				res.add(new Couple<String, String>(key, value));
+			}
+		}
+		return res;
+	}
+
 	/**
 	 * Case: Return null if it's empty and optional
 	 *
@@ -318,7 +349,7 @@ public class RESTDataSet extends ConfigurableDataSet {
 	 * @param resolveParams
 	 * @return
 	 */
-	private String getProp(String propName, JSONObject conf, boolean optional, boolean resolveParams) {
+	protected String getProp(String propName, JSONObject conf, boolean optional, boolean resolveParams) {
 		if (!optional) {
 			checkPropExists(propName, conf);
 		} else {

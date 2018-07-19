@@ -45,17 +45,21 @@ function structureTabControllerFunction($scope,sbiModule_translate,sbiModule_res
 	$scope.openPreviewPanel = false;
 	$scope.seriesNumber = 0;
 	$scope.checkCategoriesLength = 0;
-	
+
 	$scope.categ = {};
 	$scope.categ.lengthh = $scope.checkCategoriesLength;
 
 	$scope.$watch('categories',function(newValue,oldValue){
 		$scope.categ.lengthh = $scope.categories.length;
 	},true)
-
 	
+	$scope.$watch('chartTemplate.dateTime',function(newValue,oldValue){
+		if(!newValue && $scope.chartTemplate) $scope.chartTemplate.categoryDate = "";
+	},true)
+
+
 	$scope.isInvalid = function (series) {
-		
+
 		if($scope.minMaxSeries.max){
 			if(series.length>=$scope.minMaxSeries.min &&  series.length <= $scope.minMaxSeries.max){
 				$scope.structureForm.$setValidity("seriesNumber", true);
@@ -74,7 +78,7 @@ function structureTabControllerFunction($scope,sbiModule_translate,sbiModule_res
 				return true;
 			}
 		}
-		
+
 	}
 
 	$scope.numberOfSeriesContainers = 0;
@@ -86,8 +90,8 @@ function structureTabControllerFunction($scope,sbiModule_translate,sbiModule_res
 	// Indicator whether we should show the message that the maximum number of Series containers is exceeded
 	$scope.showMaxNmbSerAxesExceeded = false;
 
-	// Get all metadata of the chart's dataset (all measures and attributes)	
-	
+	// Get all metadata of the chart's dataset (all measures and attributes)
+
 	var urlForMetadata="";
 	if($scope.isCockpitEng){
 		urlForMetadata = "../api/1.0/chart/jsonChartTemplate/fieldsMetadataforCockpit/"+parent.angular.element(window.frameElement).scope().datasetId;
@@ -206,7 +210,7 @@ function structureTabControllerFunction($scope,sbiModule_translate,sbiModule_res
 
 		$scope.chartTemplate.AXES_LIST.AXIS[0].PLOTBANDS.PLOT.push(newPlot);
 	}
-	
+
 	$scope.disableUsingAttributeIfRealtimeDSisUsed = function (attribute){
 		if(!$scope.isRealTimeDataset){
 			return false;
@@ -224,7 +228,7 @@ function structureTabControllerFunction($scope,sbiModule_translate,sbiModule_res
 			var chartType = $scope.chartTemplate.type;
 			var index = findInArray($scope.categories,'column',item.alias);
 
-			if (chartType.toUpperCase() == "PIE" || chartType.toUpperCase() == "RADAR" ||
+			if (
 					chartType.toUpperCase() == "SCATTER" || chartType.toUpperCase() == "WORDCLOUD") {
 				if($scope.categories.length>=1){
 					sbiModule_messaging.showErrorMessage(sbiModule_translate.load("sbi.chartengine.designer.max.categories"), sbiModule_translate.load("sbi.data.editor.association.AssociationEditor.warning"));
@@ -256,7 +260,9 @@ function structureTabControllerFunction($scope,sbiModule_translate,sbiModule_res
 					 }
 				}
 			} else if(chartType.toUpperCase() == "TREEMAP" || chartType.toUpperCase() == "SUNBURST" ||
-						chartType.toUpperCase() == "BAR" || chartType.toUpperCase() == "LINE") {
+						chartType.toUpperCase() == "BAR" || chartType.toUpperCase() == "LINE"  ||
+							chartType.toUpperCase() == "PIE" ||
+							chartType.toUpperCase() == "RADAR" ) {
 				if(index<0){
 					  $scope.categories.push({column:item.alias,groupby:"", groupbyNames:"",name:item.alias,orderColumn:"",orderType:"",stacked:"",stackedType:""});
 				  }
@@ -974,7 +980,7 @@ function structureTabControllerFunction($scope,sbiModule_translate,sbiModule_res
      */
 
     // TODO: Check if these chart types are the only one that for which we should exclude the Ordering column option in the categories drop-down menu
-    $scope.categoriesContainerConfigDropDownExcludeTypes = ["wordcloud","treemap"];
+    $scope.categoriesContainerConfigDropDownExcludeTypes = ["wordcloud","treemap","parallel"];
 
     $scope.categoriesOrderColumnExcludeTypes = ["parallel","chord"];
     $scope.categoriesConfigExcludeTypes = ["pie","sunburst"];

@@ -1,0 +1,108 @@
+<md-card   class="flexCard htmlWidgetConfiguration" >
+	<md-card-content flex layout="column" class="noPadding">
+	    <md-toolbar> 
+	      <div class="md-toolbar-tools">
+	        <h2>{{translate.load('kn.cockpit.html.editwidget')}}</h2>
+	        <span flex></span>
+	      </div>
+	    </md-toolbar>
+	    <md-content flex layout="column">
+			<md-tabs flex md-border-bottom>
+				<md-tab label="Editor Html">
+					<section layout="row">
+					<md-content class="noPadding" layout="row" layout-fill>
+						<div layout="column" flex>
+							<md-card>
+								<md-toolbar class="ternaryToolbar"> 
+							      <div class="md-toolbar-tools">
+							        <h2>{{translate.load('kn.cockpit.html.css')}}</h2>
+							        <span flex></span>
+							        <md-button class="md-icon-button" ng-click="toggleCss()">
+							        	<md-icon ng-class="{'fa':true,'fa-chevron-down':!newModel.cssOpened,'fa-chevron-up':newModel.cssOpened}"></md-icon>
+							        </md-button>
+							      </div>
+							    </md-toolbar>
+								<md-card-content class="noPadding" ng-if="newModel.cssOpened">
+								<div layout="row" layout-align="center center">
+									<div class="kn-info" flex=80>{{translate.load('kn.cockpit.html.cssprefix')}} <span class="widgetId">#w{{newModel.id}}</span></div>
+								</div>
+								<textarea id="css" ui-codemirror="editorOptionsCss" ng-model="newModel.cssToRender" ui-refresh="reloadCodemirror" flex></textarea>
+								</md-card-content>
+							</md-card>
+						
+							<md-card class="htmlEditor">
+								<md-toolbar class="ternaryToolbar"> 
+							      <div class="md-toolbar-tools"> 
+							        <h2>{{translate.load('kn.cockpit.html.html')}}</h2>
+							        <span flex></span>
+							      </div>
+							    </md-toolbar>
+								<md-card-content class="noPadding">
+								<textarea id="html" ui-codemirror="editorOptionsHtml" ng-model="newModel.htmlToRender" ui-refresh="reloadCodemirror" flex></textarea>
+								</md-card-content>
+							</md-card>
+						</div>
+						<md-sidenav
+					        class="md-sidenav-right availableFunctions"
+					        md-component-id="right"
+					        md-is-locked-open="$mdMedia('gt-md')"
+					        md-whiteframe="1">
+					
+					      <md-toolbar class="secondaryToolbar">
+					        <h1 class="md-toolbar-tools">{{translate.load('kn.cockpit.html.availabletags')}}</h1>
+					      </md-toolbar>
+					      <md-content>
+					      	<md-subheader>[kn-column='STRING' row='NUMBER']</md-subheader>
+					        <p layout-padding class="description">
+					          {{translate.load('kn.cockpit.html.tag1.desc')}}
+					        </p>
+					        <md-divider></md-divider>
+					        <md-subheader>[kn-parameter='STRING']</md-subheader>
+					        <p layout-padding class="description">
+					          {{translate.load('kn.cockpit.html.tag2.desc')}}
+					        </p>
+					        <md-divider></md-divider>
+					      	<md-subheader>&lt;div kn-repeat="CONDITION" (limit="NUMBER")&gt; ... &lt;/div&gt;</md-subheader>
+					        <p layout-padding class="description">
+					          {{translate.load('kn.cockpit.html.tag3.desc')}}
+					        </p>
+					        <md-divider></md-divider>
+					        <md-subheader>[kn-repeat-index]</md-subheader>
+					        <p layout-padding class="description">
+					          {{translate.load('kn.cockpit.html.tag4.desc')}}
+					        </p>
+					        <md-subheader>&lt;div kn-if="CONDITION"&gt; ... &lt;/div&gt;</md-subheader>
+					        <p layout-padding class="description">
+					          {{translate.load('kn.cockpit.html.tag5.desc')}}
+					        </p>
+					      </md-content>
+					
+					    </md-sidenav>
+				    </md-content>
+				    
+					    </section>
+		        </md-tab>
+		        <md-tab label="{{translate.load('sbi.cockpit.style')}}">
+		        	<cockpit-style-configurator widget ng-model="newModel.style">
+		        	</cockpit-style-configurator>
+		        </md-tab>
+		        <md-tab label="{{translate.load('sbi.cockpit.dataset')}}">
+		        	<md-card>
+		        		<md-card-content>
+		   					<dataset-selector ng-model="newModel.dataset.dsId" on-change="handleDsChange('datasetChanged',dsId)" extended="true"></dataset-selector>  
+		   				</md-card-content>
+		   			</md-card>	
+		     	</md-tab>
+		        
+	      	</md-tabs>
+	    </md-content>
+    </md-card-content>
+    <md-card-actions layout="row"  layout-align="end center">
+	    <md-button class="md-raised" ng-click="cancelConfiguration()" >
+	     {{translate.load('sbi.generic.cancel')}}
+	    </md-button>
+	    <md-button class="md-raised md-primary" ng-click="saveConfiguration()"  >
+	     {{translate.load('sbi.generic.save')}}
+	    </md-button>
+    </md-card-actions>
+</md-card>

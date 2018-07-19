@@ -44,12 +44,38 @@ datasetModule
 
 function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_translate, sbiModule_restServices, sbiModule_messaging, sbiModule_user, $mdDialog, multipartForm, $timeout, $qbeViewer){
 
+	$scope.maxSizeStr = maxSizeStr;
+
+	$scope.csvEncodingDefault = "UTF-8";
+	$scope.csvDelimiterDefault = ",";
+	$scope.csvQuoteDefault = "\"";
+	$scope.skipRowsDefault = 0;
+	$scope.limitRowsDefault = null;
+	$scope.xslSheetNumberDefault = 1;
+	$scope.dateFormatDefault = "dd/MM/yyyy";
+
+
+	$scope.$watch("selectedDataSet.restNGSI",function(newValue,oldValue){
+		if(newValue && (newValue===true || newValue==="true")){
+			$scope.selectedDataSet.restNGSI = true;
+		}
+	});
+
+	$scope.$watch("selectedDataSet.restDirectlyJSONAttributes",function(newValue,oldValue){
+		if(newValue && (newValue===true || newValue==="true")){
+			$scope.selectedDataSet.restDirectlyJSONAttributes = true;
+		}
+	});
+
 	$scope.showDatasetScheduler = sbiModule_user.functionalities.indexOf("SchedulingDatasetManagement")>-1;
 	$scope.showExportHDFS = sbiModule_user.functionalities.indexOf("DataSourceBigData")>-1;
 
 	$scope.translate = sbiModule_translate;
 	$scope.codeMirror = null;
 	$scope.isSomething = false;
+	$scope.step=1;
+	$scope.validated = false;
+	$scope.dsMetaValue = [];
 
 	$scope.dataSetListColumns = [
 	    {"label":$scope.translate.load("sbi.generic.name"),"name":"name"},
@@ -57,7 +83,7 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 	    {"label":$scope.translate.load("sbi.generic.type"), "name":"dsTypeCd", "size":"70px"},
 	    {"label":$scope.translate.load("sbi.ds.numDocs"), "name":"usedByNDocs", "size":"60px"}
     ];
-	
+
 	$scope.sortableColumn = ["name","label","dsTypeCd"]
 
 	$scope.selectedDatasetVersion = null;
@@ -78,6 +104,7 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 	$scope.datasetTableLastPage = 1;
 	$scope.parametersTableLastPage = 1;
 	$scope.restDsRequestHeaderTableLastPage = 1;
+	$scope.restDsRequestAdditionalParametersTableLastPage = 1;
 	$scope.restDsJsonPathAttribTableLastPage = 1;
 
 	$scope.currentPageNumber = 1;
@@ -88,6 +115,8 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 	$scope.showSaveAndCancelButtons = false;
 
 	$scope.scheduling = {};
+	
+	$scope.disablePersisting = false;
 
 	// The current date for data pickers for Scheduling
 	var currentDate = new Date();
@@ -158,7 +187,7 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 		setFormDirty: $scope.setFormDirty
 	};
 
-	$scope.jsonPathTypes = ["string", "int", "double", "date yyy-MM-dd", "timestamp yyyy-MM-dd HH:mm:ss", "time HH:mm:ss", "boolean"];
+	$scope.jsonPathTypes = ["string", "int", "double", "date yyy-MM-dd", "timestamp yyyy-MM-dd HH:mm:ss", "ISO8601 yyyy-MM-ddTHH:mm:ss.SSSZ", "time HH:mm:ss", "boolean"];
 
 	$scope.fieldsMetadataColumns = [
 		{
@@ -327,6 +356,19 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 	 	{value:"\'",name:"\'"}
  	];
 
+	$scope.dateFormatTypes =
+		[
+		 	{value:"dd/MM/yyyy",name:"dd/MM/yyyy"},
+		 	{value:"MM/dd/yyyy",name:"MM/dd/yyyy"},
+		 	{value:"dd-MM-yyyy",name:"dd-MM-yyyy"},
+		 	{value:"MM-dd-yyyy",name:"MM-dd-yyyy"},
+			{value:"yyyy-MM-dd",name:"yyyy-MM-dd"},
+		 	{value:"yyyy:MM:dd",name:"yyyy:MM:dd"},
+		 	{value:"dd.MM.yyyy",name:"dd.MM.yyyy"},
+		 	{value:"MM.dd.yyyy",name:"MM.dd.yyyy"}
+
+		 ];
+
 	// Dataset preview
 	$scope.previewDatasetModel=[];
     $scope.previewDatasetColumns=[];
@@ -353,6 +395,11 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 	$scope.chooseEncoding = function(encodingObj) {
 		$scope.selectedDataSet.csvEncoding = encodingObj;
 	}
+
+	$scope.chooseDateFormat = function(dateFormat) {
+		$scope.selectedDataSet.dateFormat = dateFormat;
+	}
+
 
 	/**
 	 * Scope variables (properties) for the REST dataset.
@@ -425,6 +472,7 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 
 	// Initial list for REST request headers for a new REST dataset
 	$scope.restRequestHeaders = [];
+	$scope.restRequestAdditionalParameters = [];
 
 	$scope.requestHeadersScopeFunctions = {
 		setFormDirty: $scope.setFormDirty
@@ -443,6 +491,28 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 					//console.log(page<$scope.restDsRequestHeaderTableLastPage);
 					$scope.restDsRequestHeaderTableLastPage = (page<=$scope.restDsRequestHeaderTableLastPage)
 						? $scope.restDsRequestHeaderTableLastPage : page;
+
+					//console.log($scope.restDsRequestHeaderTableLastPage);
+				},
+
+				300
+			);
+
+	}
+
+	$scope.requestAdditionalParameterAddItem = function() {
+
+		$scope.restRequestAdditionalParameters.push({"name":"","value":"","index":$scope.counterRequestAdditionalParameters++});
+
+		$timeout(
+				function() {
+					var page = $scope.tableLastPage("requestAdditionalParametersTable");
+					console.log(page);
+					console.log($scope.restDsRequestAdditionalParametersTableLastPage);
+					// If the page that is returned is less than the current one, that means that we are already on that page, so keep it (danristo)
+					//console.log(page<$scope.restDsRequestHeaderTableLastPage);
+					$scope.restDsRequestAdditionalParametersTableLastPage = (page<=$scope.restDsRequestAdditionalParametersTableLastPage)
+						? $scope.restDsRequestAdditionalParametersTableLastPage : page;
 
 					//console.log($scope.restDsRequestHeaderTableLastPage);
 				},
@@ -486,6 +556,53 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 						 			if ($scope.restRequestHeaders[i].index == item.index) {
 						 				$scope.setFormDirty();
 						 				$scope.restRequestHeaders.splice(i,1);
+						 				break;
+						 			}
+
+						 		}
+
+					 		}
+						);
+
+	 		}
+
+	 	}
+	 ];
+
+	// Provide unique IDs for elements in the Request header grid, so we can remove them easily
+	$scope.counterRequestAdditionalParameters = 0;
+
+	$scope.requestAdditionalParametersDelete =
+	[
+		{
+			label: $scope.translate.load("sbi.generic.delete"),
+		 	icon:'fa fa-trash' ,
+		 	backgroundColor:'transparent',
+
+		 	action: function(item) {
+
+		 		console.log(item);
+
+		 		// TODO: translate
+		 		var confirm = $mdDialog.confirm()
+	 	          .title("Delete of REST dataset request parameter")
+	 	          .targetEvent(event)
+	 	          .textContent("Are you sure you want to delete request parameter")
+	 	          .ariaLabel("Delete of REST dataset request parameter")
+	 	          .ok($scope.translate.load("sbi.general.yes"))
+	 	          .cancel($scope.translate.load("sbi.general.No"));
+
+		 		$mdDialog
+	 				.show(confirm)
+	 				.then(
+
+	 						function() {
+
+				 	        	for (i=0; i<$scope.restRequestAdditionalParameters.length; i++) {
+
+						 			if ($scope.restRequestAdditionalParameters[i].index == item.index) {
+						 				$scope.setFormDirty();
+						 				$scope.restRequestAdditionalParameters.splice(i,1);
 						 				break;
 						 			}
 
@@ -693,20 +810,50 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 	$scope.parameterItems = [];
 	$scope.parametersCounter = 0;
 
-	$scope.parametersAddItem = function() {
-
-		$scope.parameterItems.push({"name":"","type":"", "defaultValue":"","multiValue":"","index":$scope.parametersCounter++});
-
-		$timeout(
+	$scope.parametersAddItem = function(event) {
+		
+		if($scope.selectedDataSet.isPersisted == true) {
+			var confirm = $mdDialog.confirm()
+				         .title($scope.translate.load("sbi.ds.parameters.dialog.title"))
+				         .targetEvent(event)
+				         .textContent($scope.translate.load("sbi.ds.parameters.dialog.text"))
+				         .ariaLabel("Add dataset parameter")
+				         .ok($scope.translate.load("sbi.general.yes"))
+				         .cancel($scope.translate.load("sbi.general.No"));
+			
+			$mdDialog.show(confirm).then(
 					function() {
-						var page = $scope.tableLastPage("datasetParametersTable");
-						// If the page that is returned is less than the current one, that means that we are already on that page, so keep it (danristo)
-						$scope.parametersTableLastPage = page<$scope.parametersTableLastPage ? $scope.parametersTableLastPage : page;
-					},
+						$scope.selectedDataSet.isPersisted = false;
+						$scope.selectedDataSet.persistTableName = '';
+						$scope.disablePersisting = true;
+						$scope.parameterItems.push({"name":"","type":"", "defaultValue":"","multiValue":"","index":$scope.parametersCounter++});
+						
+						$timeout(
+									function() {
+										var page = $scope.tableLastPage("datasetParametersTable");
+										// If the page that is returned is less than the current one, that means that we are already on that page, so keep it (danristo)
+										$scope.parametersTableLastPage = page<$scope.parametersTableLastPage ? $scope.parametersTableLastPage : page;
+									},
 
-					300
-				);
+									300
+								);
+					}
+			);
+		} else {			
+			$scope.disablePersisting = true;
+			$scope.parameterItems.push({"name":"","type":"", "defaultValue":"","multiValue":"","index":$scope.parametersCounter++});
+			
+			$timeout(
+						function() {
+							var page = $scope.tableLastPage("datasetParametersTable");
+							// If the page that is returned is less than the current one, that means that we are already on that page, so keep it (danristo)
+							$scope.parametersTableLastPage = page<$scope.parametersTableLastPage ? $scope.parametersTableLastPage : page;
+						},
 
+						300
+					);
+		}
+		
 	}
 
 	$scope.parameterDelete =
@@ -722,7 +869,6 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 			 	// TODO: translate
 		    	var confirm = $mdDialog.confirm()
 			         .title("Delete dataset parameter")
-			         .targetEvent(event)
 			         .textContent("Are you sure you want to delete the dataset parameter?")
 			         .ariaLabel("Delete dataset parameter")
 			         .ok($scope.translate.load("sbi.general.yes"))
@@ -741,10 +887,13 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 						 				break;
 						 			}
 						 		}
-
+								
+								if($scope.parameterItems.length == 0) {
+									$scope.disablePersisting = false;
+								}
+								
 					 		}
-						);
-
+						);								
 	 		}
 
 	 	}
@@ -757,7 +906,6 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 			// TODO: translate
 	    	var confirm = $mdDialog.confirm()
 		         .title("Clear all dataset parameters")
-		         .targetEvent(event)
 		         .textContent("Are you sure you want to delete all dataset parameters")
 		         .ariaLabel("Clear all dataset parameters")
 		         .ok($scope.translate.load("sbi.general.yes"))
@@ -769,6 +917,7 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 						function() {
 							$scope.setFormDirty();
 							$scope.parameterItems = [];
+							$scope.disablePersisting = false;
 				 		}
 					);
 		}
@@ -867,9 +1016,9 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
     	$scope.searchValue = searchValue;
     	var columnOrderingLabel = "";
     	if($scope.columnOrdering){
-    		columnOrderingLabel = $scope.columnOrdering.label;
+    		columnOrderingLabel = $scope.columnOrdering.name;
     	}
-    	
+
     	if($scope.searchValue!=""){
     		sbiModule_restServices.promiseGet("1.0/datasets", "countDataSetSearch/"+$scope.searchValue)
     		.then(function(response) {
@@ -901,10 +1050,10 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
     			if($scope.reverseOrdering==undefined){
     				$scope.reverseOrdering=false;
     			}
-    			
+
     			var columnOrderingLabel = "";
     	    	if($scope.columnOrdering){
-    	    		columnOrderingLabel = $scope.columnOrdering.label;
+    	    		columnOrderingLabel = $scope.columnOrdering.name;
     	    	}
     			$scope.loadDatasetList(start, itemsPerPage, $scope.searchValue,columnOrderingLabel, $scope.reverseOrdering);
     		}, function(response) {
@@ -941,7 +1090,7 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 		if(reverseOrdering!==null && reverseOrdering!==""){
 			var ordering = {"reverseOrdering":reverseOrdering,
 							"columnOrdering":columnOrderingName
-					
+
 			};
 			queryParams = queryParams+"&ordering="+angular.toJson(ordering);
 		}
@@ -1009,7 +1158,7 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 			 						   				sbiModule_messaging.showSuccessMessage($scope.translate.format($scope.translate.load('sbi.ds.deletedataset.success'), item.label));
 			 						   			var columnOrderingLabel = "";
 			 					    	    	if($scope.columnOrdering){
-			 					    	    		columnOrderingLabel = $scope.columnOrdering.label;
+			 					    	    		columnOrderingLabel = $scope.columnOrdering.name;
 			 					    	    	}
 				 						   			var start = 0;
 				 					    			if($scope.currentPageNumber>1){
@@ -1611,6 +1760,8 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 
 	 // SELECT DATASET
 	 $scope.loadDataSet = function(item,index) {
+		 $scope.isSelected = true;
+		 $scope.step=1;
 //		 console.log("A8");
 //		 console.log(item);
 //		 console.log($scope.dirtyForm);
@@ -1677,7 +1828,6 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 				// TODO: translate
 				var confirm = $mdDialog.confirm()
 				        .title($scope.translate.load("sbi.catalogues.generic.modify"))
-				        .targetEvent(event)
 				        .textContent($scope.translate.load("sbi.catalogues.generic.modify.msg"))
 				        .ariaLabel("Losing the changed and not saved data")
 				        .ok($scope.translate.load("sbi.general.yes"))
@@ -1725,6 +1875,12 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 		$scope.selectedDataSet = angular.copy(item);
 		$scope.showSaveAndCancelButtons = true;
 
+		if($scope.selectedDataSet.pars.length > 0) {
+			$scope.disablePersisting = true;
+		} else {
+			$scope.disablePersisting = false;
+		}
+		
 		// SCHEDULING
 		if ($scope.selectedDataSet.isScheduled) {
 			$scope.selectedDataSet.startDate = new Date($scope.selectedDataSet.startDate);
@@ -1888,9 +2044,15 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 		$scope.parameterItems = parameterItemsTemp;
 
 		if ($scope.selectedDataSet.dsTypeCd.toLowerCase()=="rest") {
-
 			// Cast the REST NGSI (transform from the String)
-			$scope.selectedDataSet.restNGSI = JSON.parse($scope.selectedDataSet.restNGSI);
+			if($scope.selectedDataSet.restNGSI){
+				$scope.selectedDataSet.restNGSI = JSON.parse($scope.selectedDataSet.restNGSI);
+			}
+		}
+
+		if ($scope.selectedDataSet.dsTypeCd.toLowerCase()=="rest" || $scope.selectedDataSet.dsTypeCd.toLowerCase()=="solr") {
+
+
 
 			// Cast the REST directly JSON attributes (transform from the String)
 			if($scope.selectedDataSet.restDirectlyJSONAttributes!=""){
@@ -1919,6 +2081,13 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 			}
 
 			$scope.restRequestHeaders = restRequestHeadersTemp;
+
+			// REST ADDITIONAL PARAMETERS
+			if($scope.selectedDataSet.restRequestAdditionalParameters){
+				$scope.restRequestAdditionalParameters = JSON.parse($scope.selectedDataSet.restRequestAdditionalParameters);
+			}else{
+				$scope.restRequestAdditionalParameters=[];
+			}
 
 			// REST JSON PATH
 			var restJsonPathAttributesTemp = [];
@@ -2000,6 +2169,8 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 		$scope.selectedDataSet.csvEncoding = item!=undefined ? item.csvEncoding : $scope.csvEncodingDefault;
 		$scope.selectedDataSet.csvDelimiter = item!=undefined ? item.csvDelimiter : $scope.csvDelimiterDefault;
 		$scope.selectedDataSet.csvQuote = item!=undefined ? item.csvQuote : $scope.csvQuoteDefault;
+		$scope.selectedDataSet.csvQuote = item!=undefined ? item.csvQuote : $scope.csvQuoteDefault;
+		$scope.selectedDataSet.dateFormat = (item!=undefined && item.dateFormat!=undefined) ? item.dateFormat : $scope.dateFormatDefault;
 
 		/**
 		 * Handle the limitRows property value deserialization (special case: it can be of a value NULL).
@@ -2069,6 +2240,8 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 	}
 
 	$scope.createNewDataSet = function() {
+
+		$scope.step=1;
 
 		if ($scope.datasetsListTemp.length == $scope.datasetsListPersisted.length + 1) {
 
@@ -2150,17 +2323,27 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 					restNGSI: "",
 					restOffset: "",
 					restRequestBody: "",
-					restRequestHeaders: ""
+					restRequestHeaders: "",
+					restRequestAdditionalParameters: [],
+					solrType: "FACETS",
+					solrFacetQuery: "",
+					solrFacetField: "",
+					solrFacetPrefix: "",
+					sparqlEndpoint: "",
+					sparqlDefaultGraphIri: "",
+					sparqlQuery: "",
+					sparqlExecutionTimeout: 30
 
 			}
-
+						
 			$scope.datasetsListTemp.push(object);
 			$scope.selectedDataSet = angular.copy($scope.datasetsListTemp[$scope.datasetsListTemp.length-1]);
 			$scope.selectedDataSetInit = angular.copy($scope.datasetsListTemp[$scope.datasetsListTemp.length-1]); // Reset the selection (none dataset item will be selected) (danristo)
 			$scope.showSaveAndCancelButtons = true;
 
 			$scope.transformDatasetState = false;
-
+			$scope.disablePersisting = false;
+			
 			// Give a little time for the AT to render after the insertion of a new table element (new dataset) (danristo)
 			// We do not need to check if the current page is the one that is return by a function, since we cannot add more than one empty dataset
 			$timeout(function() { var page = $scope.tableLastPage("datasetList_id"); $scope.datasetTableLastPage = (page<=$scope.datasetTableLastPage)
@@ -2181,7 +2364,7 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 			$scope.selectedDataSet.pivotRowName ? $scope.selectedDataSet.pivotRowName="" : null;
 		}
 
-		if ($scope.selectedDataSet.dsTypeCd.toLowerCase()=="rest") {
+		if ($scope.selectedDataSet.dsTypeCd.toLowerCase()=="rest" || $scope.selectedDataSet.dsTypeCd.toLowerCase()=="solr") {
 
 			//----------------------
 			// REQUEST HEADERS
@@ -2193,6 +2376,15 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 			}
 
 			$scope.selectedDataSet.restRequestHeaders = angular.copy(JSON.stringify(restRequestHeadersTemp));
+
+			if ($scope.selectedDataSet.dsTypeCd.toLowerCase()=="solr") {
+				//----------------------
+				// REQUEST ADDITIONAL PARAMETERS
+				//----------------------
+				$scope.selectedDataSet.restRequestAdditionalParameters = $scope.restRequestAdditionalParameters;
+
+			}
+
 
 			//----------------------
 			// JSON PATH ATTRIBUTES
@@ -2213,6 +2405,9 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 		}
 		else if($scope.selectedDataSet.dsTypeCd.toLowerCase()=="file") {
 			$scope.selectedDataSet.fileUploaded = !$scope.selectedDataSet.fileUploaded ? false : true;
+			if($scope.dataset!=undefined && $scope.dataset.hasOwnProperty("meta")){
+				$scope.selectedDataSet.meta = $scope.dataset.meta;
+			}
 		}
 
 		// Scheduling refactoring
@@ -2338,7 +2533,6 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 			if ($scope.selectedDataSet.id) {
 				for (i=0; i<$scope.datasetsListTemp.length; i++) {
 					if ($scope.datasetsListTemp[i].id == $scope.selectedDataSet.id) {
-//						console.log("nasao 3: ",$scope.datasetsListTemp[i]);
 						indexOfExistingDSInAT = i;
 					}
 				}
@@ -2375,7 +2569,7 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 
 							if( $scope.showDatasetScheduler){
 								if($scope.selectedDataSet.isScheduled) {
-									sbiModule_restServices.promisePost('scheduler/persistence/dataset/id',response.data.id, angular.toJson($scope.selectedDataSet))
+									sbiModule_restServices.promisePost('scheduleree/persistence/dataset/id',response.data.id, angular.toJson($scope.selectedDataSet))
 									.then(
 
 											function(responseDS) {
@@ -2390,7 +2584,7 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 											}
 									);
 								} else {
-									sbiModule_restServices.promiseDelete('scheduler/persistence/dataset/label', $scope.selectedDataSet.label, "/")
+									sbiModule_restServices.promiseDelete('scheduleree/persistence/dataset/label', $scope.selectedDataSet.label, "/")
 									.then(
 											function(responseDS) {
 												console.log("[DELETE]: SUCCESS!");
@@ -2436,7 +2630,7 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 
 	$scope.uploadFile= function(){
 
-    	multipartForm.post(sbiModule_config.contextName +"/restful-services/selfservicedataset/fileupload",$scope.fileObj).success(
+    	multipartForm.post(sbiModule_config.contextName +"/restful-services/selfservicedatasetupload/fileupload",$scope.fileObj).success(
 
 				function(data,status,headers,config){
 
@@ -2466,10 +2660,11 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 						 */
 						$scope.selectedDataSet.csvEncoding = $scope.csvEncodingDefault;
 						$scope.selectedDataSet.csvDelimiter = $scope.csvDelimiterDefault;
+						$scope.selectedDataSet.dateFormat = $scope.dateFormatDefault;
 						$scope.selectedDataSet.csvQuote = $scope.csvQuoteDefault;
-						$scope.selectedDataSet.skipRows = $scope.skipRowsDefault ? $scope.skipRowsDefault : null;
-						$scope.selectedDataSet.limitRows = $scope.limitRowsDefault ? $scope.limitRowsDefault : null;
-						$scope.selectedDataSet.xslSheetNumber = $scope.xslSheetNumberDefault ? $scope.limitRowsDefault : null;
+						$scope.selectedDataSet.skipRows = ($scope.skipRowsDefault != null) ? $scope.skipRowsDefault : null;
+						$scope.selectedDataSet.limitRows = ($scope.limitRowsDefault !=null) ? $scope.limitRowsDefault : null;
+						$scope.selectedDataSet.xslSheetNumber = ($scope.xslSheetNumberDefault != null) ? $scope.xslSheetNumberDefault : null;
 
 						/**
 						 * Whenever we upload a file, keep the track of its name, in order to indicate when the new one is browsed but not uploaded.
@@ -2478,6 +2673,14 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 						$scope.prevUploadedFile = $scope.selectedDataSet.fileName;
 						$scope.selectedDataSet.fileUploaded=true;
 						$scope.changingFile = false;
+						$scope.initialUpload = true;
+
+						if($scope.selectedDataSet.fileType=="XLS"){
+							$scope.selectedDataSet.limitRows = "";
+							$scope.selectedDataSet.csvDelimiter = "";
+							$scope.selectedDataSet.dateFormat = "";
+							$scope.selectedDataSet.csvQuote = "";
+						}
 
 					}
 				}).error(function(data, status, headers, config) {
@@ -2495,6 +2698,8 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 		console.info("CHANGE FILE [IN]");
 
 		$scope.changingFile = true;
+
+		$scope.initialUpload = true;
 
 		/**
 		 * If we are about to change the uploaded file in editing mode, we should keep the data about the name of the previously uploaded
@@ -2544,26 +2749,35 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 	  };
 
 	 $scope.queryScripts = [
-	                        {
-	                         name: 'javascript',
-		 					 mode: 'text/javascript'
-	                        },
-	                        {
-	                         name: 'SQL',
-	                         mode: 'text/x-sql'
-	                        }
-	                       ];
+	    {
+	     name: 'javascript',
+	     mode: 'text/javascript'
+	    },
+	    {
+		 name: 'SQL',
+		 mode: 'text/x-sql'
+	    }
+    ];
 
 	 $scope.codemirrorOptions = {
-			   mode : "text/x-sql",
-			   indentWithTabs: true,
-			   smartIndent: true,
-			   lineWrapping : true,
-			   matchBrackets : true,
-			   autofocus: true,
-			   theme:"eclipse",
-			   lineNumbers: true,
-			 };
+	   mode: 'text/x-sql',
+	   lineWrapping : true,
+	   indentWithTabs: true,
+	   smartIndent: true,
+	   matchBrackets : true,
+	   theme:"eclipse",
+	   lineNumbers: true
+	 };
+
+	 $scope.codemirrorSparqlOptions = {
+		   mode: 'application/sparql-query',
+		   lineWrapping : true,
+		   indentWithTabs: true,
+		   smartIndent: true,
+		   matchBrackets : true,
+		   theme:"eclipse",
+		   lineNumbers: true
+		 };
 
 
 	 $scope.getScriptTypes = function() {
@@ -2579,6 +2793,7 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 	 $scope.getScriptTypes();
 
 	 $scope.openEditScriptDialog = function () {
+		 $scope.forceRefresh = false;
 		   $mdDialog
 		   .show({
 		    scope : $scope,
@@ -2589,7 +2804,16 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 		    clickOutsideToClose : false,
 		    hasBackdrop : false
 		   });
+
+		   $timeout(function(){
+			   if(angular.element(document).find('md-dialog').length > 0){
+					 $scope.forceRefresh = true;
+				 }
+		   },1000)
+
 	 }
+
+
 
 	 $scope.saveScript = function () {
 		 $mdDialog.hide();
@@ -2723,6 +2947,9 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 			case "jsonPathAttributes":
 				takeTheInfoHtmlContent(sbiModule_config.contextName + "/themes/sbi_default/html/restdataset-json-path-attributes.html");
 				break;
+			case "facetQuery":
+				takeTheInfoHtmlContent(sbiModule_config.contextName + "/themes/sbi_default/html/facet-query.html");
+				break;
 		}
 
 	}
@@ -2835,7 +3062,7 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 
 		$scope.disableBack = true;
 
-		if ($scope.selectedDataSet.dsTypeCd.toLowerCase()=="rest") {
+		if ($scope.selectedDataSet.dsTypeCd.toLowerCase()=="rest" || $scope.selectedDataSet.dsTypeCd.toLowerCase()=="solr") {
 
 			//----------------------
 			// REQUEST HEADERS
@@ -2847,6 +3074,16 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 			}
 
 			$scope.selectedDataSet.restRequestHeaders = angular.copy(JSON.stringify(restRequestHeadersTemp));
+
+			if($scope.selectedDataSet.dsTypeCd.toLowerCase()=="solr"){
+				//----------------------
+				// REQUEST ADDITIONAL PARAMETERS
+				//----------------------
+
+				$scope.selectedDataSet.restRequestAdditionalParameters = $scope.restRequestAdditionalParameters;
+
+			}
+
 
 			//----------------------
 			// JSON PATH ATTRIBUTES
@@ -2922,29 +3159,6 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 	    	$scope.createColumnsForPreview($scope.newDatasetMeta.metaData.fields);
 	    }
     }
-
-    /*$scope.changePreviewPage = function(itemsPerPage, currentPageNumber){
-	var start = 0;
-	if(currentPageNumber>1){
-		start = (currentPageNumber - 1) * itemsPerPage;
-	}
-	 $scope.selectedDataSet.start = start;
- 	 $scope.selectedDataSet.limit = itemsPerPage;
- 	 sbiModule_restServices.promisePost('1.0/datasets','preview', angular.toJson($scope.selectedDataSet))
-	 .then(
-		function(response) {
-			console.log(response.data);
-			$scope.newDatasetMeta = response.data;
-			$scope.getPreviewSet(null);
-		},
-		function(response) {
-			$scope.translate.load(response.data.errors.messages)
-		}
-	 );
-}*/
-
-
-//$scope.numOfDSPreview = response.data.results;
 
     $scope.getNextPreviewSet = function(){
     	 if($scope.startPreviewIndex+$scope.itemsPerPage > $scope.totalItemsInPreview){
@@ -3078,6 +3292,48 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 
     }
 
+    $scope.deleteAllRESTRequestAdditionalParameters = function() {
+
+    	if ($scope.restRequestAdditionalParameters.length>0) {
+
+    		// TODO: translate
+        	var confirm = $mdDialog.confirm()
+    	         .title("Clear all REST request headers")
+    	         .targetEvent(event)
+    	         .textContent("Are you sure you want to delete all REST request headers")
+    	         .ariaLabel("Clear all REST request headers")
+    	         .ok($scope.translate.load("sbi.general.yes"))
+    	         .cancel($scope.translate.load("sbi.general.No"));
+
+    		$mdDialog
+    			.show(confirm)
+    			.then(
+    					function() {
+    						$scope.setFormDirty();
+    						$scope.restRequestAdditionalParameters = [];
+    						$scope.restDsRequestAdditionalParameterTableLastPage = 1;
+    			 		}
+    				);
+
+    	}
+    	else {
+
+    		$mdDialog
+			.show(
+					$mdDialog.alert()
+				        .clickOutsideToClose(true)
+				        .title('Dataset has no REST request headers to delete')
+				        .textContent('There are not REST request headers to delete for the selected dataset')
+				        .ariaLabel('Dataset has no REST request headers to delete')
+				        .ok('Ok')
+			    );
+
+    	}
+
+    }
+
+
+
     $scope.deleteAllRESTJsonPathAttributes = function() {
 
     	if ($scope.restJsonPathAttributes.length>0) {
@@ -3194,19 +3450,6 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
     	$scope.saveDataset();
     }
 
-//    $scope.openHelp = function () {
-//    	$mdDialog
-//		   .show({
-//		    scope : $scope,
-//		    preserveScope : true,
-//		    parent : angular.element(document.body),
-//		    controllerAs : 'openHelpDataset',
-//		    templateUrl : sbiModule_config.contextName +'/js/src/angular_1.4/tools/catalogues/templates/helpDataSet.html',
-//		    clickOutsideToClose : false,
-//		    hasBackdrop : false
-//		   });
-//    }
-
     $scope.openHelp = function() {
 
     	// The HTML page for the Help dialog on the Type tab of the Dataset catalog
@@ -3322,13 +3565,20 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
         		if ($scope.fileObj.hasOwnProperty(key)) {
         			$scope.fileObj[key] = "";
         		}
-
     		}
-
     	}
-    	else if (dsType.toLowerCase()=="rest") {
+    	else if (dsType.toLowerCase()=="rest" || dsType.toLowerCase()=="solr") {
     		$scope.restRequestHeaders = [];
+    		$scope.restRequestAdditionalParameters = [];
     		$scope.restJsonPathAttributes = [];
+    		if(dsType.toLowerCase()=="solr"){
+    			$scope.selectedDataSet.restRequestBody="*:*";
+    			$scope.selectedDataSet.restOffset =  "";
+    			$scope.selectedDataSet.restFetchSize=  "";
+    			$scope.selectedDataSet.restMaxResults=  "";
+    		}else{
+    			$scope.selectedDataSet.restRequestBody="";
+    		}
     	}
 
     	$scope.parameterItems = [];
@@ -3529,5 +3779,616 @@ function datasetFunction($scope, $log, $http, sbiModule_config, sbiModule_transl
 				}
 			);
     }
+
+    $scope.changeStep = function(way) {
+    	var oldStep = $scope.step;
+    	var tempStep = angular.copy($scope.step);
+    	if(way=='back' && way!=undefined) {
+    		tempStep = tempStep-1;
+    	} else if(way=='next') {
+    		tempStep = tempStep+1;
+    	}
+    	switch(tempStep) {
+    	case 1:
+    		$scope.step=1;
+    		break;
+    	case 2:
+    		console.log('step 2');
+    		if(way=='validate') {
+    			$scope.toStep3();
+    		} else {
+    			if((oldStep==1 && $scope.changingFile)||(oldStep==1 && $scope.initialUpload) || (oldStep==1&&$scope.isSelected)){
+        			loadDatasetValues("domainsforfinaluser/listValueDescriptionByType","?DOMAIN_TYPE=DS_GEN_META_PROPERTY");
+            		loadDatasetValues("domainsforfinaluser/listValueDescriptionByType","?DOMAIN_TYPE=DS_META_PROPERTY");
+            		loadDatasetValues("domainsforfinaluser/listValueDescriptionByType","?DOMAIN_TYPE=DS_META_VALUE");
+            		$scope.toStep2();
+        		} else {
+        			$scope.step=2;
+        		}
+    		}
+
+    		break;
+    	default:
+    		break;
+    	}
+    }
+
+    $scope.toStep2 = function () {
+    	var params = {};
+		params.showDerivedDataset=false;
+		params.SBI_EXECUTION_ID = -1;
+		params.isTech = false;
+		params.showOnlyOwner=true;
+
+		$scope.dataset = {};
+		$scope.dataset.catTypeId = $scope.selectedDataSet.catTypeId;
+		$scope.dataset.catTypeVn = $scope.selectedDataSet.catTypeVn;
+		if($scope.selectedDataSet.csvEncoding=="" || $scope.selectedDataSet.csvEncoding==undefined) {
+			$scope.selectedDataSet.csvEncoding = "UTF-8";
+		}
+		$scope.dataset.csvEncoding = $scope.selectedDataSet.csvEncoding;
+		$scope.dataset.csvDelimiter = $scope.selectedDataSet.csvDelimiter;
+		$scope.dataset.csvQuote = $scope.selectedDataSet.csvQuote;
+		$scope.dataset.dateFormat = $scope.selectedDataSet.dateFormat;
+		$scope.dataset.description = $scope.selectedDataSet.description;
+		$scope.dataset.exportToHdfs = $scope.selectedDataSet.isPersistedHDFS;
+		$scope.dataset.fileName = $scope.selectedDataSet.fileName;
+		$scope.dataset.fileType = $scope.selectedDataSet.fileType;
+		$scope.dataset.fileUploaded = $scope.selectedDataSet.fileUploaded;
+		$scope.dataset.id = $scope.selectedDataSet.id ? $scope.selectedDataSet.id : "";
+		$scope.dataset.label = $scope.selectedDataSet.label;
+		$scope.dataset.limitRows = $scope.selectedDataSet.limitRows;
+		$scope.dataset.meta = JSON.stringify($scope.selectedDataSet.meta);
+		$scope.dataset.name = $scope.selectedDataSet.name;
+		$scope.dataset.persist = $scope.selectedDataSet.isPersisted;
+		$scope.dataset.skipRows = $scope.selectedDataSet.skipRows;
+		$scope.dataset.tableName = $scope.selectedDataSet.persistTableName;
+		$scope.dataset.type = $scope.selectedDataSet.dsTypeCd;
+		$scope.dataset.xslSheetNumber = $scope.selectedDataSet.xslSheetNumber;
+
+    	$http
+		(
+			{
+				method: 'POST',
+				url: sbiModule_config.host + sbiModule_config.contextName + '/restful-services/selfservicedataset/testDataSet',
+				data: $scope.dataset,
+				params: params,
+				headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+
+				transformRequest: function(obj) {
+
+					var str = [];
+
+					for(var p in obj)
+						str.push(encodeURIComponent(p) + "=" + encodeURIComponent(obj[p]));
+
+					return str.join("&");
+
+				},
+			}
+		)
+		.then
+		(
+			function successCallback(response) {
+
+				if (!response.data.errors) {
+
+					$scope.step = 2;
+
+					$scope.dataset.meta = {};
+					$scope.dataset.meta = angular.copy(response.data.meta);
+					angular.copy(response.data.datasetColumns,$scope.datasetColumns);
+
+					$scope.validationPassed = false;
+					$scope.prepareMetaForView();
+					$scope.prepareDatasetForView();
+
+					if($scope.initialUpload){
+						$scope.initialUpload = false;
+					}
+
+
+				} else {
+					console.info("[ERROR]: ",$scope.translate.load(response.data.errors[0].message));
+					// Reset the meta after first unsuccessful try to go to Step 2
+					$scope.dataset.meta = [];
+
+					sbiModule_messaging.showErrorMessage(response.data.errors[0].message, 'Error');
+				}
+
+			},
+			function errorCallback(response) {
+
+			});
+    }
+
+    $scope.tableColumns =
+        [
+    	     {
+    	      name:"columnView",
+    	      label:"Column",
+    	      hideTooltip:true
+    	     },
+
+    	     {
+    	         name:"pnameView",
+    	         label:"Attribute",
+    	         hideTooltip:true
+    	     },
+
+    	     {
+    	         name:"pvalueView",
+    	         label:"Value",
+    	         hideTooltip:true
+    	     },
+
+    	     /**
+    	      * A new column on the Step 2 of the Dataset wizard. It contains a graphic description of a validation state
+    	      * for all metadata column separately.
+    	      * @author Danilo Ristovski (danristo, danilo.ristovski@mht.net)
+    	      */
+    	     {
+    	    	 name: "metaValid",
+    	    	 label: "Valid",
+    	    	 hideTooltip: true
+    	     }
+         ];
+
+    $scope.metaScopeFunctions={
+        	translate: sbiModule_translate,
+        	datasetColumns:$scope.datasetColumns,
+        	dsMetaProperty:$scope.dsMetaProperty,
+        	dsMetaValue   :$scope.dsMetaValue,
+        	filterMetaValues: function(value,row){
+        		console.log(row);
+        		row.dsMetaValue=[];
+        		if(value.toLowerCase()==="type".toLowerCase()){
+        			for(i=0;i<this.dsMetaValue.length;i++){
+        			 if(this.dsMetaValue[i].VALUE_CD.toLowerCase()==="string".toLowerCase()||
+        			    this.dsMetaValue[i].VALUE_CD.toLowerCase()==="double".toLowerCase()||
+        			    this.dsMetaValue[i].VALUE_CD.toLowerCase()==="integer".toLowerCase()||
+        			    this.dsMetaValue[i].VALUE_CD.toLowerCase()==="date".toLowerCase())
+        				 row.dsMetaValue.push(this.dsMetaValue[i]);
+
+        			}
+
+        		}else if(value.toLowerCase()==="fieldType".toLowerCase()){
+        			for(i=0;i<this.dsMetaValue.length;i++){
+           			 if(this.dsMetaValue[i].VALUE_CD.toLowerCase()==="attribute".toLowerCase()||
+           			    this.dsMetaValue[i].VALUE_CD.toLowerCase()==="measure".toLowerCase())
+           				 row.dsMetaValue.push(this.dsMetaValue[i]);
+
+           			}
+
+        		}else{
+
+        			angular.copy(this.dsMetaValue,row.dsMetaValue);
+        		}
+
+        	}
+        };
+
+	loadDatasetValues = function(a,b) {
+
+		sbiModule_restServices.promiseGet(a,b)
+		.then(function(response) {
+
+			if(b=="?DOMAIN_TYPE=DS_GEN_META_PROPERTY"){
+				angular.copy(response.data,$scope.dsGenMetaProperty)
+			} else if(b=="?DOMAIN_TYPE=DS_META_PROPERTY"){
+				angular.copy(response.data,$scope.dsMetaProperty)
+			} else if(b=="?DOMAIN_TYPE=DS_META_VALUE"){
+				angular.copy(response.data,$scope.dsMetaValue)
+			}
+		},function(response){
+
+			sbiModule_messaging.showErrorMessage(response.data.errors[0].message, 'Error');
+
+		});
+	}
+
+    $scope.toStep3 = function () {
+
+
+    	$scope.dataset.isPublicDS = false;
+		$scope.dataset.datasetMetadata={};
+		$scope.dataset.datasetMetadata.version=1;
+		$scope.dataset.datasetMetadata.dataset=[];
+		$scope.dataset.datasetMetadata.columns=[];
+		angular.copy($scope.dataset.meta.dataset,$scope.dataset.datasetMetadata.dataset);
+		angular.copy($scope.dataset.meta.columns,$scope.dataset.datasetMetadata.columns);
+
+		c=$scope.dataset.datasetMetadata.columns;
+
+		for (var i = 0; i < c.length; i++) {
+			delete c[i].columnView;
+			delete c[i].pvalueView;
+			delete c[i].pnameView;
+			delete c[i].dsMetaValue;
+		}
+
+		d=$scope.dataset.datasetMetadata.dataset;
+
+		for (var i = 0; i < d.length; i++) {
+			delete d[i].pvalueView;
+			delete d[i].pnameView;
+		}
+
+		$scope.dataset.datasetMetadata = JSON.stringify($scope.dataset.datasetMetadata);
+		$scope.dataset.limitPreview = true;
+
+		$scope.dataset.page = 1;
+		$scope.dataset.start = "";
+		$scope.dataset.page = 10;
+
+
+    	var params = {};
+		params.SBI_EXECUTION_ID = -1;
+
+		$http
+		(
+			{
+				method: 'POST',
+				url: sbiModule_config.host + sbiModule_config.contextName + '/restful-services/selfservicedataset/getDataStore',
+				data: $scope.dataset,
+				params: params,
+				headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+
+				transformRequest: function(obj) {
+
+					var str = [];
+
+					for(var p in obj)
+						str.push(encodeURIComponent(p) + "=" + encodeURIComponent(obj[p]));
+
+					return str.join("&");
+
+				},
+			}
+		)
+		.then
+		(
+			function successCallback(response) {
+
+				if (!response.data.validationErrors) {
+
+					//$scope.step=3;
+					$scope.validated = true;
+
+					sbiModule_messaging.showSuccessMessage($scope.translate.load('sbi.workspace.dataset.wizard.metadata.validation.success.msg'));
+
+					$scope.resultMetaDataStep2 = [];
+					$scope.resultRowsStep2 = [];
+					angular.copy(response.data.metaData.fields,$scope.resultMetaDataStep2);
+
+					// Take all results (pure data) for rows of the Angular table
+					angular.copy(response.data.rows,$scope.resultRowsStep2);
+					$scope.collectHeadersForStep3Preview();
+
+					//validation properties when validation is successful
+					$scope.step2ValidationErrors = null;
+					$scope.validationStatus = true;
+
+					$scope.validationPassed = true;
+					$scope.csvConfChanged = false;
+					$scope.validationError = false;
+
+					$scope.prepareMetaForView();
+
+				} else if(response.data.validationErrors) {
+
+					console.warn("[VALIDATION ERRORS]: Validation failed!");
+
+					$scope.validationStatus = false;
+
+//					($scope.step2ValidationFirstTime == true) ? $scope.step2ValidationFirstTime = false : null;
+
+					/**
+					 * Now, since we are having validation errors when submitting the Step 3, change the value of the
+					 * scope variable that contains these data.
+					 */
+					$scope.step2ValidationErrors = response.data.validationErrors;
+
+					/**
+					 * Since the validation of the Step 2 went wrong (metadata are not valid), set flags that indicate that
+					 * the validation did not passed, that the CSV configration parameters are not changed (anymore) and that
+					 * there were validation errors.
+					 * @author Danilo Ristovski (danristo, danilo.ristovski@mht.net)
+					 */
+					$scope.validationPassed = false;
+					$scope.csvConfChanged = false;
+					$scope.validationError = true;
+
+					// "Refresh" the Step 2 table, in order to where the validation error appears.
+					$scope.prepareMetaForView();
+					$scope.prepareDatasetForView();
+
+				} else {
+					console.info("[ERROR]: ",response.data.errors[0].message);
+					// Reset the meta after first unsuccessful try to go to Step 2
+					//$scope.dataset.meta = [];
+
+					//sbiModule_messaging.showErrorMessage(response.data.errors[0].message, 'Error');
+				}
+
+			},
+			function errorCallback(response) {
+
+			});
+    }
+
+    $scope.collectHeadersForStep3Preview = function() {
+
+		$scope.allHeadersForStep3Preview = [];
+
+		for (i=0; i<$scope.resultMetaDataStep2.length; i++) {
+
+			var temp = {};
+
+			temp['label'] = $scope.resultMetaDataStep2[i].header;
+			temp['name'] = 'column_' + (i+1);
+
+			$scope.allHeadersForStep3Preview.push(temp);
+
+		}
+
+	}
+
+	$scope.prepareMetaForView = function(item,index){
+
+		/**
+		 * If the user just opens the Dataset wizard dialog and goes to the Step 2, the grid will be initialized with the saved (when updating/editing) or with the
+		 * default (when creating a new File dataset) data. In that situation, the 'item' and 'index' will be undefined. These two values are defined only when user
+		 * clicks on the Value column comboboxes for Field type of the particular column. They tell us the type of the Field type (ATTRIBUTE or MEASURE). So, this
+		 * variable will be true only when just opening (entering) the Step 2.
+		 * @author Danilo Ristovski (danristo, danilo.ristovski@mht.net)
+		 */
+		var initialization = !item && !index;
+
+		$scope.prepareMetaValue($scope.dataset.meta.columns,item,index);
+
+		/**
+		 * Overwrite the existing metadata (the array of all rows for the metadata on the Step 2 of the Dataset wizard)
+		 * with the filtered array - the one that passes only the 'type' and 'fieldType' rows for each column in the
+		 * file dataset. Other will be filtered (they will not pass).
+		 * @author Danilo Ristovski (danristo, danilo.ristovski@mht.net)
+		 */
+		$scope.dataset.meta.columns = filterMetadataRows($scope.dataset.meta.columns);
+
+		for(i=0; i< $scope.dataset.meta.columns.length;i++) {
+
+			loc = $scope.dataset.meta.columns[i];
+
+			var pname = loc.pname;
+
+			loc.dsMetaValue=[];
+
+			/**
+			 * If initializing (entering) the Step 2, the expression (pname=="type") will indicate that we are dealing with the Type type of the Attribute column
+			 * (possible values of these combo boxes: String, Integer, Double). In that case, inspect the subsequent Field type type (ATTRIBUTE or MEASURE) and in
+			 * the case it is a MEASURE, remove the String item from the current Type combobox, since the MEASURE can be only Integer/Double. Otherwise, if the
+			 * Attribute column value is the Field type, just proceed with the filtering of metadata.
+			 * @author Danilo Ristovski (danristo, danilo.ristovski@mht.net)
+			 */
+			if (pname=="type" || pname=="fieldType") {
+				if (initialization) {
+
+					if (pname=="type") {
+						loc.dsMetaValue = $scope.filterMetaValue(pname,undefined,i,undefined,$scope.dataset.meta.columns[i+1].pvalue);
+					}
+					else {
+						loc.dsMetaValue = $scope.filterMetaValue(pname,undefined,i,undefined);
+					}
+
+				}
+				// Click
+				else  {
+
+					if (index-1==i) {
+						loc.dsMetaValue = $scope.filterMetaValue($scope.dataset.meta.columns[index-1].pname,item,i,index);
+					}
+					else {
+
+						if (pname=="type")
+							loc.dsMetaValue = $scope.filterMetaValue(pname,undefined,i,undefined,$scope.dataset.meta.columns[i+1].pvalue);
+						else
+							loc.dsMetaValue = $scope.filterMetaValue(pname,undefined,i,undefined);
+
+					}
+				}
+
+				/**
+				 * danristo
+				 */
+				loc.indexOfRow = i;
+
+				/**
+				 * If user selects the MEASURE field type after having a field type of ATTRIBUTE and type String for a particular data column, the first
+				 * item in the type combobox for a MEASURE field type will be selected (e.g. the Integer will be selected). This is implemented instead of
+				 * having an empty combo for type when performing this scenario.
+				 * @author Danilo Ristovski (danristo, danilo.ristovski@mht.net)
+				 */
+				if (i%2==0 && loc.dsMetaValue && item) {
+
+					if (item.toUpperCase()=="MEASURE" && loc.pvalue.toLowerCase()=="string") {
+						loc.pvalue = loc.dsMetaValue[0].VALUE_CD;
+					}
+
+				}
+
+				/**
+				 * Change the GUI element type for first two columns of the Step 2 of the Dataset wizard, from combo box ('md-select') to the label (fixed value).
+				 * This is done as a temporary solution - besides this, these things are removed: 'Columns/Dataset' combo box, 'Add new row' button, 'Clear all'
+				 * button, delete row item in each row. The only dynamic behavior has the 'Value' column, since we can choose between Integer and Double for MEASURES
+				 * and an additional String option for ATTRIBUTES, so for this reason we are keeping the combo box element.
+				 * @modifiedBy Danilo Ristovski (danristo, danilo.ristovski@mht.net)
+				 */
+//					loc.columnView='<md-select aria-label="column-view" ng-model=row.column class="noMargin"><md-option ng-repeat="col in scopeFunctions.datasetColumns" value="{{col.columnName}}">{{col.columnName}}</md-option></md-select>';
+//					loc.pnameView='<md-select aria-label="pname-view" ng-model=row.pname class="noMargin"><md-option ng-repeat="col in scopeFunctions.dsMetaProperty" value="{{col.VALUE_CD}}" ng-click="scopeFunctions.filterMetaValues(col.VALUE_CD,row)">{{col.VALUE_NM}}</md-option></md-select>';
+
+				loc.columnView='<label>{{row.column}}</label>';
+				loc.pnameView='<label>{{row.pname}}</label>';
+				loc.pvalueView='<md-select aria-label="pvalue-view" ng-model=row.pvalue class="noMargin" style=styleString><md-option ng-repeat="col in row.dsMetaValue" value="{{col.VALUE_CD}}" ng-click="scopeFunctions.valueChanged(col,row.indexOfRow)">{{col.VALUE_NM}}</md-option></md-select>';
+
+				/**
+				 * Manage the Step 2 "Valid" column state according to the validation after submitting the Step 2.
+				 * @author Danilo Ristovski (danristo, danilo.ristovski@mht.net)
+				 */
+				if (($scope.validationPassed==true || $scope.validationError==true) && $scope.csvConfChanged==false) {
+
+					var invalidType = $scope.step2ValidationErrors!=null && $scope.step2ValidationErrors[0]['column_'+i] && $scope.step2ValidationErrors[0]['column_'+i]!="";
+					//{{translate.load('')}}
+
+					// If type is invalid and there are validation errors in response.
+					var msg = invalidType && $scope.step2ValidationErrors[0]["column_"+i] ? $scope.step2ValidationErrors[0]["column_"+i] : "sbi.workspace.dataset.wizard.metadata.validation.success.title";
+
+					var invalidColumnValidContent = '<md-content><md-icon md-font-icon="fa fa-times fa-1x" class="invalidTypeMetadata" title="' + eval("sbiModule_translate.load(msg)") + '"></md-icon></md-content>';
+					var validColumnValidContent = '<md-content><md-icon md-font-icon="fa fa-check fa-1x" class="validTypeMetadata" title="' + eval("sbiModule_translate.load(msg)") + '"></md-icon></md-content>';
+
+					// Set the content of the "Valid" column for the current row to an appropriate state (passed/failed validation).
+					loc.metaValid = (invalidType) ? invalidColumnValidContent : validColumnValidContent;
+
+				}
+				else {
+
+					msg = "sbi.workspace.dataset.wizard.metadata.validation.pending.title";
+
+					// Set the state of the Step 2 "Valid" column to the initial value - pending for the validation (default state).
+//					loc.metaValid = '<md-content><md-icon md-font-icon="fa fa-circle-o fa-1x" style="background-color: #e6e6e6; width: 55%; padding-left: 45%; height: 100%" title="Pending for validation check..."></md-icon></md-content>';
+					loc.metaValid = '<md-content><md-icon md-font-icon="fa fa-question fa-1x" class="defaultStateValidType" title="' + eval("sbiModule_translate.load(msg)") + '"></md-icon></md-content>';
+
+				}
+			}
+
+		}
+	}
+
+	$scope.prepareDatasetForView = function() {
+
+		var datasets = $scope.dataset.meta.dataset;
+
+		for (var i = 0; i < datasets.length; i++) {
+			datasets[i].pnameView = '<md-select aria-label="dspname-view" ng-model=row.pname class="noMargin"><md-option ng-repeat="col in scopeFunctions.dsGenMetaProperty" value="{{col.VALUE_CD}}">{{col.VALUE_NM}}</md-option></md-select>';
+			datasets[i].pvalueView = '<input ng-model="row.pvalue"></input>';
+		}
+
+	}
+
+	$scope.prepareMetaValue=function(values){
+
+		for(i=0;i<values.length;i++){
+
+			if (values[i].pname.toUpperCase() == 'type'.toUpperCase()){
+				values[i].pname=values[i].pname.toLowerCase();
+				typeValue = values[i].pvalue;
+				typeValue = typeValue!=null ? typeValue.replace("java.lang.","") : null;
+				typeValue = typeValue!=null ? typeValue.replace("java.util.","") : null;
+				values[i].pvalue = typeValue;
+			}
+		}
+	}
+
+	/**
+	 * Local function that is used for filtering rows (metadata) for all columns available in the file dataset.
+	 * It will pass only the 'type' and 'fieldType' rows, whilst others will be ignored (filtered).
+	 * @author Danilo Ristovski (danristo, danilo.ristovski@mht.net)
+	 */
+	var filterMetadataRows = function() {
+
+		/**
+		 * The final (filtered) array of all rows in the Step 2
+		 */
+		var finalFilteredRows = [];
+		var pname = "";
+
+		for(i=0; i< $scope.dataset.meta.columns.length;i++) {
+
+			loc = $scope.dataset.meta.columns[i];
+			pname = loc.pname;
+
+			if (pname=="type" || pname=="fieldType") {
+				finalFilteredRows.push(loc);
+			}
+
+		}
+
+		return finalFilteredRows;
+
+	}
+
+	$scope.filterMetaValue = function(pname,item,i,index,myFieldType){
+
+		var filteredMetaValues = [];
+
+		/**
+		 * A flag that will indicate if the "String" item in the Value column combobox for the belonging Field type row for the current column
+		 * should be excluded. It does if one of two cases specified below are true.
+		 * @author Danilo Ristovski (danristo, danilo.ristovski@mht.net)
+		 */
+		var insertString = true;
+
+		/**
+		 * Cases in which the "String" item in the Field type should be excluded:
+		 *
+		 * myFieldType=="MEASURE":
+		 * 		If initializing (entering) the Step 2, inspect the next Field type value and if it is a MEASURE, remove the "String" values
+		 * 		from the current Type row (since the column of the MEASURE field type cannot be a String). If it is not a MEASURE, i.e. if
+		 * 		it is an ATTRIBUTE, continue with initializing items in the Type combobox for particular row without any modification (include
+		 * 		the "String" item as well).
+		 *
+		 * index && item=="MEASURE":
+		 * 		If the user clicks on some Field type combobox (the combo in the Value column in the Step 2) and choose a MEASURE, its
+		 * 		belonging Type value (for the same column, e.g. Country) should exclude the "String" item. In that case the "index" input
+		 * 		parameter is defined.
+		 *
+		 * @author Danilo Ristovski (danristo, danilo.ristovski@mht.net)
+		 */
+		if (myFieldType=="MEASURE" || index && item=="MEASURE")
+			insertString = false;
+
+		if(pname.toLowerCase()==="type".toLowerCase()){
+
+			for(j=0;j<$scope.dsMetaValue.length;j++){
+
+				 if($scope.dsMetaValue[j].VALUE_CD.toLowerCase()==="string".toLowerCase() && insertString ||
+						 $scope.dsMetaValue[j].VALUE_CD.toLowerCase()==="double".toLowerCase()||
+						 $scope.dsMetaValue[j].VALUE_CD.toLowerCase()==="integer".toLowerCase()||
+						 $scope.dsMetaValue[j].VALUE_CD.toLowerCase()==="date".toLowerCase()){
+					 filteredMetaValues.push($scope.dsMetaValue[j]);
+				 }
+			}
+
+		}else if(pname.toLowerCase()==="fieldType".toLowerCase()){
+			for(j=0;j<$scope.dsMetaValue.length;j++){
+   			 if($scope.dsMetaValue[j].VALUE_CD.toLowerCase()==="attribute".toLowerCase()||
+   			    $scope.dsMetaValue[j].VALUE_CD.toLowerCase()==="measure".toLowerCase()){
+   				filteredMetaValues.push($scope.dsMetaValue[j]);
+   			 }
+
+   			}
+
+		}
+		else {
+			angular.copy($scope.dsMetaValue,filteredMetaValues);
+		}
+
+		return filteredMetaValues;
+	}
+
+
+	$scope.metaScopeFunctions.valueChanged = function(item,index) {
+
+    	if (item.VALUE_CD=="MEASURE" || item.VALUE_CD=="ATTRIBUTE") {
+    		$scope.prepareMetaForView(item.VALUE_CD,index);
+    	}
+
+    }
+
+	$scope.goToFirstStep = function () {
+		$scope.step=1;
+		$scope.validated = false;
+	}
+
+    $scope.metaScopeFunctions.dsGenMetaProperty = $scope.dsGenMetaProperty;
 
 };

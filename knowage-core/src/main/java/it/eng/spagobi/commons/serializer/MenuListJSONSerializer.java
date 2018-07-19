@@ -17,6 +17,16 @@
  */
 package it.eng.spagobi.commons.serializer;
 
+import java.util.List;
+import java.util.Locale;
+
+import javax.servlet.http.HttpSession;
+
+import org.apache.commons.lang.StringEscapeUtils;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import it.eng.spago.error.EMFInternalError;
 import it.eng.spago.error.EMFUserError;
 import it.eng.spago.security.IEngUserProfile;
@@ -32,16 +42,6 @@ import it.eng.spagobi.utilities.assertion.Assert;
 import it.eng.spagobi.wapp.bo.Menu;
 import it.eng.spagobi.wapp.services.DetailMenuModule;
 import it.eng.spagobi.wapp.util.MenuUtilities;
-
-import java.util.List;
-import java.util.Locale;
-
-import javax.servlet.http.HttpSession;
-
-import org.apache.commons.lang.StringEscapeUtils;
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
 
 /**
  * @author Monica Franceschini
@@ -80,7 +80,7 @@ public class MenuListJSONSerializer implements Serializer {
 
 	/**
 	 * The URL for the Workspace web page.
-	 * 
+	 *
 	 * @author Danilo Ristovski (danristo, danilo.ristovski@mht.net)
 	 */
 	private static final String HREF_DOC_BROWSER_WORKSPACE = "/servlet/AdapterHTTP?ACTION_NAME=DOCUMENT_USER_BROWSER_WORKSPACE&LIGHT_NAVIGATOR_RESET_INSERT=TRUE";
@@ -192,7 +192,8 @@ public class MenuListJSONSerializer implements Serializer {
 							String text = "";
 							if (!menuElem.isAdminsMenu() || !menuElem.getName().startsWith("#"))
 
-								text = msgBuild.getI18nMessage(locale, menuElem.getName());
+								// text = msgBuild.getI18nMessage(locale, menuElem.getName());
+								text = menuElem.getName();
 							else {
 								if (menuElem.getName().startsWith("#")) {
 									String titleCode = menuElem.getName().substring(1);
@@ -215,7 +216,7 @@ public class MenuListJSONSerializer implements Serializer {
 
 							/**
 							 * The URL for the Workspace web page.
-							 * 
+							 *
 							 * @author Danilo Ristovski (danristo, danilo.ristovski@mht.net)
 							 */
 							if (menuElem.getCode() != null && menuElem.getCode().equals("workspace")) {
@@ -341,9 +342,10 @@ public class MenuListJSONSerializer implements Serializer {
 			socialAnalysis.put(SCALE, "large");
 			socialAnalysis.put(TARGET, "_self");
 			// if (!GeneralUtilities.isSSOEnabled()) {
-			socialAnalysis.put(HREF, "javascript:execDirectUrl('" + HREF_SOCIAL_ANALYSIS + "?" + SsoServiceInterface.USER_ID + "="
-					+ userProfile.getUserUniqueIdentifier().toString() + "&" + SpagoBIConstants.SBI_LANGUAGE + "=" + locale.getLanguage() + "&"
-					+ SpagoBIConstants.SBI_COUNTRY + "=" + locale.getCountry() + "');");
+			socialAnalysis.put(HREF,
+					"javascript:execDirectUrl('" + HREF_SOCIAL_ANALYSIS + "?" + SsoServiceInterface.USER_ID + "="
+							+ userProfile.getUserUniqueIdentifier().toString() + "&" + SpagoBIConstants.SBI_LANGUAGE + "=" + locale.getLanguage() + "&"
+							+ SpagoBIConstants.SBI_COUNTRY + "=" + locale.getCountry() + "');");
 			/*
 			 * } else { socialAnalysis.put(HREF, "javascript:execDirectUrl('" + HREF_SOCIAL_ANALYSIS + "?" + SpagoBIConstants.SBI_LANGUAGE + "=" +
 			 * locale.getLanguage() + "&" + SpagoBIConstants.SBI_COUNTRY + "=" + locale.getCountry() + "');"); }
@@ -603,16 +605,24 @@ public class MenuListJSONSerializer implements Serializer {
 
 		MessageBuilder msgBuild = new MessageBuilder();
 		String text = "";
-		if (!childElem.isAdminsMenu() || !childElem.getName().startsWith("#"))
-			text = msgBuild.getI18nMessage(locale, childElem.getName());
-		else {
-			if (childElem.getName().startsWith("#")) {
-				String titleCode = childElem.getName().substring(1);
-				text = msgBuild.getMessage(titleCode, locale);
-			} else {
-				text = childElem.getName();
-			}
+
+		if (childElem.getName().startsWith("#")) {
+			String titleCode = childElem.getName().substring(1);
+			text = msgBuild.getMessage(titleCode, locale);
+		} else {
+			text = childElem.getName();
 		}
+
+		// if (!childElem.isAdminsMenu() || !childElem.getName().startsWith("#"))
+		// text = msgBuild.getI18nMessage(locale, childElem.getName());
+		// else {
+		// if (childElem.getName().startsWith("#")) {
+		// String titleCode = childElem.getName().substring(1);
+		// text = msgBuild.getMessage(titleCode, locale);
+		// } else {
+		// text = childElem.getName();
+		// }
+		// }
 		/*
 		 * Cannot set a static ID as a random number!!!! See https://www.spagoworld.org/jira/browse/SPAGOBI-1268 See
 		 * https://www.spagoworld.org/jira/browse/SPAGOBI-1269 The following line was the cause of the above issues!!
@@ -634,18 +644,23 @@ public class MenuListJSONSerializer implements Serializer {
 			temp2.put(ICON_CLS, "bullet");
 
 			if (childElem.getObjId() != null) {
-				temp2.put(HREF,
-						"javascript:execDirectUrl('" + contextName + "/servlet/AdapterHTTP?ACTION_NAME=MENU_BEFORE_EXEC&MENU_ID=" + childElem.getMenuId()
-								+ "', '" + path + "' )");
-			} else if (childElem.getStaticPage() != null) {
+				if (childElem.isClickable() == true) {
+					temp2.put(HREF, "javascript:execDirectUrl('" + contextName + "/servlet/AdapterHTTP?ACTION_NAME=MENU_BEFORE_EXEC&MENU_ID="
+							+ childElem.getMenuId() + "', '" + path + "' )");
+				} else {
+					// temp2.put(HREF, "javascript:execDirectUrl('')");
+					temp2.put("isClickable", "false");
+
+				}
+			} else if (childElem.getStaticPage() != null && !childElem.getStaticPage().equals("")) {
 				temp2.put(HREF, "javascript:execDirectUrl('" + contextName + "/servlet/AdapterHTTP?ACTION_NAME=READ_HTML_FILE&MENU_ID=" + childElem.getMenuId()
 						+ "', '" + path + "' )");
 			} else if (childElem.getFunctionality() != null) {
 				String finalUrl = "javascript:execDirectUrl('" + DetailMenuModule.findFunctionalityUrl(childElem, contextName) + "', '" + path + "')";
 				temp2.put(HREF, finalUrl);
 			} else if (childElem.getExternalApplicationUrl() != null) {
-				temp2.put(HREF, "javascript:callExternalApp('" + StringEscapeUtils.escapeJavaScript(childElem.getExternalApplicationUrl()) + "', '" + path
-						+ "')");
+				temp2.put(HREF,
+						"javascript:callExternalApp('" + StringEscapeUtils.escapeJavaScript(childElem.getExternalApplicationUrl()) + "', '" + path + "')");
 			} else if (childElem.isAdminsMenu() && childElem.getUrl() != null) {
 				String url = "javascript:execDirectUrl('" + childElem.getUrl() + "'";
 				url = url.replace("${SPAGOBI_CONTEXT}", contextName);
@@ -657,8 +672,8 @@ public class MenuListJSONSerializer implements Serializer {
 					url = url.substring(0, url.length() - 1);
 					url = url.replace("${SPAGOBI_SOCIAL_ANALYSIS_URL}", SingletonConfig.getInstance().getConfigValue("SPAGOBI.SOCIAL_ANALYSIS_URL"));
 					// if (!GeneralUtilities.isSSOEnabled()) {
-					url = url + "?" + SsoServiceInterface.USER_ID + "=" + userProfile.getUserUniqueIdentifier().toString() + "&"
-							+ SpagoBIConstants.SBI_LANGUAGE + "=" + locale.getLanguage() + "&" + SpagoBIConstants.SBI_COUNTRY + "=" + locale.getCountry() + "'";
+					url = url + "?" + SsoServiceInterface.USER_ID + "=" + userProfile.getUserUniqueIdentifier().toString() + "&" + SpagoBIConstants.SBI_LANGUAGE
+							+ "=" + locale.getLanguage() + "&" + SpagoBIConstants.SBI_COUNTRY + "=" + locale.getCountry() + "'";
 					/*
 					 * } else { url = url + "?" + SpagoBIConstants.SBI_LANGUAGE + "=" + locale.getLanguage() + "&" + SpagoBIConstants.SBI_COUNTRY + "=" +
 					 * locale.getCountry() + "'"; }

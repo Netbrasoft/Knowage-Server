@@ -30,6 +30,7 @@ angular.module('cockpitModule').directive('datasetSelector',function($compile){
 		   replace: true,		  
 		   scope:{
 			   ngModel:"=",
+			   extended:"=?",
 			   onChange:"&",
 		   },
 		   compile: function (tElement, tAttrs, transclude) {
@@ -46,7 +47,7 @@ angular.module('cockpitModule').directive('datasetSelector',function($compile){
 	   }
 });
 
-function datasetSelectorControllerFunction($scope,cockpitModule_datasetServices,sbiModule_translate){
+function datasetSelectorControllerFunction($scope,cockpitModule_datasetServices,sbiModule_translate,sbiModule_restServices){
 	$scope.translate=sbiModule_translate;
 	$scope.availableDatasets=cockpitModule_datasetServices.getAvaiableDatasets();
 	$scope.addNewDataset=function(){
@@ -57,6 +58,38 @@ function datasetSelectorControllerFunction($scope,cockpitModule_datasetServices,
 			 $scope.onChange({dsId:data.id.dsId});
 		 });
 	}
+	$scope.cancelDataset=function(){
+		delete $scope.ngModel;
+	}
+	$scope.getMetaData = function(id){
+		if(id){
+			sbiModule_restServices.restToRootProject();
+			var params = cockpitModule_datasetServices.getDatasetParameters(id);
+			for(var p in params){
+				if(params[p].length == 1){
+					params[p] = params[p][0];
+				}
+			}
+			sbiModule_restServices.promisePost("2.0/datasets", encodeURIComponent(cockpitModule_datasetServices.getDatasetLabelById(id)) + "/data",params && JSON.stringify({"parameters": params}))
+				.then(function(data){
+					$scope.dataset = data.data;
+				})
+		}else {
+			$scope.dataset = {};
+		}
+		
+	}
+	if($scope.extended){
+		$scope.getMetaData($scope.ngModel);
+	}
+	
+	var metaDataWatcher = $scope.$watch('ngModel',function(newValue,oldValue){
+		if($scope.extended && newValue!=oldValue){
+			$scope.getMetaData(newValue);
+		}
+	})
+	
+	
 };
 
 })();

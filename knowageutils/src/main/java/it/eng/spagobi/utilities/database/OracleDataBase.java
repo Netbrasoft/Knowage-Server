@@ -17,20 +17,35 @@
  */
 package it.eng.spagobi.utilities.database;
 
-import it.eng.spagobi.tools.datasource.bo.IDataSource;
+import java.sql.Connection;
+import java.sql.SQLException;
 
 import org.apache.log4j.Logger;
+
+import it.eng.spagobi.tools.datasource.bo.IDataSource;
 
 /**
  * @author Andrea Gioia (andrea.gioia@eng.it)
  *
  */
-public class OracleDataBase extends AbstractDataBase {
+public class OracleDataBase extends AbstractDataBase implements CacheDataBase, MetaDataBase {
 
 	private static transient Logger logger = Logger.getLogger(OracleDataBase.class);
 
+	private int varcharLength = 255;
+
 	public OracleDataBase(IDataSource dataSource) {
 		super(dataSource);
+	}
+
+	@Override
+	public int getVarcharLength() {
+		return varcharLength;
+	}
+
+	@Override
+	public void setVarcharLength(int varcharLength) {
+		this.varcharLength = varcharLength;
 	}
 
 	@Override
@@ -49,26 +64,27 @@ public class OracleDataBase extends AbstractDataBase {
 			toReturn = " INTEGER ";
 		} else if (javaTypeName.contains("java.lang.Long")) {
 			toReturn = " NUMBER ";
-		} else if (javaTypeName.contains("java.lang.BigDecimal") || javaTypeName.contains("java.math.BigDecimal")) {
+		} else if (javaTypeName.contains("java.math.BigDecimal")) {
 			toReturn = " NUMBER ";
 		} else if (javaTypeName.contains("java.lang.Double")) {
-			toReturn = " NUMBER ";
+			toReturn = " FLOAT ";
 		} else if (javaTypeName.contains("java.lang.Float")) {
-			toReturn = " NUMBER ";
+			toReturn = " REAL ";
 		} else if (javaTypeName.contains("java.lang.Boolean")) {
 			toReturn = " SMALLINT ";
-		} else if (javaTypeName.contains("java.sql.Time")) {
-			toReturn = " TIMESTAMP ";
-		} else if (javaTypeName.contains("java.sql.Date")) {
+		} else if (javaTypeName.contains("java.sql.Date") || javaTypeName.contains("java.util.Date")) {
 			toReturn = " DATE ";
 		} else if (javaTypeName.toLowerCase().contains("timestamp")) {
 			toReturn = " TIMESTAMP ";
+		} else if (javaTypeName.contains("java.sql.Time")) {
+			toReturn = " TIMESTAMP ";
 		} else if (javaTypeName.contains("[B") || javaTypeName.contains("BLOB")) {
 			toReturn = " BLOB ";
-		} else if (javaTypeName.contains("[C") || javaTypeName.contains("CLOB")) {
+		} else if (javaTypeName.contains("[C") || javaTypeName.contains("CLOB") || javaTypeName.contains("Map") || javaTypeName.contains("List")) {
 			toReturn = " CLOB ";
 		} else {
-			logger.debug("Cannot map java type [" + javaTypeName + "] to a valid database type ");
+			toReturn = " VARCHAR(4000) ";
+			logger.error("Cannot map java type [" + javaTypeName + "] to a valid database type. Set VARCHAR(4000) by default ");
 		}
 
 		return toReturn;
@@ -97,5 +113,15 @@ public class OracleDataBase extends AbstractDataBase {
 		// " group by segment_name ";
 
 		return query;
+	}
+
+	@Override
+	public String getSchema(Connection conn) throws SQLException {
+		return conn.getSchema();
+	}
+
+	@Override
+	public String getCatalog(Connection conn) throws SQLException {
+		return conn.getCatalog();
 	}
 }

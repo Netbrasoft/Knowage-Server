@@ -37,18 +37,24 @@ import it.eng.qbe.datasource.configuration.DataSetDataSourceConfiguration;
 import it.eng.qbe.datasource.configuration.FileDataSourceConfiguration;
 import it.eng.qbe.datasource.dataset.DataSetDataSource;
 import it.eng.qbe.datasource.dataset.DataSetDriver;
+import it.eng.qbe.datasource.jpa.JPADataSource;
 import it.eng.qbe.query.Query;
 import it.eng.qbe.query.TimeAggregationHandler;
 import it.eng.qbe.query.catalogue.QueryCatalogue;
 import it.eng.qbe.statement.AbstractQbeDataSet;
 import it.eng.qbe.statement.QbeDatasetFactory;
+import it.eng.qbe.utility.CustomFunctionsSingleton;
+import it.eng.qbe.utility.CustomizedFunctionsReader;
+import it.eng.spagobi.commons.bo.UserProfile;
 import it.eng.spagobi.commons.constants.SpagoBIConstants;
 import it.eng.spagobi.container.ObjectUtils;
 import it.eng.spagobi.services.dataset.bo.SpagoBiDataSet;
 import it.eng.spagobi.tools.dataset.bo.ConfigurableDataSet;
+import it.eng.spagobi.tools.dataset.bo.DatasetEvaluationStrategy;
 import it.eng.spagobi.tools.dataset.bo.IDataSet;
 import it.eng.spagobi.tools.dataset.common.datastore.IDataStore;
 import it.eng.spagobi.tools.dataset.common.datastore.IDataStoreFilter;
+import it.eng.spagobi.tools.dataset.common.iterator.DataIterator;
 import it.eng.spagobi.tools.dataset.common.metadata.IMetaData;
 import it.eng.spagobi.tools.dataset.exceptions.DataSetNotLoadedYetException;
 import it.eng.spagobi.tools.dataset.persist.IDataSetTableDescriptor;
@@ -102,19 +108,12 @@ public class QbeDataSet extends ConfigurableDataSet {
 		} catch (Exception e) {
 			logger.error("Error while defining dataset configuration.  Error: " + e.getMessage());
 		}
-		// this.setDatamarts(dataSetConfig.getDatamarts());
-		// this.setJsonQuery(dataSetConfig.getJsonQuery());
 
 		setDatasourceInternal(dataSetConfig);
 
-		// (dataSetConfig.getDataSourcePersist() != null) {
-		// IDataSource dataSourcePersist = DataSourceFactory.getDataSource( dataSetConfig.getDataSourcePersist() ) ;
-		// this.setDataSourcePersist(dataSourcePersist);
-		// }
-
 	}
-	
-	protected void setDatasourceInternal(SpagoBiDataSet dataSetConfig){
+
+	protected void setDatasourceInternal(SpagoBiDataSet dataSetConfig) {
 		IDataSource dataSource = DataSourceFactory.getDataSource(dataSetConfig.getDataSource());
 		this.setDataSource(dataSource);
 	}
@@ -125,6 +124,12 @@ public class QbeDataSet extends ConfigurableDataSet {
 
 	private void init() {
 		if (ds == null) {
+			UserProfile profile = getUserProfile();
+			if (profile != null) {
+				JSONObject jsonObj = new CustomizedFunctionsReader().getJSONCustomFunctionsVariable(profile);
+				CustomFunctionsSingleton.getInstance().setCustomizedFunctionsJSON(jsonObj);
+			}
+
 			it.eng.qbe.datasource.IDataSource qbeDataSource = getQbeDataSource();
 			QueryCatalogue catalogue = getCatalogue(jsonQuery, qbeDataSource);
 			Query query = catalogue.getFirstQuery();
@@ -156,11 +161,10 @@ public class QbeDataSet extends ConfigurableDataSet {
 		Query qbeQuery = (Query) query;
 		new TimeAggregationHandler(getQbeDataSource()).handleTimeFilters(qbeQuery);
 		Map<String, Map<String, String>> inlineFilteredSelectFields = qbeQuery.getInlineFilteredSelectFields();
-		if(inlineFilteredSelectFields != null && inlineFilteredSelectFields.size() > 0) {
+		if (inlineFilteredSelectFields != null && inlineFilteredSelectFields.size() > 0) {
 			initDs(getQbeDataSource(), qbeQuery);
 			ds.loadData(0, 0, -1);
-		}
-		else {
+		} else {
 			ds.loadData(offset, fetchSize, maxResults);
 		}
 	}
@@ -170,10 +174,9 @@ public class QbeDataSet extends ConfigurableDataSet {
 		init();
 		Query qbeQuery = (Query) query;
 		Map<String, Map<String, String>> inlineFilteredSelectFields = qbeQuery.getInlineFilteredSelectFields();
-		if(inlineFilteredSelectFields != null && inlineFilteredSelectFields.size() > 0) {
+		if (inlineFilteredSelectFields != null && inlineFilteredSelectFields.size() > 0) {
 			ds.loadData(0, 0, -1);
-		}
-		else {
+		} else {
 			ds.loadData();
 		}
 	}
@@ -191,8 +194,8 @@ public class QbeDataSet extends ConfigurableDataSet {
 		}
 
 		// keeping previous datamart retriever, if input map doesn't contain any
-		IQbeDataSetDatamartRetriever previousRetriever = this.params == null ? null : (IQbeDataSetDatamartRetriever) this.params
-				.get(SpagoBIConstants.DATAMART_RETRIEVER);
+		IQbeDataSetDatamartRetriever previousRetriever = this.params == null ? null
+				: (IQbeDataSetDatamartRetriever) this.params.get(SpagoBIConstants.DATAMART_RETRIEVER);
 		IQbeDataSetDatamartRetriever newRetriever = params == null ? null : (IQbeDataSetDatamartRetriever) params.get(SpagoBIConstants.DATAMART_RETRIEVER);
 
 		this.params = params;
@@ -215,14 +218,14 @@ public class QbeDataSet extends ConfigurableDataSet {
 		if (ds == null) {
 			throw new DataSetNotLoadedYetException();
 		}
-		
+
 		IDataStore dataStore = ds.getDataStore();
 		Query qbeQuery = (Query) query;
 		Map<String, Map<String, String>> inlineFilteredSelectFields = qbeQuery.getInlineFilteredSelectFields();
-		if(inlineFilteredSelectFields != null && inlineFilteredSelectFields.size() > 0) {
+		if (inlineFilteredSelectFields != null && inlineFilteredSelectFields.size() > 0) {
 			dataStore = new TimeAggregationHandler(getQbeDataSource()).handleTimeAggregations(qbeQuery, dataStore);
 		}
-		
+
 		return dataStore;
 	}
 
@@ -262,18 +265,6 @@ public class QbeDataSet extends ConfigurableDataSet {
 		if (getDataSource() != null) {
 			sbd.setDataSource(getDataSource().toSpagoBiDataSource());
 		}
-
-		// if (getDataSourcePersist() != null) {
-		// sbd.setDataSourcePersist(getDataSourcePersist().toSpagoBiDataSource());
-		// }
-
-		/*
-		 * next informations are already loaded in method super.toSpagoBiDataSet() through the table field configuration try{ JSONObject jsonConf = new
-		 * JSONObject(); jsonConf.put(QBE_JSON_QUERY, getJsonQuery()); jsonConf.put(QBE_DATAMARTS, getDatamarts()); sbd.setConfiguration(jsonConf.toString());
-		 * }catch (Exception e){ logger.error("Error while defining dataset configuration.  Error: " + e.getMessage()); }
-		 */
-		// sbd.setJsonQuery(getJsonQuery());
-		// sbd.setDatamarts(getDatamarts());
 
 		return sbd;
 	}
@@ -340,9 +331,6 @@ public class QbeDataSet extends ConfigurableDataSet {
 		CompositeDataSourceConfiguration compositeConfiguration = new CompositeDataSourceConfiguration();
 		compositeConfiguration.loadDataSourceProperties().putAll(dataSourceProperties);
 
-		// String resourcePath = getResourcePath();
-		// modelJarFile = new File(resourcePath+File.separator+"qbe" + File.separator + "datamarts" + File.separator +
-		// modelNames.get(0)+File.separator+"datamart.jar");
 		IQbeDataSetDatamartRetriever retriever = this.getDatamartRetriever();
 		if (retriever == null) {
 			throw new SpagoBIRuntimeException("Missing datamart retriever, cannot proceed.");
@@ -453,9 +441,6 @@ public class QbeDataSet extends ConfigurableDataSet {
 		this.useCache = useCache;
 	}
 
-	/**
-	 * TODO check this
-	 */
 	@Override
 	public IMetaData getMetadata() {
 		IMetaData metadata = null;
@@ -495,5 +480,28 @@ public class QbeDataSet extends ConfigurableDataSet {
 		return ((AbstractQbeDataSet) ds).getStatement().getDataSource();
 	}
 
-	
+	@Override
+	public DataIterator iterator() {
+		init();
+		return ds.iterator();
+	}
+
+	@Override
+	public boolean isIterable() {
+		// only underlying JPQLDataSet is iterable
+		return getQbeDataSource() instanceof JPADataSource;
+	}
+
+	@Override
+	public DatasetEvaluationStrategy getEvaluationStrategy(boolean isNearRealtime) {
+		DatasetEvaluationStrategy strategy;
+
+		if (isPersisted()) {
+			strategy = DatasetEvaluationStrategy.PERSISTED;
+		} else {
+			strategy = DatasetEvaluationStrategy.CACHED;
+		}
+
+		return strategy;
+	}
 }
