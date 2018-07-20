@@ -13,6 +13,13 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Security
 
 ## [6.1.1] - 2017-11-10
+### Added
+- [Docker](https://github.com/KnowageLabs/Knowage-Server-Docker/tree/master/6.1.1) image released
+- [Chef](https://github.com/KnowageLabs/Knowage-Server-Chef/tree/master/6.1.1) deployment script released
+
+### Fixed
+- ChartJS and D3 now works with NGSI dataset inside dashboard
+- Readthedocs typos
 
 ## [6.1.0] - 2017-10-25
 ### Added
