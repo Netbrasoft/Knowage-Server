@@ -12,6 +12,23 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Fixed
 ### Security
 
+
+## [6.2.0] - 2018-07-19
+### Added
+- new cockpit features (new selector/HTML widgets, dynamic text, chart switching and drilling, widgets cloning and others);
+- improvements on Meta designer: capability to exploit DBMS custom functions on calculated fields;
+- new options for datasets on self service section;
+- i18n support within cockpit and other user functionalities;
+- improvements on collaboration & sharing: user can easily get the direct link to an analysis or the HTML code to embed it.
+
+### Fixed
+- many bugs fixed.
+
+### Security
+- new SSO mechanism based on a JWT token, enabled in default configuration;
+- fixed some XSS vulnerabilities.
+
+
 ## [6.1.1] - 2017-11-10
 ### Added
 - [Docker](https://github.com/KnowageLabs/Knowage-Server-Docker/tree/master/6.1.1) image released
@@ -20,6 +37,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Fixed
 - ChartJS and D3 now works with NGSI dataset inside dashboard
 - Readthedocs typos
+
 
 ## [6.1.0] - 2017-10-25
 ### Added
@@ -44,6 +62,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 -	Creation of gauge chart
 - Restored correct credential for default login page
 - Other minor bug fixes
+
 
 ## 6.0.0 - 2017-06-30
 
