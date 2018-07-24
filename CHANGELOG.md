@@ -15,18 +15,18 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [6.2.0] - 2018-07-19
 ### Added
-- new cockpit features (new selector/HTML widgets, dynamic text, chart switching and drilling, widgets cloning and others);
-- improvements on Meta designer: capability to exploit DBMS custom functions on calculated fields;
-- new options for datasets on self service section;
-- i18n support within cockpit and other user functionalities;
-- improvements on collaboration & sharing: user can easily get the direct link to an analysis or the HTML code to embed it.
+- New cockpit features (new selector/HTML widgets, dynamic text, chart switching and drilling, widgets cloning and others);
+- Improvements on Meta designer: capability to exploit DBMS custom functions on calculated fields;
+- New options for datasets on self service section;
+- I18n support within cockpit and other user functionalities;
+- Improvements on collaboration & sharing: user can easily get the direct link to an analysis or the HTML code to embed it.
 
 ### Fixed
-- many bugs fixed.
+- Many bugs fixed.
 
 ### Security
-- new SSO mechanism based on a JWT token, enabled in default configuration;
-- fixed some XSS vulnerabilities.
+- New SSO mechanism based on a JWT token, enabled in default configuration;
+- Fixed some XSS vulnerabilities.
 
 
 ## [6.1.1] - 2017-11-10
