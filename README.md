@@ -5,7 +5,7 @@ The suite is composed of several modules, each one conceived for a specific anal
 
 The sub-products of the suite are:
 
-| Logo  | Name  |  Description |
+|   | Name  |  Description |
 |---|---|---|
 | <img src="http://www.knowage-suite.com/site/wp-content/uploads/2016/03/BD_txt-150x150.png" alt="BD" width="50px"/>  | Big Data  | To analyse data stored on big data clusters or NoSQL databases  |
 | <img src="http://www.knowage-suite.com/site/wp-content/uploads/2016/03/SI_txt-150x150.png" alt="SI" width="50px"/>  | Smart Intelligence | The usual business intelligence on structured data, but more oriented to self-service capabilities and agile prototyping |
