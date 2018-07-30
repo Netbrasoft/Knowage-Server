@@ -2,8 +2,7 @@
 <img src="https://www.knowage-suite.com/site/wp-content/uploads/2016/03/KNOWAGE_logo_color.png">
 </p>
 
-Knowage is the professional open source suite for modern business analytics over traditional sources and big data systems. Knowage is the new brand for SpagoBI project: this new brand marks the value of the well-known open source business intelligence suite after significant functional and technological transformations and a new offering model. 
-The suite is composed of several modules, each one conceived for a specific analytical domain. They can be used individually as complete solution for a certain task, or combined with one another to ensure full coverage of user’ requirements. 
+Knowage is the full capabilities open source suite for modern business analytics over traditional sources and big data systems. Its features, such as data federation, mash-up, data/text mining and advanced data visualization, give comprehensive support to rich and multi-source data analysis. The suite is composed of several modules, each one conceived for a specific analytical domain. They can be used individually as complete solution for a certain task, or combined with one another to ensure full coverage of user’ requirements.
 
 ## Modules available
 
@@ -13,8 +12,8 @@ The suite is composed of several modules, each one conceived for a specific anal
 | <img src="http://www.knowage-suite.com/site/wp-content/uploads/2016/03/SI_txt-150x150.png" alt="SI" width="50px"/>  | Smart Intelligence | The usual business intelligence on structured data, but more oriented to self-service capabilities and agile prototyping |
 | <img src="http://www.knowage-suite.com/site/wp-content/uploads/2016/03/ER_txt-150x150.png" alt="ER" width="50px"/>  | Enterprise Reporting | To produce and distribute static reports |
 | <img src="http://www.knowage-suite.com/site/wp-content/uploads/2016/03/LI_txt-150x150.png" alt="LI" width="50px"/>  | Location Intelligence  | To relate business data with spatial or geographical information |
-| <img src="http://www.knowage-suite.com/site/wp-content/uploads/2016/03/PM_txt-150x150.png" alt="PM" width="50px"/>  | Performance Management | To manage KPIs and organize scorecards |
-| <img src="http://www.knowage-suite.com/site/wp-content/uploads/2016/03/PA_txt-150x150.png" alt="PA" width="50px"/>  | Predictive Analysis | For more advanced analyses |
+| <img src="http://www.knowage-suite.com/site/wp-content/uploads/2016/03/PM_txt-150x150.png" alt="PM" width="50px"/>  | Performance Management | To manage KPIs and organize scorecards, to monitor your business in real-time |
+| <img src="http://www.knowage-suite.com/site/wp-content/uploads/2016/03/PA_txt-150x150.png" alt="PA" width="50px"/>  | Predictive Analysis | To perform advanced analyses for forecasting and prescriptive purposes |
 
 Knowage supports a modern vision of the data analytics, providing new self-service capabilities that give autonomy to the end-user, now able to build his own analysis and explore his own data space, also combining data that come from different sources. 
 
