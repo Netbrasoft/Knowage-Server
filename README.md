@@ -31,7 +31,7 @@ Before start to contribute, please read and sign the [Contributor License Agreem
 
 # Documentation
 
-The official documentantion is available at [Read the Docs](http://knowage-suite.readthedocs.io/)
+The official documentantion is available at [Read the Docs](http://knowage-suite.readthedocs.io/).
 
 # More
-Please visit [Knowage project website](http://www.knowage-suite.com) for information about the Enterprise Edition.
+Please visit [the project website](http://www.knowage-suite.com) for information about the Enterprise Edition.
